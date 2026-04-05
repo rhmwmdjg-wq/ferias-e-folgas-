@@ -286,6 +286,13 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  padding-bottom: calc(15px + env(safe-area-inset-bottom, 0px));
+}
+
+@media (max-width: 600px) {
+  .sidebar-footer {
+    padding-bottom: calc(var(--bottomnav-h) + 20px);
+  }
 }
 
 .sidebar-user {
@@ -1338,9 +1345,9 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <div class="status-dot">v2.1</div>
       </div>
       
-      <button class="tab-btn tab-sair-btn" onclick="sairSistema()" id="tab-sair" style="margin-top:10px; border-top:1px solid var(--border); border-radius:var(--r-sm); width:100%">
-        <i class="fa-solid fa-right-from-bracket"></i>
-        <span class="tab-label">Sair do Sistema</span>
+      <button class="tab-btn tab-sair-btn" onclick="sairSistema()" id="tab-sair" style="margin-top:10px; border-top:1px solid var(--border); border-radius:var(--r-sm); width:100%; background: rgba(255, 77, 106, 0.05);">
+        <i class="fa-solid fa-right-from-bracket" style="color:var(--danger)"></i>
+        <span class="tab-label" style="color:var(--danger); font-weight:700">Sair do Sistema</span>
       </button>
     </div>
   </aside>
