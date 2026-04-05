@@ -202,12 +202,12 @@ body::before {
 }
 
 .tab-btn {
-  padding: 10px 12px;
+  padding: 14px 16px;
   border: none;
   background: none;
   color: var(--muted);
   font-family: var(--font);
-  font-size: 0.83rem;
+  font-size: 0.88rem;
   font-weight: 500;
   cursor: pointer;
   border-radius: var(--r-sm);
@@ -239,6 +239,16 @@ body::before {
 }
 
 .tab-btn:hover:not(.active) { background:rgba(255,255,255,0.04); color:var(--text-mid); }
+
+.sidebar-section-label {
+  font-size: 0.64rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: var(--primary);
+  margin: 15px 12px 6px;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+}
 
 .tab-btn .tab-label { flex: 1; }
 
@@ -1116,14 +1126,25 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 
   /* Table horizontal scroll hint */
   .table-wrap::after {
-    content: '';
-    position: absolute; top: 0; right: 0; bottom: 0;
-    width: 24px;
-    background: linear-gradient(90deg, transparent, rgba(9,12,24,0.6));
+    content: '→';
+    position: absolute; top: 50%; right: 5px;
+    width: 24px; height: 24px;
+    background: var(--primary);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    font-size: 12px;
+    animation: bounceRight 2s infinite;
+    opacity: 0.7;
     pointer-events: none;
-    border-radius: 0 var(--r-lg) var(--r-lg) 0;
+    z-index: 10;
   }
-  .table-wrap { position: relative; }
+  @keyframes bounceRight {
+    0%, 20%, 50%, 80%, 100% {transform: translateX(0);}
+    40% {transform: translateX(-5px);}
+    60% {transform: translateX(-3px);}
+  }
+  .table-wrap { position: relative; overflow-x: auto; }
 
   /* Smaller stats on mobile */
   .stat .val { font-size: 1.8rem; }
@@ -1254,6 +1275,17 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     </div>
 
     <div class="tabs" id="sidebar-tabs">
+      <div class="sidebar-section-label" id="label-admin-section" style="display:none">Gestão Administrativa</div>
+      <button class="tab-btn" onclick="showTab('config')" id="tab-config" style="display:none">
+        <i class="fa-solid fa-gear"></i>
+        <span class="tab-label">Configurações do Sistema</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('gestores')" id="tab-gestores" style="display:none; margin-bottom:10px">
+        <i class="fa-solid fa-user-shield"></i>
+        <span class="tab-label">Gerenciar Gestores</span>
+      </button>
+
+      <div class="sidebar-section-label">Menu Principal</div>
       <button class="tab-btn active" onclick="showTab('alertas')" id="tab-alertas">
         <i class="fa-solid fa-gauge-high"></i>
         <span class="tab-label">Dashboard</span>
@@ -1263,40 +1295,34 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-users"></i>
         <span class="tab-label">Servidores</span>
       </button>
-      <button class="tab-btn" onclick="showTab('gestores')" id="tab-gestores">
-        <i class="fa-solid fa-user-shield"></i>
-        <span class="tab-label">Gestores</span>
-      </button>
       <button class="tab-btn" onclick="showTab('ferias')" id="tab-ferias">
         <i class="fa-solid fa-calendar-days"></i>
         <span class="tab-label">Programar Férias</span>
       </button>
       <button class="tab-btn" onclick="showTab('calendario')" id="tab-calendario">
         <i class="fa-solid fa-calendar-week"></i>
-        <span class="tab-label">Calendário</span>
+        <span class="tab-label">Calendário Visual</span>
       </button>
       <button class="tab-btn" onclick="showTab('folgas')" id="tab-folgas">
         <i class="fa-solid fa-umbrella-beach"></i>
-        <span class="tab-label">Folgas</span>
+        <span class="tab-label">Banco de Folgas</span>
         <span class="badge" id="badge-folgas" style="background:var(--warning);color:#000;display:none">!</span>
-      </button>
-      <button class="tab-btn" onclick="showTab('relatorio')" id="tab-relatorio">
-        <i class="fa-solid fa-chart-line"></i>
-        <span class="tab-label">Relatório</span>
-      </button>
-      <button class="tab-btn" onclick="showTab('aniversariantes')" id="tab-aniversariantes">
-        <i class="fa-solid fa-cake-candles"></i>
-        <span class="tab-label">Aniversariantes</span>
-        <span class="badge" id="badge-bday" style="background:linear-gradient(90deg,var(--warning),#ec4899)">0</span>
-      </button>
-      <button class="tab-btn" onclick="showTab('config')" id="tab-config">
-        <i class="fa-solid fa-gear"></i>
-        <span class="tab-label">Configurações</span>
       </button>
       <button class="tab-btn" onclick="showTab('solicitacoes')" id="tab-solicitacoes">
         <i class="fa-solid fa-file-signature"></i>
         <span class="tab-label">Solicitações</span>
         <span class="badge" id="badge-solic" style="background:var(--accent);display:none">0</span>
+      </button>
+      
+      <div class="sidebar-section-label">Relatórios e Consultas</div>
+      <button class="tab-btn" onclick="showTab('relatorio')" id="tab-relatorio">
+        <i class="fa-solid fa-chart-line"></i>
+        <span class="tab-label">Relatório Geral</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('aniversariantes')" id="tab-aniversariantes">
+        <i class="fa-solid fa-cake-candles"></i>
+        <span class="tab-label">Aniversariantes</span>
+        <span class="badge" id="badge-bday" style="background:linear-gradient(90deg,var(--warning),#ec4899)">0</span>
       </button>
     </div>
 
@@ -2192,18 +2218,9 @@ Coordenação de RH
       <i class="fa-solid fa-umbrella-beach"></i>
       <span>Folgas</span>
     </button>
-    <button class="bnav-btn" onclick="showTab('relatorio')" id="bnav-relatorio">
-      <i class="fa-solid fa-chart-line"></i>
-      <span>Relatório</span>
-    </button>
-    <button class="bnav-btn" onclick="showTab('aniversariantes')" id="bnav-aniversariantes">
-      <i class="fa-solid fa-cake-candles"></i>
-      <span>Aniversários</span>
-      <span class="bnav-badge" id="bnav-badge-bday" style="display:none">0</span>
-    </button>
     <button class="bnav-btn" onclick="toggleSidebar()" id="bnav-mais">
-      <i class="fa-solid fa-ellipsis"></i>
-      <span>Mais</span>
+      <i class="fa-solid fa-bars"></i>
+      <span>Menu</span>
     </button>
   </div>
 </nav>
@@ -2555,12 +2572,13 @@ async function verificarSessao() {
     const isGestor = role === 'gestor';
     
     // Controle de abas por role
-    const adminTabs = ['tab-config', 'tab-gestores'];
+    const adminTabs = ['tab-config', 'tab-gestores', 'label-admin-section'];
     const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-solicitacoes'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
       if (el) el.style.display = isAdmin ? 'flex' : 'none';
+      if (el && id === 'label-admin-section') el.style.display = isAdmin ? 'block' : 'none';
     });
     
     gestorTabs.forEach(id => {
@@ -6403,10 +6421,14 @@ window.addEventListener('resize', () => {
 const _origShowTab = window.showTab;
 window.showTab = function(tab) {
   if (_origShowTab) _origShowTab(tab);
-  // Update bottom nav
-  document.querySelectorAll('.bnav-btn').forEach(b => b.classList.remove('active'));
   const bnav = document.getElementById('bnav-' + tab);
-  if (bnav) bnav.classList.add('active');
+  if (bnav) {
+    bnav.classList.add('active');
+  } else {
+    // Se a aba não está na barra de baixo, destaca o botão "Menu"
+    const bnavMenu = document.getElementById('bnav-mais');
+    if (bnavMenu) bnavMenu.classList.add('active');
+  }
   // Close sidebar on mobile after tab select
   if (window.innerWidth <= 1024) closeSidebar();
 };
