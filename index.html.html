@@ -973,8 +973,14 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 .login-wrapper { position:relative; z-index:10; width:100%; max-width:420px; padding:20px; animation:loginIn 0.45s cubic-bezier(0.16,1,0.3,1); }
 @keyframes loginIn { from{opacity:0;transform:translateY(24px);} to{opacity:1;transform:translateY(0);} }
 .login-brand { text-align:center; margin-bottom:28px; }
-.brand-icon { display:inline-flex; align-items:center; justify-content:center; width:64px;height:64px; background:linear-gradient(135deg,var(--primary),var(--accent)); border-radius:16px; font-size:30px; margin-bottom:14px; box-shadow:0 0 0 1px rgba(77,123,255,0.3),0 8px 32px rgba(77,123,255,0.3); animation:pulseGlow 3s ease-in-out infinite; }
-@keyframes pulseGlow { 0%,100%{box-shadow:0 0 0 1px rgba(77,123,255,0.3),0 8px 32px rgba(77,123,255,0.3);} 50%{box-shadow:0 0 0 1px rgba(77,123,255,0.5),0 8px 40px rgba(77,123,255,0.5),0 0 80px rgba(77,123,255,0.18);} }
+.brand-icon { 
+  display:inline-flex; align-items:center; justify-content:center; 
+  min-width:64px; min-height:64px; 
+  width: auto; height: auto;
+  border-radius:16px; font-size:40px; margin-bottom:18px; 
+  transition: all 0.3s ease;
+}
+@keyframes pulseGlow { 0%,100%{box-shadow:0 8px 32px rgba(77,123,255,0.2);} 50%{box-shadow:0 8px 40px rgba(77,123,255,0.4),0 0 60px rgba(77,123,255,0.1);} }
 
 .login-card { 
   background: rgba(20, 25, 41, 0.6); 
@@ -1185,7 +1191,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   /* Login */
   .login-wrapper { padding: 16px; }
   .login-card { padding: 24px 20px; }
-  .brand-icon { width: 56px; height: 56px; font-size: 26px; }
+  .brand-icon { min-width: 56px; min-height: 56px; font-size: 32px; }
 
   /* Month selector wrap */
   .month-selector { gap: 4px; }
