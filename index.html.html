@@ -110,6 +110,7 @@ body::before {
   position: sticky;
   top: 0;
   height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   transition: transform var(--transition), width var(--transition);
   z-index: 500;
@@ -133,7 +134,14 @@ body::before {
 }
 .sidebar-backdrop.show { display: block; }
 
-/* Hamburger toggle button (tablet) */
+@media (max-width: 1024px) {
+  .sidebar { 
+    height: 100vh; 
+    height: 100dvh; 
+    z-index: 500;
+  }
+}
+
 .menu-toggle {
   display: none;
   background: none;
@@ -195,10 +203,12 @@ body::before {
   display: flex;
   flex-direction: column;
   gap: 1px;
-  padding: 12px 10px;
+  padding: 12px 10px 40px;
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 
 .tab-btn {
@@ -1089,8 +1099,9 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     position: fixed;
     top: 0; left: 0;
     height: 100vh;
+    height: 100dvh;
     transform: translateX(-100%);
-    z-index: 300;
+    z-index: 500;
     box-shadow: 4px 0 40px rgba(0,0,0,0.5);
   }
   .sidebar.open {
