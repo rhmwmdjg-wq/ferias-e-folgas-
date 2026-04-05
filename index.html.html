@@ -2813,6 +2813,10 @@ const DB = {
        toastMsg("Erro ao salvar servidores na nuvem: " + error.message, "error");
     }
   },
+  deleteServidor: async (id) => {
+    const { error } = await supabaseClient.from('servidores').delete().eq('id', id);
+    if (error) toastMsg("Erro ao excluir servidor na nuvem: " + error.message, "error");
+  },
 
   programacoes: () => _remoteData.programacoes.length ? _remoteData.programacoes : JSON.parse(localStorage.getItem('srv_programacoes') || '[]'),
   saveProgramacoes: async (d) => {
@@ -2823,6 +2827,10 @@ const DB = {
        console.error("Erro Supabase (programacoes):", error);
        toastMsg("Erro ao salvar programações na nuvem: " + error.message, "error");
     }
+  },
+  deleteProgramacao: async (id) => {
+    const { error } = await supabaseClient.from('programacoes').delete().eq('id', id);
+    if (error) toastMsg("Erro ao excluir programação na nuvem: " + error.message, "error");
   },
 
   config: () => {
@@ -2848,46 +2856,27 @@ const DB = {
        toastMsg("Erro ao salvar folgas na nuvem: " + error.message, "error");
     }
   },
+  deleteFolga: async (id) => {
+    const { error } = await supabaseClient.from('folgas').delete().eq('id', id);
+    if (error) toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
+  },
 
   gestores: () => {
-    // Se já sincronizamos com a nuvem pelo menos uma vez, usamos apenas a nuvem.
-    // Caso contrário (no primeiro acesso sem internet), usamos o local.
     if (_remoteData.gestores && _remoteData.gestores.length > 0) return _remoteData.gestores;
     return JSON.parse(localStorage.getItem('srv_gestores') || '[]');
   },
   saveGestores: async (d) => {
-    // Atualiza localmente primeiro
     _remoteData.gestores = d;
     localStorage.setItem('srv_gestores', JSON.stringify(d));
-    
-    try {
-      // Tenta salvar na nuvem
-      const { error } = await supabaseClient.from('gestores').upsert(d);
-      
-      if (error) {
-        console.error("DEBUG GESTORES:", error);
-        
-        // Erro específico de usuário já existente (Unique Constraint)
-        if (error.code === '23505') {
-          toastMsg("Erro: Este Usuário de Login já está sendo usado por outro gestor!", "error");
-        } 
-        // Erro de coluna ou tabela não encontrada
-        else if (error.code === '42P01') {
-          toastMsg("Erro: Tabela 'gestores' não encontrada. Verifique se rodou o comando SQL no Supabase.", "error");
-        }
-        else {
-          toastMsg("Erro no Banco: " + error.message, "error");
-        }
-        return false;
-      }
-      
-      toastMsg("Gestor salvo e sincronizado na nuvem!", "success");
-      return true;
-    } catch (e) {
-      console.error("FALHA CRÍTICA:", e);
-      toastMsg("Falha na conexão de rede ao salvar gestor.", "error");
-      return false;
+    const { error } = await supabaseClient.from('gestores').upsert(d);
+    if (error) {
+      if (error.code === '23505') toastMsg("Erro: Usuário de Login já existe!", "error");
+      else toastMsg("Erro ao salvar gestores na nuvem: " + error.message, "error");
     }
+  },
+  deleteGestor: async (id) => {
+    const { error } = await supabaseClient.from('gestores').delete().eq('id', id);
+    if (error) toastMsg("Erro ao excluir gestor na nuvem: " + error.message, "error");
   },
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
@@ -2896,6 +2885,10 @@ const DB = {
     localStorage.setItem('srv_solicitacoes', JSON.stringify(d));
     const { error } = await supabaseClient.from('solicitacoes').upsert(d);
     if (error) toastMsg("Erro ao salvar solicitações: " + error.message, "error");
+  },
+  deleteSolicitacao: async (id) => {
+    const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
+    if (error) toastMsg("Erro ao excluir solicitação na nuvem: " + error.message, "error");
   }
 };
 
@@ -3147,10 +3140,17 @@ function renderGestores() {
 
 async function excluirGestor(id) {
   if (!confirm('Deseja realmente excluir este gestor?')) return;
+  
+  // 1. Apaga do Supabase
+  await DB.deleteGestor(id);
+
+  // 2. Apaga localmente
   const lista = DB.gestores().filter(g => g.id !== id);
-  await DB.saveGestores(lista);
+  _remoteData.gestores = lista;
+  localStorage.setItem('srv_gestores', JSON.stringify(lista));
+
   renderGestores();
-  toastMsg('Gestor removido.');
+  toastMsg('Gestor removido permanentemente.');
 }
 
 function limparFormGestor() {
@@ -3391,32 +3391,37 @@ function alterarMinhaSenha() {
 async function excluirServidor(id) {
   if (!confirm('Excluir este servidor? TODAS as férias, folgas e registros ligados a ele também serão apagados.')) return;
   
-  // 1. Apaga o servidor
+  // 1. Apaga do Supabase (Cascata Manual)
+  await DB.deleteServidor(id);
+  // Deletar dependentes no Supabase
+  await supabaseClient.from('programacoes').delete().eq('srvId', id);
+  await supabaseClient.from('folgas').delete().eq('srvId', id);
+  await supabaseClient.from('solicitacoes').delete().eq('srvId', id);
+
+  // 2. Apaga localmente
   const servidoresNovos = DB.servidores().filter(s => s.id !== id);
-  await DB.saveServidores(servidoresNovos);
+  _remoteData.servidores = servidoresNovos;
+  localStorage.setItem('srv_servidores', JSON.stringify(servidoresNovos));
   
-  // 2. Apaga férias ligadas a ele (Cascata)
   const progsNovas = DB.programacoes().filter(p => p.srvId !== id);
-  await DB.saveProgramacoes(progsNovas);
+  _remoteData.programacoes = progsNovas;
+  localStorage.setItem('srv_programacoes', JSON.stringify(progsNovas));
   
-  // 3. Apaga folgas ligadas a ele (Cascata)
-  if (typeof DB.folgas === 'function') {
-    const folgasNovas = DB.folgas().filter(f => f.srvId !== id);
-    await DB.saveFolgas(folgasNovas);
-  }
+  const folgasNovas = DB.folgas().filter(f => f.srvId !== id);
+  _remoteData.folgas = folgasNovas;
+  localStorage.setItem('srv_folgas', JSON.stringify(folgasNovas));
 
-  // 4. Apaga solicitações ligadas a ele (Cascata)
-  if (typeof DB.solicitacoes === 'function') {
-    const solicNovas = DB.solicitacoes().filter(s => s.srvId !== id);
-    await DB.saveSolicitacoes(solicNovas);
-  }
+  const solicNovas = DB.solicitacoes().filter(s => s.srvId !== id);
+  _remoteData.solicitacoes = solicNovas;
+  localStorage.setItem('srv_solicitacoes', JSON.stringify(solicNovas));
 
-  // 5. Atualiza TODAS as telas
+  // 3. Atualiza TODAS as telas
   renderTabela();
   renderAlertas();
   renderAniversariantes();
+  renderDashboard();
   atualizarBadge();
-  toastMsg('Servidor e todos os seus registros foram excluídos.');
+  toastMsg('Servidor e registros vinculados excluídos permanentemente!');
 }
 
 // ===================== FOTO DE PERFIL =====================
@@ -3616,11 +3621,20 @@ function renderProgramacoes() {
 
 async function excluirProg(id) {
   if (!confirm('Excluir esta programação?')) return;
-  await DB.saveProgramacoes(DB.programacoes().filter(p => p.id !== id));
+  
+  // 1. Apaga do Supabase
+  await DB.deleteProgramacao(id);
+
+  // 2. Apaga localmente
+  const novaLista = DB.programacoes().filter(p => p.id !== id);
+  _remoteData.programacoes = novaLista;
+  localStorage.setItem('srv_programacoes', JSON.stringify(novaLista));
+
   renderProgramacoes();
   renderAlertas(); // Atualiza contadores do Dashboard
+  renderDashboard();
   atualizarBadge();
-  toastMsg('Programação excluída.');
+  toastMsg('Programação excluída permanentemente.');
 }
 
 // ===================== EDITAR PROGRAMAÇÃO =====================
@@ -4006,11 +4020,19 @@ function renderRelatorio() {
 
 async function excluirProgRel(id) {
   if (!confirm('Excluir esta programação?')) return;
+  
+  // 1. Apaga do Supabase
+  await DB.deleteProgramacao(id);
+
+  // 2. Apaga localmente
   const lista = DB.programacoes().filter(p => p.id !== id);
-  await DB.saveProgramacoes(lista);
+  _remoteData.programacoes = lista;
+  localStorage.setItem('srv_programacoes', JSON.stringify(lista));
+
   renderRelatorio();
   renderDashboard();
   atualizarBadge();
+  toastMsg('Programação excluída permanentemente.');
 }
 
 // ===================== SALDO POR SERVIDOR (RELATÓRIO) =====================
@@ -6127,11 +6149,20 @@ function renderHistoricoFolgas() {
 
 async function excluirFolga(id) {
   if (!confirm('Excluir este lançamento de folga?')) return;
-  await DB.saveFolgas(DB.folgas().filter(f => f.id !== id));
+
+  // 1. Apaga do Supabase
+  await DB.deleteFolga(id);
+
+  // 2. Apaga localmente
+  const novaLista = DB.folgas().filter(f => f.id !== id);
+  _remoteData.folgas = novaLista;
+  localStorage.setItem('srv_folgas', JSON.stringify(novaLista));
+
   renderHistoricoFolgas();
   atualizarSaldoDisplay();
   atualizarBadgeFolgas();
-  toastMsg('Lançamento excluído.');
+  renderDashboard();
+  toastMsg('Lançamento excluído permanentemente.');
 }
 
 function atualizarBadgeFolgas() {
