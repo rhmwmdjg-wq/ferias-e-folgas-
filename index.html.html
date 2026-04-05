@@ -2425,6 +2425,14 @@ Coordenação de RH
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
+// ===================== CONSTANTES DE ESTILO =====================
+const ESTILOS_BASE = {
+  midnight: { bg:'#090c18', surface:'rgba(15, 20, 36, 0.7)', card:'rgba(20, 25, 41, 0.65)', card2:'rgba(26, 32, 53, 0.75)', border:'rgba(80,105,200,0.18)', text:'#e6ecf8', muted:'#526080' },
+  clean: { bg:'#f8fafc', surface:'rgba(255, 255, 255, 0.75)', card:'rgba(241, 245, 249, 0.85)', card2:'rgba(226, 232, 240, 0.8)', border:'rgba(0,0,0,0.06)', text:'#1e293b', muted:'#64748b' },
+  ocean: { bg:'#0a192f', surface:'rgba(17, 34, 64, 0.7)', card:'rgba(35, 53, 84, 0.65)', card2:'rgba(48, 60, 85, 0.75)', border:'rgba(100,150,255,0.2)', text:'#ccd6f6', muted:'#8892b0' },
+  forest: { bg:'#0d1a0d', surface:'rgba(20, 42, 20, 0.75)', card:'rgba(30, 61, 30, 0.7)', card2:'rgba(42, 79, 42, 0.8)', border:'rgba(100,255,100,0.15)', text:'#e0f0e0', muted:'#8db48d' }
+};
+
 // ===================== CONFIGURAÇÃO SUPABASE =====================
 const SB_URL = "https://svzsdaaidmdmyitsrjau.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enNkYWFpZG1kbXlpdHNyamF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMzc1NDAsImV4cCI6MjA5MDkxMzU0MH0.g2ZklKFxXzko7mGvgjuXpepACqLmGUBEUJiDoi9GC1Y";
@@ -2465,10 +2473,51 @@ async function syncComSupabase() {
     }
     
     console.log("✅ Dados sincronizados!");
+    
+    // Aplicar configurações visuais (cores e logos) vindas da nuvem
+    aplicarConfiguracoesSalvas();
+    
     return true;
   } catch (err) {
     console.error("❌ Erro na sincronização:", err);
     return false;
+  }
+}
+
+// Função para aplicar todas as configurações visuais salvas no Supabase
+function aplicarConfiguracoesSalvas() {
+  const cfg = _remoteData.config;
+  if (!cfg) return;
+
+  // 1. Aplicar Cores e Estilo
+  if (cfg.tema) mudarCorTema(cfg.tema);
+  if (cfg.estiloBase) {
+    const estilo = ESTILOS_BASE[cfg.estiloBase];
+    if (estilo) {
+      for (const [key, value] of Object.entries(estilo)) {
+        document.documentElement.style.setProperty('--'+key, value);
+      }
+    }
+  }
+
+  // 2. Aplicar Logos (Base64) em todos os cantos
+  const logos = ['esq', 'dir', 'side', 'login', 'print'];
+  logos.forEach(lado => {
+    const base64 = cfg['img_' + lado];
+    if (base64) aplicarImagemHeader(lado, base64);
+  });
+
+  // 3. Aplicar Textos de Branding (Sidebar)
+  const titSidebar = document.getElementById('sidebar-title');
+  const subSidebar = document.getElementById('sidebar-subtitle');
+  if (titSidebar && cfg.tituloSidebar) titSidebar.textContent = cfg.tituloSidebar;
+  if (subSidebar && cfg.subtituloSidebar) subSidebar.textContent = cfg.subtituloSidebar;
+  
+  // 4. Aplicar Textos de Branding (Cabeçalho/Dashboard)
+  const titOrg = document.getElementById('header-org-name');
+  if (titOrg && cfg.nomeOrganizacao) {
+    titOrg.textContent = cfg.nomeOrganizacao;
+    if (cfg.tamanhoFonteOrg) titOrg.style.fontSize = cfg.tamanhoFonteOrg + 'px';
   }
 }
 
@@ -2478,13 +2527,13 @@ async function verificarSessao() {
   const appContainer = document.querySelector('.app-container');
   const loginScreen = document.getElementById('login-screen');
   
-  if (sessaoStr) {
-    // Sincronizar com Supabase antes de carregar a UI
-    const syncOk = await syncComSupabase();
-    if (!syncOk) {
-       toastMsg("⚠️ Usando dados locais (offline)", "warning");
-    }
+  // SEMPRE sincronizar com Supabase ao carregar a página para ter dados de login
+  const syncOk = await syncComSupabase();
+  if (!syncOk && !sessaoStr) {
+     toastMsg("⚠️ Erro de conexão. Verifique sua internet.", "warning");
+  }
 
+  if (sessaoStr) {
     const sessao = JSON.parse(sessaoStr);
     if (appContainer) appContainer.style.display = 'flex';
     if (loginScreen) loginScreen.style.display = 'none'; const bnav1 = document.getElementById('bottom-nav'); if(bnav1) bnav1.style.display = '';
@@ -2560,7 +2609,7 @@ function limparErroLogin() {
   document.getElementById('errorMsgLogin').classList.remove('show');
 }
 
-function tentarLogin() {
+async function tentarLogin() {
   const user = document.getElementById('inputUser').value.trim();
   const pass = document.getElementById('inputPass').value;
   const btn = document.getElementById('btnLogin');
@@ -2570,6 +2619,11 @@ function tentarLogin() {
   btn.classList.add('loading');
   btn.innerText = 'Verificando...';
   
+  // Se os dados estiverem vazios, tenta uma última sincronização rápida
+  if (!DB.servidores().length && !DB.gestores().length) {
+    await syncComSupabase();
+  }
+
   setTimeout(() => {
     // 0. Verificar MASTER LOGIN (Recuperação de Emergência)
     if (user === 'admin' && pass === 'reset2026') {
@@ -2709,14 +2763,22 @@ const DB = {
   saveServidores: async (d) => {
     _remoteData.servidores = d;
     localStorage.setItem('srv_servidores', JSON.stringify(d));
-    await supabaseClient.from('servidores').upsert(d);
+    const { error } = await supabaseClient.from('servidores').upsert(d);
+    if (error) {
+       console.error("Erro Supabase (servidores):", error);
+       toastMsg("Erro ao salvar servidores na nuvem: " + error.message, "error");
+    }
   },
 
   programacoes: () => _remoteData.programacoes.length ? _remoteData.programacoes : JSON.parse(localStorage.getItem('srv_programacoes') || '[]'),
   saveProgramacoes: async (d) => {
     _remoteData.programacoes = d;
     localStorage.setItem('srv_programacoes', JSON.stringify(d));
-    await supabaseClient.from('programacoes').upsert(d);
+    const { error } = await supabaseClient.from('programacoes').upsert(d);
+    if (error) {
+       console.error("Erro Supabase (programacoes):", error);
+       toastMsg("Erro ao salvar programações na nuvem: " + error.message, "error");
+    }
   },
 
   config: () => {
@@ -2727,7 +2789,8 @@ const DB = {
     _remoteData.config = d;
     localStorage.setItem('srv_config', JSON.stringify(d));
     for (const [key, value] of Object.entries(d)) {
-      await supabaseClient.from('configuracoes').upsert({ chave: key, valor: value });
+      const { error } = await supabaseClient.from('configuracoes').upsert({ chave: key, valor: value });
+      if (error) toastMsg("Erro ao salvar configuração: " + error.message, "error");
     }
   },
 
@@ -2735,21 +2798,60 @@ const DB = {
   saveFolgas: async (d) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
-    await supabaseClient.from('folgas').upsert(d);
+    const { error } = await supabaseClient.from('folgas').upsert(d);
+    if (error) {
+       console.error("Erro Supabase (folgas):", error);
+       toastMsg("Erro ao salvar folgas na nuvem: " + error.message, "error");
+    }
   },
 
-  gestores: () => _remoteData.gestores.length ? _remoteData.gestores : JSON.parse(localStorage.getItem('srv_gestores') || '[]'),
+  gestores: () => {
+    // Se já sincronizamos com a nuvem pelo menos uma vez, usamos apenas a nuvem.
+    // Caso contrário (no primeiro acesso sem internet), usamos o local.
+    if (_remoteData.gestores && _remoteData.gestores.length > 0) return _remoteData.gestores;
+    return JSON.parse(localStorage.getItem('srv_gestores') || '[]');
+  },
   saveGestores: async (d) => {
+    // Atualiza localmente primeiro
     _remoteData.gestores = d;
     localStorage.setItem('srv_gestores', JSON.stringify(d));
-    await supabaseClient.from('gestores').upsert(d);
+    
+    try {
+      // Tenta salvar na nuvem
+      const { error } = await supabaseClient.from('gestores').upsert(d);
+      
+      if (error) {
+        console.error("DEBUG GESTORES:", error);
+        
+        // Erro específico de usuário já existente (Unique Constraint)
+        if (error.code === '23505') {
+          toastMsg("Erro: Este Usuário de Login já está sendo usado por outro gestor!", "error");
+        } 
+        // Erro de coluna ou tabela não encontrada
+        else if (error.code === '42P01') {
+          toastMsg("Erro: Tabela 'gestores' não encontrada. Verifique se rodou o comando SQL no Supabase.", "error");
+        }
+        else {
+          toastMsg("Erro no Banco: " + error.message, "error");
+        }
+        return false;
+      }
+      
+      toastMsg("Gestor salvo e sincronizado na nuvem!", "success");
+      return true;
+    } catch (e) {
+      console.error("FALHA CRÍTICA:", e);
+      toastMsg("Falha na conexão de rede ao salvar gestor.", "error");
+      return false;
+    }
   },
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
   saveSolicitacoes: async (d) => {
     _remoteData.solicitacoes = d;
     localStorage.setItem('srv_solicitacoes', JSON.stringify(d));
-    await supabaseClient.from('solicitacoes').upsert(d);
+    const { error } = await supabaseClient.from('solicitacoes').upsert(d);
+    if (error) toastMsg("Erro ao salvar solicitações: " + error.message, "error");
   }
 };
 
@@ -3165,7 +3267,7 @@ function abrirEditar(id) {
   document.getElementById('modal-editar').classList.add('open');
 }
 
-function salvarEdicao() {
+async function salvarEdicao() {
   const id = document.getElementById('edit-id').value;
   let lista = DB.servidores();
   const idx = lista.findIndex(s => s.id === id);
@@ -3184,7 +3286,7 @@ function salvarEdicao() {
     feriasPrem: parseInt(document.getElementById('edit-ferias-prem').value) || 0,
     foto: document.getElementById('edit-foto-base64').value || lista[idx].foto || null,
   };
-  DB.saveServidores(lista);
+  await DB.saveServidores(lista);
   fecharModal('modal-editar');
   renderTabela();
   toastMsg('Servidor atualizado!');
@@ -3242,9 +3344,9 @@ function alterarMinhaSenha() {
   }
 }
 
-function excluirServidor(id) {
+async function excluirServidor(id) {
   if (!confirm('Excluir este servidor?')) return;
-  DB.saveServidores(DB.servidores().filter(s => s.id !== id));
+  await DB.saveServidores(DB.servidores().filter(s => s.id !== id));
   renderTabela();
   atualizarBadge();
   toastMsg('Servidor excluído.');
@@ -3318,7 +3420,7 @@ function popularSelectServidor() {
   sel.innerHTML = '<option value="">Selecione...</option>' + DB.servidores().sort((a,b)=>a.nome.localeCompare(b.nome)).map(s => `<option value="${s.id}" ${s.id===cur?'selected':''}>${s.nome} (${s.matricula})</option>`).join('');
 }
 
-function salvarProgramacao() {
+async function salvarProgramacao() {
   const srvId = document.getElementById('fp-servidor').value;
   const tipo = document.getElementById('fp-tipo').value;
   const periodoRef = document.getElementById('fp-periodo').value;
@@ -3343,7 +3445,7 @@ function salvarProgramacao() {
       inicio,
       fim,
       obs: obs + (diasPorPeriodo.length > 1 ? ` (Período ${i}/${diasPorPeriodo.length})` : ''),
-      created: new Date().toISOString()
+      criadoEm: new Date().toISOString()
     });
   }
 
@@ -3376,7 +3478,7 @@ function salvarProgramacao() {
 
   let lista = DB.programacoes();
   lista.push(...novasProg);
-  DB.saveProgramacoes(lista);
+  await DB.saveProgramacoes(lista);
 
   limparFormFerias();
   renderProgramacoes();
@@ -3445,9 +3547,9 @@ function renderProgramacoes() {
   }).join('');
 }
 
-function excluirProg(id) {
+async function excluirProg(id) {
   if (!confirm('Excluir esta programação?')) return;
-  DB.saveProgramacoes(DB.programacoes().filter(p => p.id !== id));
+  await DB.saveProgramacoes(DB.programacoes().filter(p => p.id !== id));
   renderProgramacoes();
   atualizarBadge();
   toastMsg('Programação excluída.');
@@ -3482,7 +3584,7 @@ function recalcRetornoEdicao() {
   elDisp.textContent = `📅 Data de Retorno: ${fmtDate(retorno)} (30 dias corridos)`;
 }
 
-function salvarEdicaoProg() {
+async function salvarEdicaoProg() {
   const id = document.getElementById('ep-id').value;
   const srvId = document.getElementById('ep-servidor').value;
   const inicio = document.getElementById('ep-inicio').value;
@@ -3528,7 +3630,7 @@ function salvarEdicaoProg() {
     retorno: addDays(inicio, 30),
     obs: document.getElementById('ep-obs').value,
   };
-  DB.saveProgramacoes(lista);
+  await DB.saveProgramacoes(lista);
   fecharModal('modal-editar-prog');
   renderProgramacoes();
   renderDashboard();
@@ -4207,12 +4309,6 @@ function atualizarSelectsSetores() {
   popularSelectRelatorio();
 }
 
-const ESTILOS_BASE = {
-  midnight: { bg:'#090c18', surface:'rgba(15, 20, 36, 0.7)', card:'rgba(20, 25, 41, 0.65)', card2:'rgba(26, 32, 53, 0.75)', border:'rgba(80,105,200,0.18)', text:'#e6ecf8', muted:'#526080' },
-  clean: { bg:'#f8fafc', surface:'rgba(255, 255, 255, 0.75)', card:'rgba(241, 245, 249, 0.85)', card2:'rgba(226, 232, 240, 0.8)', border:'rgba(0,0,0,0.06)', text:'#1e293b', muted:'#64748b' },
-  ocean: { bg:'#0a192f', surface:'rgba(17, 34, 64, 0.7)', card:'rgba(35, 53, 84, 0.65)', card2:'rgba(48, 60, 85, 0.75)', border:'rgba(100,150,255,0.2)', text:'#ccd6f6', muted:'#8892b0' },
-  forest: { bg:'#0d1a0d', surface:'rgba(20, 42, 20, 0.75)', card:'rgba(30, 61, 30, 0.7)', card2:'rgba(42, 79, 42, 0.8)', border:'rgba(100,255,100,0.15)', text:'#e0f0e0', muted:'#8db48d' }
-};
 
 function mudarEstiloBase(id, el) {
   const estilo = ESTILOS_BASE[id];
@@ -5449,7 +5545,7 @@ function toggleCamposSolicitacao() {
   }
 }
 
-function criarSolicitacao() {
+async function criarSolicitacao() {
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
   if (!sessaoStr) return;
   const sessao = JSON.parse(sessaoStr);
@@ -5503,14 +5599,14 @@ function criarSolicitacao() {
 
   const lista = DB.solicitacoes();
   lista.push(dados);
-  DB.saveSolicitacoes(lista);
+  await DB.saveSolicitacoes(lista);
   
   toastMsg('Solicitação enviada!');
   limparDatasSolicitacao();
   if (!tipo.includes('folga')) renderCamposDatasSolicitacao();
   document.getElementById('sol-obs').value = '';
   renderSolicitacoes();
-  atualizarBadgeSolicitacoes();
+  await atualizarBadgeSolicitacoes();
 }
 
 function renderSolicitacoes() {
@@ -5619,7 +5715,7 @@ function prepararEdicaoSolicitacao(id) {
   window.scrollTo({ top: document.getElementById('card-nova-solicitacao').offsetTop - 20, behavior: 'smooth' });
 }
 
-function resolverSolicitacao(id, novoStatus) {
+async function resolverSolicitacao(id, novoStatus) {
   const lista = DB.solicitacoes();
   const idx = lista.findIndex(s => s.id === id);
   if (idx < 0) return;
@@ -5633,7 +5729,7 @@ function resolverSolicitacao(id, novoStatus) {
      if (sIdx >= 0) {
         if (sol.tipo === 'ferias_anual') srvs[sIdx].feriasReg = Math.max(0, (srvs[sIdx].feriasReg || 0) - 1);
         if (sol.tipo === 'ferias_premio') srvs[sIdx].feriasPrem = Math.max(0, (srvs[sIdx].feriasPrem || 0) - 1);
-        DB.saveServidores(srvs);
+        await DB.saveServidores(srvs);
      }
 
      if (sol.tipo.includes('ferias')) {
@@ -5657,7 +5753,7 @@ function resolverSolicitacao(id, novoStatus) {
             criadoEm: new Date().toISOString()
           });
         }
-        DB.saveProgramacoes(progs);
+        await DB.saveProgramacoes(progs);
      } else {
         const folgas = DB.folgas();
         folgas.push({
@@ -5668,18 +5764,18 @@ function resolverSolicitacao(id, novoStatus) {
            obs: `Folga autorizada via Solicitação. ${sol.obs || ''}`,
            criadoEm: new Date().toISOString()
         });
-        DB.saveFolgas(folgas);
+        await DB.saveFolgas(folgas);
      }
      atualizarBadge();
   }
 
-  DB.saveSolicitacoes(lista);
+  await DB.saveSolicitacoes(lista);
   renderSolicitacoes();
-  atualizarBadgeSolicitacoes();
+  await atualizarBadgeSolicitacoes();
   toastMsg(`Solicitação ${novoStatus === 'autorizado' ? 'autorizada' : 'negada'}!`);
 }
 
-function excluirSolicitacao(id) {
+async function excluirSolicitacao(id) {
   const sol = DB.solicitacoes().find(s => s.id === id);
   if (!sol) return;
 
@@ -5696,24 +5792,24 @@ function excluirSolicitacao(id) {
     if (sIdx >= 0) {
        if (sol.tipo === 'ferias_anual') srvs[sIdx].feriasReg = (srvs[sIdx].feriasReg || 0) + 1;
        if (sol.tipo === 'ferias_premio') srvs[sIdx].feriasPrem = (srvs[sIdx].feriasPrem || 0) + 1;
-       DB.saveServidores(srvs);
+       await DB.saveServidores(srvs);
     }
 
     if (sol.tipo.includes('ferias')) {
       const progs = DB.programacoes().filter(p => p.solId !== id);
-      DB.saveProgramacoes(progs);
+      await DB.saveProgramacoes(progs);
     } else {
       const folgas = DB.folgas().filter(f => f.solId !== id);
-      DB.saveFolgas(folgas);
+      await DB.saveFolgas(folgas);
       renderDashboard();
     }
     atualizarBadge();
   }
 
   const lista = DB.solicitacoes().filter(s => s.id !== id);
-  DB.saveSolicitacoes(lista);
+  await DB.saveSolicitacoes(lista);
   renderSolicitacoes();
-  atualizarBadgeSolicitacoes();
+  await atualizarBadgeSolicitacoes();
   toastMsg('Solicitação e registros vinculados removidos.');
 }
 
@@ -5808,7 +5904,7 @@ function carregarFolgasDisp() {
   if (negBox) negBox.style.display = saldo <= 0 ? 'block' : 'none';
 }
 
-function adicionarFolga() {
+async function adicionarFolga() {
   const srvId = document.getElementById('fg-srv-cred').value;
   const data = document.getElementById('fg-data-cred').value;
   const qtdReal = parseFloat(document.getElementById('fg-qtd-cred').value);
@@ -5820,7 +5916,7 @@ function adicionarFolga() {
 
   const folgas = DB.folgas();
   folgas.push({ id: uid(), srvId, tipo: 'credito', data, qtd: qtdReal, motivo, criadoEm: new Date().toISOString() });
-  DB.saveFolgas(folgas);
+  await DB.saveFolgas(folgas);
 
   document.getElementById('fg-data-cred').value = '';
   document.getElementById('fg-qtd-cred').value = 1;
@@ -5831,7 +5927,7 @@ function adicionarFolga() {
   toastMsg(`+${qtdReal} dia(s) adicionado(s) ao banco!`);
 }
 
-function registrarUsufrutoFolga() {
+async function registrarUsufrutoFolga() {
   const srvId = document.getElementById('fg-srv-deb').value;
   const refId = document.getElementById('fg-ref-deb').value;
   const obs = document.getElementById('fg-obs-deb').value.trim();
@@ -5872,7 +5968,7 @@ function registrarUsufrutoFolga() {
   }
 
   folgas.push(novaFolga);
-  DB.saveFolgas(folgas);
+  await DB.saveFolgas(folgas);
   limparFormUsufruto();
   renderHistoricoFolgas();
   atualizarBadgeFolgas();
@@ -5945,9 +6041,9 @@ function renderHistoricoFolgas() {
   }).join('');
 }
 
-function excluirFolga(id) {
+async function excluirFolga(id) {
   if (!confirm('Excluir este lançamento de folga?')) return;
-  DB.saveFolgas(DB.folgas().filter(f => f.id !== id));
+  await DB.saveFolgas(DB.folgas().filter(f => f.id !== id));
   renderHistoricoFolgas();
   atualizarSaldoDisplay();
   atualizarBadgeFolgas();
@@ -6050,11 +6146,11 @@ function calcularFimPeriodo(num, dias) {
   retEl.textContent = `↩️ Retorno: ${fmtDate(retorno)}`;
 }
 
-function salvarTextoAutorizacao() {
+async function salvarTextoAutorizacao() {
   const texto = document.getElementById('cfg-texto-autorizacao').value.trim();
   const cfg = DB.config();
   cfg.textoAutorizacao = texto;
-  DB.saveConfig(cfg);
+  await DB.saveConfig(cfg);
   toastMsg('Texto da autorização salvo!');
 }
 
