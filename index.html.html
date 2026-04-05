@@ -3383,11 +3383,34 @@ function alterarMinhaSenha() {
 }
 
 async function excluirServidor(id) {
-  if (!confirm('Excluir este servidor?')) return;
-  await DB.saveServidores(DB.servidores().filter(s => s.id !== id));
+  if (!confirm('Excluir este servidor? TODAS as férias, folgas e registros ligados a ele também serão apagados.')) return;
+  
+  // 1. Apaga o servidor
+  const servidoresNovos = DB.servidores().filter(s => s.id !== id);
+  await DB.saveServidores(servidoresNovos);
+  
+  // 2. Apaga férias ligadas a ele (Cascata)
+  const progsNovas = DB.programacoes().filter(p => p.srvId !== id);
+  await DB.saveProgramacoes(progsNovas);
+  
+  // 3. Apaga folgas ligadas a ele (Cascata)
+  if (typeof DB.folgas === 'function') {
+    const folgasNovas = DB.folgas().filter(f => f.srvId !== id);
+    await DB.saveFolgas(folgasNovas);
+  }
+
+  // 4. Apaga solicitações ligadas a ele (Cascata)
+  if (typeof DB.solicitacoes === 'function') {
+    const solicNovas = DB.solicitacoes().filter(s => s.srvId !== id);
+    await DB.saveSolicitacoes(solicNovas);
+  }
+
+  // 5. Atualiza TODAS as telas
   renderTabela();
+  renderAlertas();
+  renderAniversariantes();
   atualizarBadge();
-  toastMsg('Servidor excluído.');
+  toastMsg('Servidor e todos os seus registros foram excluídos.');
 }
 
 // ===================== FOTO DE PERFIL =====================
@@ -3589,6 +3612,7 @@ async function excluirProg(id) {
   if (!confirm('Excluir esta programação?')) return;
   await DB.saveProgramacoes(DB.programacoes().filter(p => p.id !== id));
   renderProgramacoes();
+  renderAlertas(); // Atualiza contadores do Dashboard
   atualizarBadge();
   toastMsg('Programação excluída.');
 }
@@ -3728,6 +3752,9 @@ function renderDashboard() {
   
   renderResumoAlertas();
   renderAlertas();
+  
+  const statTotal = document.getElementById('stat-total');
+  if (statTotal) statTotal.textContent = servidores.length;
 }
 
 function renderChart(canvasId, type, labels, data, label, key, color) {
@@ -4569,7 +4596,9 @@ function renderAniversariantes() {
   document.getElementById('badge-bday').textContent = anivMesReal.length;
 
   // Lista filtrada pelo mês selecionado, ordenada por dia
-  const lista = servidores
+  // IMPORTANTE: Filtrar servidores que podem ter sido deletados do banco recentemente
+  const servidoresValidos = DB.servidores();
+  const lista = servidoresValidos
     .filter(s => {
       const [,, m] = s.nascimento.match(/(\d{4})-(\d{2})-(\d{2})/) || [];
       return parseInt(m) - 1 === mesAtual;
@@ -4607,16 +4636,27 @@ function renderAniversariantes() {
         <p>📋 Mat. ${s.matricula}</p>
         <p>📍 ${s.setor || '-'} · ${s.cargo || '-'}</p>
         <p>🎂 ${dia} de ${meses[mesAtual]} · ${idade} anos</p>
-        ${isHoje ? `
-          <div style="display:flex;align-items:center;gap:10px;margin-top:6px">
-            <span class="bday-today-badge">🎉 Aniversário HOJE!</span>
-            ${s.telefone ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsAppAniversario('${s.id}')" style="padding:4px 10px;font-size:11px">💬 WhatsApp</button>` : ''}
-          </div>
-        ` : ''}
+        <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+          ${isHoje ? '<span class="bday-today-badge">🎉 Aniversário HOJE!</span>' : ''}
+          ${s.telefone ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsAppAniversario('${s.id}')" style="padding:4px 10px;font-size:11px">💬 WhatsApp</button>` : ''}
+        </div>
       </div>
       <div class="bday-day">dia ${dia}</div>
     </div>`;
   }).join('');
+}
+
+function prepararWhatsAppAniversario(id) {
+  const s = DB.servidores().find(srv => srv.id === id);
+  if (!s || !s.telefone) return toastMsg('Servidor sem telefone cadastrado!', 'warning');
+  
+  const nomeCurto = s.nome.split(' ')[0];
+  const msg = `Olá, ${nomeCurto}! 🎉🎂\n\nNós do RH/APS passamos para desejar um Feliz Aniversário! Que seu dia seja repleto de alegrias, saúde e realizações.\n\nParabéns! 🎈🎊`;
+  
+  document.getElementById('wa-msg').value = msg;
+  document.getElementById('wa-tel').value = s.telefone.replace(/\D/g,'');
+  const modal = document.getElementById('modal-whatsapp');
+  if (modal) modal.classList.add('open');
 }
 
 // ===================== BACKUP =====================
