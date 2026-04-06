@@ -1,0 +1,18 @@
+{
+  "name": "Férias & Folgas - Gestão",
+  "short_name": "Férias Gestão",
+  "description": "Sistema moderno de gestão de férias e banco de folgas.",
+  "start_url": "index.html.html",
+  "display": "standalone",
+  "background_color": "#090c18",
+  "theme_color": "#5b7fff",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
