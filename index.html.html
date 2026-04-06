@@ -2595,29 +2595,54 @@ async function migrarFotosLegado() {
   if (servidores.length === 0) return;
 
   console.log(`🚀 Iniciando migração de ${servidores.length} fotos para o Storage...`);
-  toastMsg(`Migrando ${servidores.length} fotos para nuvem...`, 'info');
+  
+  let sucessos = 0;
+  let erros = 0;
+  let erroMsg = '';
 
   for (const srv of servidores) {
-    const url = await uploadImagemParaStorage(srv.foto, srv.matricula);
-    if (url) {
-      // Atualizar no banco de dados
-      const { error } = await supabaseClient
-        .from('servidores')
-        .update({ foto: url })
-        .eq('id', srv.id);
+    try {
+      console.log(`⏳ Migrando: ${srv.nome}...`);
+      const url = await uploadImagemParaStorage(srv.foto, srv.matricula);
       
-      if (!error) {
-        srv.foto = url; // Atualiza cache local
-        console.log(`✅ Foto de ${srv.nome} migrada.`);
+      if (url) {
+        console.log(`🔗 URL Gerada para ${srv.nome}: ${url}`);
+        
+        // Atualizar no banco de dados (Supabase)
+        const { error } = await supabaseClient
+          .from('servidores')
+          .update({ foto: url })
+          .eq('id', srv.id);
+        
+        if (!error) {
+          srv.foto = url;
+          sucessos++;
+          toastMsg(`✅ Migrado: ${srv.nome}`, 'success');
+        } else {
+          erros++;
+          console.error(`❌ Erro DB para ${srv.nome}:`, error.message);
+        }
+      } else {
+        erros++;
+        console.error(`❌ Falha no upload Storage para ${srv.nome}`);
       }
+    } catch (e) {
+      erros++;
+      console.error(`❌ Exceção na migração de ${srv.nome}:`, e.message);
     }
-    // Pequena pausa para evitar rate limit
-    await new Promise(r => setTimeout(r, 500));
+    // Pausa curta para não sobrecarregar
+    await new Promise(r => setTimeout(r, 600));
   }
   
-  localStorage.setItem('srv_servidores', JSON.stringify(_remoteData.servidores));
-  renderTabela();
-  toastMsg('Migração de fotos concluída!', 'success');
+  if (sucessos > 0) {
+    localStorage.setItem('srv_servidores', JSON.stringify(_remoteData.servidores));
+    renderTabela();
+    toastMsg(`Sucesso: ${sucessos} fotos migradas!`, 'success');
+  }
+
+  if (erros > 0) {
+    toastMsg(`Erro em ${erros} fotos: ${erroMsg}`, 'error');
+  }
 }
 
 // Cache local para manter compatibilidade com funções síncronas do sistema
@@ -3364,42 +3389,54 @@ async function salvarServidor() {
   const matricula = document.getElementById('f-matricula').value.trim();
   if (!nome || !matricula) return toastMsg('Nome e Matrícula são obrigatórios!', 'error');
   
-  const servidores = DB.servidores();
-  if (servidores.find(s => s.matricula === matricula)) return toastMsg('Matrícula já cadastrada!', 'error');
+  const btn = event?.target?.closest('button') || document.querySelector('#panel-servidores .btn-primary');
+  const originalText = btn ? btn.innerHTML : 'Salvar';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
 
-  const senhaAuto = Math.floor(100000 + Math.random() * 900000).toString();
-  
-  // Upload da Foto para Storage (se houver)
-  let fotoUrl = null;
-  const fotoBase64 = document.getElementById('f-foto-base64').value;
-  if (fotoBase64) {
-    toastMsg('Enviando foto...', 'info');
-    fotoUrl = await uploadImagemParaStorage(fotoBase64, matricula);
+  try {
+    const servidores = DB.servidores();
+    if (servidores.find(s => s.matricula === matricula)) {
+      if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+      return toastMsg('Matrícula já cadastrada!', 'error');
+    }
+
+    const senhaAuto = Math.floor(100000 + Math.random() * 900000).toString();
+    
+    // Upload da Foto para Storage (se houver)
+    let fotoUrl = null;
+    const fotoBase64 = document.getElementById('f-foto-base64').value;
+    if (fotoBase64) {
+      fotoUrl = await uploadImagemParaStorage(fotoBase64, matricula);
+    }
+
+    const servidor = {
+      id: uid(),
+      nome, matricula,
+      senha: senhaAuto,
+      nascimento: document.getElementById('f-nascimento').value,
+      admissao: document.getElementById('f-admissao').value,
+      setor: document.getElementById('f-setor').value.trim(),
+      cargo: document.getElementById('f-cargo').value.trim(),
+      telefone: document.getElementById('f-telefone').value.replace(/\D/g,''),
+      feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
+      feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
+      cpf: document.getElementById('f-cpf').value.trim(),
+      pis: document.getElementById('f-pis').value.trim(),
+      foto: fotoUrl,
+    };
+    servidores.push(servidor);
+    await DB.saveServidores(servidores);
+    limparFormServidor();
+    renderTabela();
+    atualizarBadge();
+    
+    alert(`Servidor cadastrado!\n\nID de Acesso: ${matricula}\nSenha Inicial: ${senhaAuto}\n\nInforme estes dados ao servidor.`);
+  } catch (err) {
+    console.error(err);
+    toastMsg("Erro ao salvar servidor: " + err.message, "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
   }
-
-  const servidor = {
-    id: uid(),
-    nome, matricula,
-    senha: senhaAuto, // Senha inicial gerada
-    nascimento: document.getElementById('f-nascimento').value,
-    admissao: document.getElementById('f-admissao').value,
-    setor: document.getElementById('f-setor').value.trim(),
-    cargo: document.getElementById('f-cargo').value.trim(),
-    telefone: document.getElementById('f-telefone').value.replace(/\D/g,''),
-    feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
-    feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
-    cpf: document.getElementById('f-cpf').value.trim(),
-    pis: document.getElementById('f-pis').value.trim(),
-    foto: fotoUrl,
-  };
-  servidores.push(servidor);
-  await DB.saveServidores(servidores);
-  limparFormServidor();
-  renderTabela();
-  atualizarBadge();
-  
-  // Alerta com a senha gerada
-  alert(`Servidor cadastrado!\n\nID de Acesso: ${matricula}\nSenha Inicial: ${senhaAuto}\n\nInforme estes dados ao servidor.`);
 }
 
 function limparFormServidor() {
@@ -3526,34 +3563,44 @@ async function salvarEdicao() {
   const idx = lista.findIndex(s => s.id === id);
   if (idx < 0) return;
 
-  // Se trocar a foto (houver novo Base64 no input), faz o upload
-  const fotoBase64 = document.getElementById('edit-foto-base64').value;
-  let fotoFinal = lista[idx].foto;
+  const btn = event?.target?.closest('button') || document.querySelector('#modal-editar .btn-primary');
+  const originalText = btn ? btn.innerHTML : 'Salvar';
+  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...'; }
 
-  if (fotoBase64 && fotoBase64.startsWith('data:image')) {
-    toastMsg('Atualizando foto...', 'info');
-    const novaUrl = await uploadImagemParaStorage(fotoBase64, lista[idx].matricula);
-    if (novaUrl) fotoFinal = novaUrl;
+  try {
+    // Se trocar a foto (houver novo Base64 no input), faz o upload
+    const fotoBase64 = document.getElementById('edit-foto-base64').value;
+    let fotoFinal = lista[idx].foto;
+
+    if (fotoBase64 && fotoBase64.startsWith('data:image')) {
+      const novaUrl = await uploadImagemParaStorage(fotoBase64, lista[idx].matricula);
+      if (novaUrl) fotoFinal = novaUrl;
+    }
+
+    lista[idx] = { ...lista[idx],
+      matricula: document.getElementById('edit-matricula').value,
+      nome: document.getElementById('edit-nome').value,
+      nascimento: document.getElementById('edit-nascimento').value,
+      admissao: document.getElementById('edit-admissao').value,
+      setor: document.getElementById('edit-setor').value,
+      cargo: document.getElementById('edit-cargo').value,
+      telefone: document.getElementById('edit-telefone').value.replace(/\D/g,''),
+      cpf: document.getElementById('edit-cpf').value.trim(),
+      pis: document.getElementById('edit-pis').value.trim(),
+      feriasReg: parseInt(document.getElementById('edit-ferias-reg').value) || 0,
+      feriasPrem: parseInt(document.getElementById('edit-ferias-prem').value) || 0,
+      foto: fotoFinal,
+    };
+    await DB.saveServidores(lista);
+    fecharModal('modal-editar');
+    renderTabela();
+    toastMsg('Servidor atualizado!');
+  } catch (err) {
+    console.error(err);
+    toastMsg("Erro ao atualizar: " + err.message, "error");
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
   }
-
-  lista[idx] = { ...lista[idx],
-    matricula: document.getElementById('edit-matricula').value,
-    nome: document.getElementById('edit-nome').value,
-    nascimento: document.getElementById('edit-nascimento').value,
-    admissao: document.getElementById('edit-admissao').value,
-    setor: document.getElementById('edit-setor').value,
-    cargo: document.getElementById('edit-cargo').value,
-    telefone: document.getElementById('edit-telefone').value.replace(/\D/g,''),
-    cpf: document.getElementById('edit-cpf').value.trim(),
-    pis: document.getElementById('edit-pis').value.trim(),
-    feriasReg: parseInt(document.getElementById('edit-ferias-reg').value) || 0,
-    feriasPrem: parseInt(document.getElementById('edit-ferias-prem').value) || 0,
-    foto: fotoFinal,
-  };
-  await DB.saveServidores(lista);
-  fecharModal('modal-editar');
-  renderTabela();
-  toastMsg('Servidor atualizado!');
 }
 
 function resetarSenhaServidor() {
