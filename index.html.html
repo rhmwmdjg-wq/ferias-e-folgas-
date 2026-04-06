@@ -2523,26 +2523,31 @@ const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
  * Mantém a proporção fazendo um "crop" central se necessário.
  */
 function redimensionarImagem(base64, targetSize = 400) {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const img = new Image();
+    img.onerror = () => reject(new Error("Erro ao carregar imagem para redimensionar."));
     img.onload = () => {
-      const canvas = document.createElement('canvas');
-      canvas.width = targetSize;
-      canvas.height = targetSize;
-      const ctx = canvas.getContext('2d');
+      try {
+        const canvas = document.createElement('canvas');
+        canvas.width = targetSize;
+        canvas.height = targetSize;
+        const ctx = canvas.getContext('2d');
 
-      // Calcular dimensões para crop central
-      let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
-      if (img.width > img.height) {
-        srcW = img.height;
-        srcX = (img.width - img.height) / 2;
-      } else {
-        srcH = img.width;
-        srcY = (img.height - img.width) / 2;
+        // Calcular dimensões para crop central
+        let srcX = 0, srcY = 0, srcW = img.width, srcH = img.height;
+        if (img.width > img.height) {
+          srcW = img.height;
+          srcX = (img.width - img.height) / 2;
+        } else {
+          srcH = img.width;
+          srcY = (img.height - img.width) / 2;
+        }
+
+        ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetSize, targetSize);
+        resolve(canvas.toDataURL('image/jpeg', 0.8));
+      } catch (e) {
+        reject(e);
       }
-
-      ctx.drawImage(img, srcX, srcY, srcW, srcH, 0, 0, targetSize, targetSize);
-      resolve(canvas.toDataURL('image/jpeg', 0.8)); // Salva em JPG 80% qualidade
     };
     img.src = base64;
   });
@@ -2572,20 +2577,37 @@ async function uploadImagemParaStorage(base64, matricula) {
     const fileName = `foto_${matricula}_${Date.now()}.jpg`;
     const filePath = `servidores/${fileName}`;
 
-    const { data, error } = await supabaseClient.storage
-      .from('FOTOS')
+    // Tentar primeiro com FOTOS (maiúsculo)
+    let bucketName = 'FOTOS';
+    let { data, error } = await supabaseClient.storage
+      .from(bucketName)
       .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
 
-    if (error) throw error;
+    // Se falhar por balde não encontrado, tenta fotos (minúsculo)
+    if (error && (error.message?.includes('not found') || error.status === 404)) {
+      bucketName = 'fotos';
+      const retry = await supabaseClient.storage
+        .from(bucketName)
+        .upload(filePath, blob, { contentType: 'image/jpeg', upsert: true });
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      console.error("❌ Erro Supabase Storage:", error);
+      toastMsg(`Erro no Storage: ${error.message || 'Verifique as Políticas'}`, 'error');
+      return null;
+    }
 
     // Retornar a URL pública
     const { data: { publicUrl } } = supabaseClient.storage
-      .from('FOTOS')
+      .from(bucketName)
       .getPublicUrl(filePath);
 
     return publicUrl;
   } catch (err) {
     console.error("❌ Erro no upload:", err);
+    toastMsg("Erro ao processar imagem: " + err.message, 'error');
     return null;
   }
 }
