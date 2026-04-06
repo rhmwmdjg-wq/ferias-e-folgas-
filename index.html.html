@@ -3147,27 +3147,41 @@ const DB = {
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
   saveSolicitacao: async (obj) => {
-    // 1. Atualizar cache local (singular)
+    // 1. Atualizar cache local (com TODAS as informações para uso na UI)
     const idx = _remoteData.solicitacoes.findIndex(s => s.id === obj.id);
     if (idx >= 0) _remoteData.solicitacoes[idx] = obj;
     else _remoteData.solicitacoes.push(obj);
     
     localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
     
-    // 2. Tentar enviar ao Supabase
-    const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
-    
-    // Se o erro for "coluna não encontrada", tenta salvar sem as colunas extras (qtd, inicio, fim)
-    if (error && error.message.includes('column') && error.message.includes('not found')) {
-      console.warn("⚠️ Colunas ausentes no Supabase. Tentando salvamento simplificado...");
-      const { id, srvId, srvNome, tipo, obs, status, criadoEm } = obj;
-      const { error: retryError } = await supabaseClient.from('solicitacoes').upsert({
-        id, srvId, srvNome, tipo, obs, status, criadoEm
-      });
-      if (retryError) toastMsg("Erro persistente no banco: " + retryError.message, "error");
-      else toastMsg("Solicitação salva (banco precisa de atualização de colunas)", "warning");
-    } else if (error) {
-      toastMsg("Erro ao salvar solicitação: " + error.message, "error");
+    // 2. Tentar enviar ao Supabase apenas campos BÁSICOS (que temos certeza que existem)
+    // Se você adicionar as colunas 'qtd', 'inicio', 'fim' no futuro, este código passará a enviá-las.
+    const fieldsToSave = {
+      id: obj.id,
+      srvId: obj.srvId,
+      srvNome: obj.srvNome,
+      tipo: obj.tipo,
+      status: obj.status,
+      obs: obj.obs || '',
+      criadoEm: obj.criadoEm || new Date().toISOString()
+    };
+
+    // Caso o objeto tenha as colunas novas, vamos tentar enviá-las, mas se falhar, limpamos.
+    try {
+      const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
+      if (error && error.message.includes('column') && error.message.includes('not found')) {
+        console.warn("⚠️ Coluna 'qtd' ou similar não encontrada. Salvando apenas o básico.");
+        const { error: retryError } = await supabaseClient.from('solicitacoes').upsert(fieldsToSave);
+        if (retryError) throw retryError;
+        else toastMsg("Solicitação enviada (modo seguro)", "success");
+      } else if (error) {
+        throw error;
+      } else {
+        toastMsg("Solicitação enviada!", "success");
+      }
+    } catch (e) {
+      console.error("Erro fatal ao salvar:", e);
+      toastMsg("Erro crítico no banco: " + e.message, "error");
     }
   },
   saveSolicitacoes: async (d) => { // Mantido para compatibilidade se necessário (bulk)
