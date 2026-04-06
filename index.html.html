@@ -6030,14 +6030,18 @@ async function criarSolicitacao() {
   }
 
   // Salvar apenas a nova solicitação
-  await DB.saveSolicitacao(dados);
-  
-  toastMsg('Solicitação enviada!');
-  limparDatasSolicitacao();
-  if (!tipo.includes('folga')) renderCamposDatasSolicitacao();
-  document.getElementById('sol-obs').value = '';
-  renderSolicitacoes();
-  await atualizarBadgeSolicitacoes();
+  try {
+    await DB.saveSolicitacao(dados);
+    toastMsg('Solicitação enviada!');
+    limparDatasSolicitacao();
+    if (!tipo.includes('folga')) renderCamposDatasSolicitacao();
+    document.getElementById('sol-obs').value = '';
+    renderSolicitacoes();
+    await atualizarBadgeSolicitacoes();
+  } catch (e) {
+     console.error("Erro ao salvar:", e);
+     toastMsg("Erro ao salvar: verifique se as colunas 'qtd', 'inicio' e 'fim' existem na tabela 'solicitacoes'.", "error");
+  }
 }
 
 function renderSolicitacoes() {
