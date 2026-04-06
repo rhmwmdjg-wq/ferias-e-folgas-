@@ -3198,6 +3198,12 @@ const DB = {
   }
 };
 
+// Helper global para obter imagens (Prioridade: Nuvem > Local)
+const getImg = (lado) => {
+  const cfg = DB.config();
+  return cfg['img_' + lado] || localStorage.getItem('srv_img_' + lado);
+};
+
 function uid() { return Math.random().toString(36).substr(2, 9); }
 
 let editId = null;
@@ -5368,7 +5374,7 @@ function imprimirRelatorio(tipo) {
     <table class="doc-header">
       <tr>
         <td class="cell-logo">
-          ${localStorage.getItem('srv_img_print') ? `<img src="${localStorage.getItem('srv_img_print')}" style="max-height:80px;max-width:100%;object-fit:contain;display:block;margin:0 auto;">` : '<div style="font-weight:800;font-size:16px;color:#1a1a2e;">RH</div>'}
+          ${getImg('print') ? `<img src="${getImg('print')}" style="max-height:80px;max-width:100%;object-fit:contain;display:block;margin:0 auto;">` : '<div style="font-weight:800;font-size:16px;color:#1a1a2e;">RH</div>'}
         </td>
         <td class="cell-title">
           <div class="org-name">${DB.config().nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde'}</div>
@@ -5397,7 +5403,7 @@ function imprimirRelatorioIndividual(srvId, tipo) {
   const win = window.open('', '_blank');
   const folgas = DB.folgas().filter(f => f.srvId === srvId).sort((a,b) => new Date(b.data) - new Date(a.data));
   const hoje = new Date();
-  const imgPrint = localStorage.getItem('srv_img_print');
+  const imgPrint = getImg('print');
   
   const headCSS = `
     <style>
@@ -5510,7 +5516,7 @@ function imprimirComprovanteFolga(folgaId) {
 
   const win = window.open('', '_blank');
   const hoje = new Date();
-  const imgPrint = localStorage.getItem('srv_img_print');
+  const imgPrint = getImg('print');
 
   const fullHTML = `
     <!DOCTYPE html>
@@ -5768,9 +5774,9 @@ async function realizarBackup() {
       versao: '1.0', exportadoEm: new Date().toISOString(),
       servidores: DB.servidores(), programacoes: DB.programacoes(),
       folgas: DB.folgas(), config: DB.config(),
-      img_esq: localStorage.getItem('srv_img_esq') || null,
-      img_dir: localStorage.getItem('srv_img_dir') || null,
-      img_print: localStorage.getItem('srv_img_print') || null
+      img_esq: getImg('esq') || null,
+      img_dir: getImg('dir') || null,
+      img_print: getImg('print') || null
     };
     const writable = await backupFileHandle.createWritable();
     await writable.write(JSON.stringify(dados, null, 2));
@@ -5797,9 +5803,9 @@ function exportarBackup() {
     versao: '1.0', exportadoEm: new Date().toISOString(),
     servidores: DB.servidores(), programacoes: DB.programacoes(),
     folgas: DB.folgas(), config: DB.config(),
-    img_esq: localStorage.getItem('srv_img_esq') || null,
-    img_dir: localStorage.getItem('srv_img_dir') || null,
-    img_print: localStorage.getItem('srv_img_print') || null
+    img_esq: getImg('esq') || null,
+    img_dir: getImg('dir') || null,
+    img_print: getImg('print') || null
   };
   const json = JSON.stringify(dados, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
@@ -5865,10 +5871,10 @@ function initApp() {
   atualizarBadge();
   atualizarBadgeSolicitacoes();
   renderAniversariantes();
-  aplicarImagemHeader('esq', localStorage.getItem('srv_img_esq'));
-  aplicarImagemHeader('dir', localStorage.getItem('srv_img_dir'));
-  aplicarImagemHeader('side', localStorage.getItem('srv_img_side'));
-  aplicarImagemHeader('login', localStorage.getItem('srv_img_login'));
+  aplicarImagemHeader('esq', getImg('esq'));
+  aplicarImagemHeader('dir', getImg('dir'));
+  aplicarImagemHeader('side', getImg('side'));
+  aplicarImagemHeader('login', getImg('login'));
   inicializarBackupAutomatico();
   aplicarCorSalva();
   initFlatpickrFolga();
@@ -6676,7 +6682,7 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
   const win = window.open('', '_blank');
   const hoje = new Date();
   const cfg = DB.config();
-  const imgPrint = localStorage.getItem('srv_img_print');
+  const imgPrint = getImg('print');
   const coordNome = cfg.coordenadorAPS || '';
 
   const tipoParc = periodos.length === 1 ? 'Integral (30 dias)' : periodos.length === 2 ? '2 períodos de 15 dias' : '3 períodos de 10 dias';
