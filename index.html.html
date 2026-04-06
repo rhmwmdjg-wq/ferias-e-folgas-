@@ -1675,7 +1675,8 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   </div>
 
   <div class="card" style="margin-bottom:24px">
-    <h3><span class="icon">👤</span> Novo Gestor</h3>
+    <h3><span class="icon">👤</span> <span id="g-form-title">Novo Gestor</span></h3>
+    <input type="hidden" id="g-id">
     <div class="form-row cols-3">
       <div class="field"><label>Nome do Gestor *</label><input id="g-nome" type="text" placeholder="Nome Completo"></div>
       <div class="field"><label>Usuário de Login *</label><input id="g-usuario" type="text" placeholder="Ex: gestoraps"></div>
@@ -3417,6 +3418,7 @@ function popularSetoresGestor() {
 }
 
 async function salvarGestor() {
+  const id = document.getElementById('g-id').value;
   const nome = document.getElementById('g-nome').value.trim();
   const usuario = document.getElementById('g-usuario').value.trim();
   const senha = document.getElementById('g-senha').value.trim();
@@ -3428,16 +3430,47 @@ async function salvarGestor() {
   }
 
   const gestores = DB.gestores();
-  if (gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase())) {
+  
+  // Se for novo, verifica se usuário já existe
+  if (!id && gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase())) {
      return toastMsg('Este usuário de login já existe!', 'error');
+  } else if (id && gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase() && g.id !== id)) {
+     return toastMsg('Este usuário de login já está em uso por outro gestor!', 'error');
   }
 
-  gestores.push({ id: uid(), nome, usuario, senha, setores });
+  if (id) {
+    const idx = gestores.findIndex(g => g.id === id);
+    if (idx >= 0) {
+      gestores[idx] = { ...gestores[idx], nome, usuario, senha, setores };
+    }
+  } else {
+    gestores.push({ id: uid(), nome, usuario, senha, setores });
+  }
+
   await DB.saveGestores(gestores);
   
   limparFormGestor();
   renderGestores();
-  toastMsg('Gestor cadastrado com sucesso!');
+  toastMsg(id ? 'Gestor atualizado com sucesso!' : 'Gestor cadastrado com sucesso!');
+}
+
+function abrirEditarGestor(id) {
+  const gestores = DB.gestores();
+  const g = gestores.find(x => x.id === id);
+  if (!g) return;
+
+  document.getElementById('g-id').value = g.id;
+  document.getElementById('g-nome').value = g.nome;
+  document.getElementById('g-usuario').value = g.usuario;
+  document.getElementById('g-senha').value = g.senha;
+  document.getElementById('g-form-title').textContent = 'Editar Gestor';
+  
+  // Marcar setores
+  document.querySelectorAll('input[name="g-setor"]').forEach(c => {
+    c.checked = g.setores.includes(c.value);
+  });
+  
+  window.scrollTo({ top: document.getElementById('panel-gestores').offsetTop - 20, behavior: 'smooth' });
 }
 
 function renderGestores() {
@@ -3456,7 +3489,8 @@ function renderGestores() {
       <td><span class="tag tag-blue">${g.usuario}</span></td>
       <td>${g.setores.map(s => `<span class="tag tag-purple" style="margin-right:4px">${s}</span>`).join('')}</td>
       <td>
-        <button class="btn btn-danger btn-sm" onclick="excluirGestor('${g.id}')">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditarGestor('${g.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-danger btn-sm" onclick="excluirGestor('${g.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
       </td>
     </tr>
   `).join('');
@@ -3478,6 +3512,8 @@ async function excluirGestor(id) {
 }
 
 function limparFormGestor() {
+  document.getElementById('g-id').value = '';
+  document.getElementById('g-form-title').textContent = 'Novo Gestor';
   ['g-nome','g-usuario','g-senha'].forEach(id => document.getElementById(id).value = '');
   document.querySelectorAll('input[name="g-setor"]').forEach(c => c.checked = false);
 }
