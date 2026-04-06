@@ -3147,16 +3147,14 @@ const DB = {
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
   saveSolicitacao: async (obj) => {
-    // 1. Atualizar cache local (com TODAS as informações para uso na UI)
+    // 1. Atualizar cache local (sempre funciona)
     const idx = _remoteData.solicitacoes.findIndex(s => s.id === obj.id);
     if (idx >= 0) _remoteData.solicitacoes[idx] = obj;
     else _remoteData.solicitacoes.push(obj);
-    
     localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
     
-    // 2. Tentar enviar ao Supabase apenas campos BÁSICOS (que temos certeza que existem)
-    // Se você adicionar as colunas 'qtd', 'inicio', 'fim' no futuro, este código passará a enviá-las.
-    const fieldsToSave = {
+    // 2. Tentar enviar ao Supabase
+    const fieldsToSaveSafe = {
       id: obj.id,
       srvId: obj.srvId,
       srvNome: obj.srvNome,
@@ -3166,33 +3164,35 @@ const DB = {
       criadoEm: obj.criadoEm || new Date().toISOString()
     };
 
-    // Caso o objeto tenha as colunas novas, vamos tentar enviá-las, mas se falhar, limpamos.
     try {
+      // Tenta salvar o objeto completo primeiro
       const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
-      if (error && error.message.includes('column') && error.message.includes('not found')) {
-        console.warn("⚠️ Coluna 'qtd' ou similar não encontrada. Salvando apenas o básico.");
-        const { error: retryError } = await supabaseClient.from('solicitacoes').upsert(fieldsToSave);
-        if (retryError) throw retryError;
-        else toastMsg("Solicitação enviada (modo seguro)", "success");
-      } else if (error) {
+      
+      if (error) {
+        // Se o erro for coluna não encontrada, tenta o modo seguro (só campos básicos)
+        if (error.message.includes('column') && error.message.includes('not found')) {
+          console.warn("⚠️ Colunas extras (qtd/inicio/fim) não encontradas em 'solicitacoes'. Usando modo seguro.");
+          const { error: retryError } = await supabaseClient.from('solicitacoes').upsert(fieldsToSaveSafe);
+          if (retryError) throw retryError;
+          return { success: true, mode: 'safe' };
+        }
         throw error;
-      } else {
-        toastMsg("Solicitação enviada!", "success");
       }
+      return { success: true, mode: 'full' };
     } catch (e) {
-      console.error("Erro fatal ao salvar:", e);
-      toastMsg("Erro crítico no banco: " + e.message, "error");
+      console.error("❌ Erro ao salvar solicitação:", e);
+      throw e; // Lança para ser capturado pela UI
     }
   },
-  saveSolicitacoes: async (d) => { // Mantido para compatibilidade se necessário (bulk)
+  saveSolicitacoes: async (d) => { // Bulk save (raro uso)
     _remoteData.solicitacoes = d;
     localStorage.setItem('srv_solicitacoes', JSON.stringify(d));
     const { error } = await supabaseClient.from('solicitacoes').upsert(d);
-     if (error) toastMsg("Erro ao salvar solicitações: " + error.message, "error");
+    if (error) throw error;
   },
   deleteSolicitacao: async (id) => {
     const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
-    if (error) toastMsg("Erro ao excluir solicitação na nuvem: " + error.message, "error");
+    if (error) throw error;
   }
 };
 
@@ -6055,18 +6055,29 @@ async function criarSolicitacao() {
     dados.parcelamento = solTipoPeriodo === 1 ? 'Integral' : (solTipoPeriodo === 2 ? '15/15' : '10/10/10');
   }
 
-  // Salvar apenas a nova solicitação
+  // Salvar solicitação
   try {
-    await DB.saveSolicitacao(dados);
-    toastMsg('Solicitação enviada!');
+    const result = await DB.saveSolicitacao(dados);
+    
+    if (result && result.mode === 'safe') {
+      toastMsg('Solicitação enviada (Modo de Compatibilidade)', 'warning');
+    } else {
+      toastMsg('Solicitação enviada com sucesso!', 'success');
+    }
+    
     limparDatasSolicitacao();
     if (!tipo.includes('folga')) renderCamposDatasSolicitacao();
     document.getElementById('sol-obs').value = '';
     renderSolicitacoes();
     await atualizarBadgeSolicitacoes();
   } catch (e) {
-     console.error("Erro ao salvar:", e);
-     toastMsg("Erro ao salvar: verifique se as colunas 'qtd', 'inicio' e 'fim' existem na tabela 'solicitacoes'.", "error");
+     console.error("❌ Erro ao criar solicitação:", e);
+     const msg = e.message || 'Erro desconhecido';
+     if (msg.includes('column')) {
+        toastMsg("Erro no banco: As colunas 'qtd', 'inicio' e 'fim' parecem faltar na tabela 'solicitacoes'. Use o modo offline ou atualize o banco.", "error");
+     } else {
+        toastMsg("Erro ao salvar solicitação: " + msg, "error");
+     }
   }
 }
 
