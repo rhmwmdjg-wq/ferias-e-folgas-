@@ -3146,11 +3146,23 @@ const DB = {
   },
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
-  saveSolicitacoes: async (d) => {
+  saveSolicitacao: async (obj) => {
+    // 1. Atualizar cache local (singular)
+    const idx = _remoteData.solicitacoes.findIndex(s => s.id === obj.id);
+    if (idx >= 0) _remoteData.solicitacoes[idx] = obj;
+    else _remoteData.solicitacoes.push(obj);
+    
+    localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
+    
+    // 2. Enviar apenas ESTE registro ao Supabase (evita erro de permissão em outros)
+    const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
+    if (error) toastMsg("Erro ao salvar solicitação: " + error.message, "error");
+  },
+  saveSolicitacoes: async (d) => { // Mantido para compatibilidade se necessário (bulk)
     _remoteData.solicitacoes = d;
     localStorage.setItem('srv_solicitacoes', JSON.stringify(d));
     const { error } = await supabaseClient.from('solicitacoes').upsert(d);
-    if (error) toastMsg("Erro ao salvar solicitações: " + error.message, "error");
+     if (error) toastMsg("Erro ao salvar solicitações: " + error.message, "error");
   },
   deleteSolicitacao: async (id) => {
     const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
@@ -6017,9 +6029,8 @@ async function criarSolicitacao() {
     dados.parcelamento = solTipoPeriodo === 1 ? 'Integral' : (solTipoPeriodo === 2 ? '15/15' : '10/10/10');
   }
 
-  const lista = DB.solicitacoes();
-  lista.push(dados);
-  await DB.saveSolicitacoes(lista);
+  // Salvar apenas a nova solicitação
+  await DB.saveSolicitacao(dados);
   
   toastMsg('Solicitação enviada!');
   limparDatasSolicitacao();
@@ -6189,7 +6200,8 @@ async function resolverSolicitacao(id, novoStatus) {
      atualizarBadge();
   }
 
-  await DB.saveSolicitacoes(lista);
+  // Atualizar apenas esta solicitação
+  await DB.saveSolicitacao(sol);
   renderSolicitacoes();
   await atualizarBadgeSolicitacoes();
   toastMsg(`Solicitação ${novoStatus === 'autorizado' ? 'autorizada' : 'negada'}!`);
@@ -6226,8 +6238,9 @@ async function excluirSolicitacao(id) {
     atualizarBadge();
   }
 
-  const lista = DB.solicitacoes().filter(s => s.id !== id);
-  await DB.saveSolicitacoes(lista);
+  _remoteData.solicitacoes = _remoteData.solicitacoes.filter(s => s.id !== id);
+  localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
+  await DB.deleteSolicitacao(id);
   renderSolicitacoes();
   await atualizarBadgeSolicitacoes();
   toastMsg('Solicitação e registros vinculados removidos.');
