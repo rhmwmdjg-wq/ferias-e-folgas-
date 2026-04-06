@@ -1207,6 +1207,42 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   .card:hover    { border-color: var(--border) !important; }
   .bday-card:hover { transform: none !important; }
   .alert-card:hover { transform: none !important; }
+
+/* ================================================================
+   SKELETON LOADERS (Shimmer Effect)
+================================================================ */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-sm);
+}
+
+.skeleton::after {
+  content: "";
+  position: absolute;
+  top: 0; right: 0; bottom: 0; left: 0;
+  transform: translateX(-100%);
+  background-image: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0,
+    rgba(255, 255, 255, 0.03) 20%,
+    rgba(255, 255, 255, 0.06) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 1.5s infinite;
+}
+
+@keyframes shimmer {
+  100% { transform: translateX(100%); }
+}
+
+.skeleton-text { height: 12px; margin-bottom: 8px; width: 100%; }
+.skeleton-text.short { width: 40%; }
+.skeleton-text.mid { width: 70%; }
+.skeleton-circle { width: 40px; height: 40px; border-radius: 50%; }
+.skeleton-rect { height: 150px; width: 100%; }
+
 }
 </style>
 </head>
@@ -2482,6 +2518,57 @@ const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJ
 const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
 // Cache local para manter compatibilidade com funções síncronas do sistema
+/* ===================== SKELETON LOADERS ===================== */
+function mostrarSkeletonsDashboard() {
+  const stats = ['stat-count-anual', 'stat-count-premium', 'stat-total'];
+  stats.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = '<div class="skeleton skeleton-text" style="height:32px; width:60px; margin:0 auto"></div>';
+  });
+
+  const charts = ['chart-ferias-mes', 'chart-setores', 'chart-folgas-saldo'];
+  charts.forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      el.style.display = 'none';
+      if (!el.parentElement.querySelector('.loader-temp')) {
+        const skeleton = document.createElement('div');
+        skeleton.className = 'skeleton skeleton-rect loader-temp';
+        skeleton.style.height = '250px';
+        el.parentElement.appendChild(skeleton);
+      }
+    }
+  });
+
+  const alertas = document.getElementById('dashboard-alertas-resumo');
+  if (alertas) {
+    alertas.innerHTML = Array(3).fill(0).map(() => `
+      <div style="margin-bottom:10px; padding:10px; background:var(--surface); border-radius:8px">
+        <div class="skeleton skeleton-text mid"></div>
+        <div class="skeleton skeleton-text" style="width:40%"></div>
+      </div>
+    `).join('');
+  }
+}
+
+function mostrarSkeletonsTabela(tbodyId, cols = 8) {
+  const tbody = document.getElementById(tbodyId);
+  if (!tbody) return;
+  tbody.innerHTML = Array(5).fill(0).map(() => `
+    <tr>
+      ${Array(cols).fill(0).map(() => `<td><div class="skeleton skeleton-text"></div></td>`).join('')}
+    </tr>
+  `).join('');
+}
+
+function removerSkeletonsCharts() {
+  document.querySelectorAll('.loader-temp').forEach(el => el.remove());
+  ['chart-ferias-mes', 'chart-setores', 'chart-folgas-saldo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'block';
+  });
+}
+
 let _remoteData = {
   servidores: [],
   programacoes: [],
@@ -2493,6 +2580,14 @@ let _remoteData = {
 
 async function syncComSupabase() {
   console.log("🔄 Sincronizando com Supabase...");
+  
+  // Ativar Skeletons se estiver logado e na área principal
+  if (sessionStorage.getItem('ferias_sessao')) {
+    mostrarSkeletonsDashboard();
+    mostrarSkeletonsTabela('tbody-servidores', 11);
+    mostrarSkeletonsTabela('tbody-relatorio', 9);
+  }
+
   try {
     const [srv, prog, fol, sol, gst, cfg] = await Promise.all([
       supabaseClient.from('servidores').select('*'),
@@ -3724,6 +3819,7 @@ async function salvarEdicaoProg() {
 let dashboardCharts = { ferias: null, setores: null, folgas: null };
 
 function renderDashboard() {
+  removerSkeletonsCharts();
   const servidores = getServidoresAcessiveis();
   const programacoes = getProgramacoesAcessiveis();
   const folgas = getFolgasAcessiveis();
