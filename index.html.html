@@ -3154,24 +3154,26 @@ const DB = {
     localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
     
     // 2. Tentar enviar ao Supabase
+    // Modo ultra-seguro: apenas os campos que certamente existem em qualquer versão da tabela
     const fieldsToSaveSafe = {
       id: obj.id,
       srvId: obj.srvId,
-      srvNome: obj.srvNome,
       tipo: obj.tipo,
       status: obj.status,
-      obs: obj.obs || '',
       criadoEm: obj.criadoEm || new Date().toISOString()
     };
+    if (obj.obs) fieldsToSaveSafe.obs = obj.obs;
+    if (obj.srvNome) fieldsToSaveSafe.srvNome = obj.srvNome;
 
     try {
       // Tenta salvar o objeto completo primeiro
       const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
       
       if (error) {
-        // Se o erro for coluna não encontrada, tenta o modo seguro (só campos básicos)
-        if (error.message.includes('column') && error.message.includes('not found')) {
-          console.warn("⚠️ Colunas extras (qtd/inicio/fim) não encontradas em 'solicitacoes'. Usando modo seguro.");
+        const msg = (error.message || "").toLowerCase();
+        // Se o erro for coluna não encontrada ( PostgREST usa "Could not find" ou "not found")
+        if (msg.includes('column') && (msg.includes('not find') || msg.includes('not found') || msg.includes('não encontrada'))) {
+          console.warn("⚠️ Colunas extras não encontradas. Usando modo seguro...");
           const { error: retryError } = await supabaseClient.from('solicitacoes').upsert(fieldsToSaveSafe);
           if (retryError) throw retryError;
           return { success: true, mode: 'safe' };
