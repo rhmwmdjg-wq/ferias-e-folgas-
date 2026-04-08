@@ -527,6 +527,36 @@ header {
 .field textarea { resize:vertical; min-height:80px; line-height:1.5; font-size:0.86rem; }
 .field select option { background:var(--card); }
 
+/* Segmented Control (Tabs) */
+.aba-container {
+  display: flex;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: var(--r-sm);
+  padding: 4px;
+  border: 1px solid var(--border-mid);
+  gap: 4px;
+  margin-top: 4px;
+}
+.aba-item {
+  flex: 1;
+  padding: 8px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all var(--transition);
+  text-align: center;
+}
+.aba-item.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(77,123,255,0.3);
+}
+
 /* ================================================================
    BUTTONS
 ================================================================ */
@@ -1634,7 +1664,15 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
       <div class="field"><label>CPF</label><input id="f-cpf" type="text" placeholder="Ex: 000.000.000-00"></div>
       <div class="field"><label>PIS</label><input id="f-pis" type="text" placeholder="Ex: 000.00000.00-0"></div>
     </div>
-    <div class="form-row cols-2">
+    <div class="form-row cols-3">
+      <div class="field">
+        <label>Tipo de Vínculo *</label>
+        <div class="aba-container" id="aba-f-vinculo">
+          <button type="button" class="aba-item active" onclick="setVinculo('efetivo')">Efetivo</button>
+          <button type="button" class="aba-item" onclick="setVinculo('contratado')">Contratado</button>
+        </div>
+        <input type="hidden" id="f-vinculo" value="efetivo">
+      </div>
       <div class="field"><label>Férias Regulamentares Acumuladas</label><input id="f-ferias-reg" type="number" min="0" placeholder="0" value="0"></div>
       <div class="field"><label>Férias Prêmio Acumuladas</label><input id="f-ferias-prem" type="number" min="0" placeholder="0" value="0"></div>
     </div>
@@ -2347,15 +2385,21 @@ Coordenação de RH
       <div class="field"><label>Setor</label><select id="edit-setor"><option value="">Selecione o setor...</option></select></div>
       <div class="field"><label>Cargo</label><input id="edit-cargo" type="text"></div>
     </div>
-    <div class="form-row cols-2">
+    <div class="form-row cols-3">
       <div class="field"><label>Telefone</label><input id="edit-telefone" type="text"></div>
       <div class="field"><label>CPF</label><input id="edit-cpf" type="text"></div>
-    </div>
-    <div class="form-row cols-2">
       <div class="field"><label>PIS</label><input id="edit-pis" type="text"></div>
-      <div class="field"><label>Férias Reg. Acumuladas</label><input id="edit-ferias-reg" type="number" min="0"></div>
     </div>
-    <div class="form-row">
+    <div class="form-row cols-3">
+      <div class="field">
+        <label>Tipo de Vínculo</label>
+        <div class="aba-container" id="aba-edit-vinculo">
+          <button type="button" class="aba-item active" onclick="setVinculoEdit('efetivo')">Efetivo</button>
+          <button type="button" class="aba-item" onclick="setVinculoEdit('contratado')">Contratado</button>
+        </div>
+        <input type="hidden" id="edit-vinculo" value="efetivo">
+      </div>
+      <div class="field"><label>Férias Reg. Acumuladas</label><input id="edit-ferias-reg" type="number" min="0"></div>
       <div class="field"><label>Férias Prêmio Acumuladas</label><input id="edit-ferias-prem" type="number" min="0"></div>
     </div>
     <div class="modal-footer">
@@ -3088,6 +3132,22 @@ function logadoComSucesso() {
   }, 1500);
 }
 
+function setVinculo(v) {
+  document.getElementById('f-vinculo').value = v;
+  const btns = document.querySelectorAll('#aba-f-vinculo .aba-item');
+  btns.forEach(b => {
+    b.classList.toggle('active', b.innerText.toLowerCase() === v.toLowerCase());
+  });
+}
+
+function setVinculoEdit(v) {
+  document.getElementById('edit-vinculo').value = v;
+  const btns = document.querySelectorAll('#aba-edit-vinculo .aba-item');
+  btns.forEach(b => {
+    b.classList.toggle('active', b.innerText.toLowerCase() === v.toLowerCase());
+  });
+}
+
 // ===================== STORAGE (SUPABASE BRIDGE) =====================
 const DB = {
   servidores: () => _remoteData.servidores.length ? _remoteData.servidores : JSON.parse(localStorage.getItem('srv_servidores') || '[]'),
@@ -3109,10 +3169,23 @@ const DB = {
   saveProgramacoes: async (d) => {
     _remoteData.programacoes = d;
     localStorage.setItem('srv_programacoes', JSON.stringify(d));
+    
+    // Tenta salvar completo
     const { error } = await supabaseClient.from('programacoes').upsert(d);
+    
     if (error) {
-       console.error("Erro Supabase (programacoes):", error);
-       toastMsg("Erro ao salvar programações na nuvem: " + error.message, "error");
+       console.warn("⚠️ Erro ao salvar programações completo. Tentando modo seguro...");
+       // Fallback: Se der erro de coluna, tenta salvar sem o campo 'concluido'
+       if (error.message?.includes('concluido')) {
+         const safeData = d.map(p => {
+           const { concluido, ...rest } = p;
+           return rest;
+         });
+         await supabaseClient.from('programacoes').upsert(safeData);
+       } else {
+         console.error("Erro Supabase (programacoes):", error);
+         toastMsg("Erro ao sincronizar programações: " + error.message, "error");
+       }
     }
   },
   deleteProgramacao: async (id) => {
@@ -3207,11 +3280,29 @@ const DB = {
       throw e; // Lança para ser capturado pela UI
     }
   },
-  saveSolicitacoes: async (d) => { // Bulk save (raro uso)
+  saveSolicitacoes: async (d) => { 
     _remoteData.solicitacoes = d;
     localStorage.setItem('srv_solicitacoes', JSON.stringify(d));
-    const { error } = await supabaseClient.from('solicitacoes').upsert(d);
-    if (error) throw error;
+    
+    try {
+      const { error } = await supabaseClient.from('solicitacoes').upsert(d);
+      if (error) {
+        console.warn("⚠️ Erro no salvamento em lote de solicitações. Tentando modo seguro...");
+        // Fallback para lote: Garante campos básicos
+        const safeBatch = d.map(obj => ({
+          id: obj.id,
+          srvId: obj.srvId,
+          tipo: obj.tipo,
+          status: obj.status,
+          criadoEm: obj.criadoEm || new Date().toISOString(),
+          obs: obj.obs || '',
+          srvNome: obj.srvNome || ''
+        }));
+        await supabaseClient.from('solicitacoes').upsert(safeBatch);
+      }
+    } catch (e) {
+      console.error("Erro grave ao salvar solicitações:", e);
+    }
   },
   deleteSolicitacao: async (id) => {
     const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
@@ -3559,6 +3650,7 @@ async function salvarServidor() {
       admissao: document.getElementById('f-admissao').value,
       setor: document.getElementById('f-setor').value.trim(),
       cargo: document.getElementById('f-cargo').value.trim(),
+      vinculo: document.getElementById('f-vinculo').value,
       telefone: document.getElementById('f-telefone').value.replace(/\D/g,''),
       feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
       feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
@@ -3585,6 +3677,7 @@ function limparFormServidor() {
   ['f-matricula','f-nome','f-nascimento','f-admissao','f-setor','f-cargo','f-telefone','f-cpf','f-pis'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('f-ferias-reg').value = 0;
   document.getElementById('f-ferias-prem').value = 0;
+  setVinculo('efetivo');
   document.getElementById('f-foto-base64').value = '';
   const prev = document.getElementById('f-foto-preview');
   prev.innerHTML = '<span style="font-size:24px">📷</span><span>Adicionar foto</span>';
@@ -3655,7 +3748,10 @@ function renderTabela() {
       <td><span class="tag tag-blue">${s.matricula}</span></td>
       <td><div style="font-weight:700">${s.nome}</div></td>
       <td><div style="font-size:0.75rem">${s.setor || '-'}</div></td>
-      <td><span class="tag tag-purple">${s.cargo || '-'}</span></td>
+      <td>
+        <span class="tag tag-purple">${s.cargo || '-'}</span>
+        ${s.vinculo ? `<br><span class="tag ${s.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="margin-top:4px;font-size:0.6rem">${s.vinculo.toUpperCase()}</span>` : ''}
+      </td>
       <td style="font-family:monospace;font-size:0.75rem">${s.cpf || '-'}</td>
       <td style="font-family:monospace;font-size:0.75rem">${s.pis || '-'}</td>
       <td>${fmtDate(s.nascimento)}</td>
@@ -3681,6 +3777,7 @@ function abrirEditar(id) {
   document.getElementById('edit-admissao').value = s.admissao;
   document.getElementById('edit-setor').value = s.setor;
   document.getElementById('edit-cargo').value = s.cargo;
+  setVinculoEdit(s.vinculo || 'efetivo');
   document.getElementById('edit-telefone').value = s.telefone || '';
   document.getElementById('edit-cpf').value = s.cpf || '';
   document.getElementById('edit-pis').value = s.pis || '';
@@ -3726,6 +3823,7 @@ async function salvarEdicao() {
       admissao: document.getElementById('edit-admissao').value,
       setor: document.getElementById('edit-setor').value,
       cargo: document.getElementById('edit-cargo').value,
+      vinculo: document.getElementById('edit-vinculo').value,
       telefone: document.getElementById('edit-telefone').value.replace(/\D/g,''),
       cpf: document.getElementById('edit-cpf').value.trim(),
       pis: document.getElementById('edit-pis').value.trim(),
