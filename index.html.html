@@ -1896,6 +1896,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     <div class="section-title" style="margin:0">📊 Relatório de Férias</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('ferias')">🖨️ Imprimir Férias</button>
+      <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('sem_ferias')">🖨️ Sem Férias</button>
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('folgas')">🖨️ Imprimir Folgas</button>
       <div style="width:1px;background:var(--border);margin:0 2px"></div>
       <button class="btn btn-ghost btn-sm" style="color:var(--success);border-color:rgba(16,185,129,0.3)" onclick="exportarCSV('servidores')" title="Exportar lista de servidores para Excel">💾 Servidores.csv</button>
@@ -1937,6 +1938,26 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
       <option value="premio">Férias Prêmio</option>
     </select>
     <select id="filtro-setor-rel" onchange="renderRelatorio()"><option value="">Todos os Setores</option></select>
+    <select id="filtro-vinculo-rel" onchange="renderRelatorio()">
+      <option value="">Vínculo: Todos</option>
+      <option value="efetivo">Efetivo</option>
+      <option value="contratado">Contratado</option>
+    </select>
+    <select id="filtro-mes-rel" onchange="renderRelatorio()">
+      <option value="">Meses: Todos</option>
+      <option value="0">Janeiro</option>
+      <option value="1">Fevereiro</option>
+      <option value="2">Março</option>
+      <option value="3">Abril</option>
+      <option value="4">Maio</option>
+      <option value="5">Junho</option>
+      <option value="6">Julho</option>
+      <option value="7">Agosto</option>
+      <option value="8">Setembro</option>
+      <option value="9">Outubro</option>
+      <option value="10">Novembro</option>
+      <option value="11">Dezembro</option>
+    </select>
   </div>
   <div class="table-wrap card" style="padding:0">
     <table>
@@ -4492,20 +4513,28 @@ function renderRelatorio() {
   const busca = (document.getElementById('busca-rel')?.value || '').toLowerCase();
   const tipo = document.getElementById('filtro-tipo-rel')?.value || '';
   const setor = document.getElementById('filtro-setor-rel')?.value || '';
+  const vinculo = document.getElementById('filtro-vinculo-rel')?.value || '';
+  const mes = document.getElementById('filtro-mes-rel')?.value || '';
   
   const servidores = getServidoresAcessiveis();
   const programacoes = getProgramacoesAcessiveis();
   
   const setores = [...new Set(servidores.map(s => s.setor).filter(Boolean))];
   const sel = document.getElementById('filtro-setor-rel');
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Todos os Setores</option>' + setores.map(s => `<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Todos os Setores</option>' + setores.map(s => `<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
+  }
 
   const progs = programacoes.filter(p => {
     const srv = servidores.find(s => s.id === p.srvId);
     if (!srv) return false;
+    const mesProg = p.inicio ? new Date(p.inicio + 'T12:00:00').getMonth() : -1;
+    const vSrv = srv.vinculo || 'efetivo';
     return (!tipo || p.tipo === tipo) &&
            (!setor || srv.setor === setor) &&
+           (!vinculo || vSrv === vinculo) &&
+           (mes === '' || mesProg === parseInt(mes)) &&
            (!busca || srv.nome.toLowerCase().includes(busca) || srv.matricula.includes(busca));
   });
 
@@ -4537,13 +4566,14 @@ function renderRelatorio() {
     else { sit = 'Agendado'; cls = 'tag-blue'; }
     const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao'));
     const isAdmin = sessao.role === 'admin';
+    const retorno = p.retorno || (p.fim ? addDays(p.fim, 1) : '-');
     return `<tr>
       <td><strong>${srv?.nome || '-'}</strong></td>
       <td>${srv?.matricula || '-'}</td>
       <td>${srv?.setor || '-'}</td>
       <td><span class="tag ${p.tipo==='anual'?'tag-blue':'tag-purple'}">${p.tipo==='anual'?'🌴 Anual':'🏆 Prêmio'}</span></td>
       <td>${fmtDate(p.inicio)}</td>
-      <td>${fmtDate(p.retorno)}</td>
+      <td>${fmtDate(retorno)}</td>
       <td>${p.periodo || '-'}</td>
       <td><span class="tag ${cls}">${sit}</span></td>
       <td>
@@ -5455,42 +5485,156 @@ function imprimirRelatorio(tipo) {
     const filtBusca = document.getElementById('busca-rel')?.value.toLowerCase() || '';
     const filtTipo = document.getElementById('filtro-tipo-rel')?.value || '';
     const filtSetor = document.getElementById('filtro-setor-rel')?.value || '';
+    const filtVinculo = document.getElementById('filtro-vinculo-rel')?.value || '';
+    const filtMes = document.getElementById('filtro-mes-rel')?.value || '';
+
     const progsFiltradas = programacoes.filter(p => {
       const srv = servidores.find(s => s.id === p.srvId);
       if (!srv) return false;
-      return (!filtTipo || p.tipo === filtTipo) && (!filtSetor || srv.setor === filtSetor) && (!filtBusca || srv.nome.toLowerCase().includes(filtBusca) || srv.matricula.includes(filtBusca));
+      const mesProg = p.inicio ? new Date(p.inicio + 'T12:00:00').getMonth() : -1;
+      const vSrv = srv.vinculo || 'efetivo';
+      return (!filtTipo || p.tipo === filtTipo) && 
+             (!filtSetor || srv.setor === filtSetor) && 
+             (!filtVinculo || vSrv === filtVinculo) &&
+             (filtMes === '' || mesProg === parseInt(filtMes)) &&
+             (!filtBusca || srv.nome.toLowerCase().includes(filtBusca) || srv.matricula.includes(filtBusca));
     }).sort((a,b) => new Date(a.inicio) - new Date(b.inicio));
+
+    if (filtMes === '') {
+      // AGRUPAR POR MÊS E SETOR
+      const mesesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+      const grupos = {};
+      progsFiltradas.forEach(p => {
+        const mIdx = new Date(p.inicio + 'T12:00:00').getMonth();
+        const srv = servidores.find(s => s.id === p.srvId);
+        const setorNome = srv?.setor || 'NÃO INFORMADO';
+        if (!grupos[mIdx]) grupos[mIdx] = {};
+        if (!grupos[mIdx][setorNome]) grupos[mIdx][setorNome] = [];
+        grupos[mIdx][setorNome].push(p);
+      });
+
+      htmlTabela = '';
+      const mesesOrdenados = Object.keys(grupos).sort((a,b) => parseInt(a) - parseInt(b));
+      mesesOrdenados.forEach(mIdx => {
+        htmlTabela += `<div class="section-title-print" style="background:#f0f4ff; padding: 10px; font-size: 11px; margin-top:25px; border:1.5px solid #000;">📅 MÊS: ${mesesNomes[mIdx].toUpperCase()}</div>`;
+        const setoresNoMes = Object.keys(grupos[mIdx]).sort();
+        setoresNoMes.forEach(setor => {
+          htmlTabela += `
+            <div style="font-weight: 800; font-size: 9px; margin-top: 12px; margin-bottom: 5px; color: #1a1a2e;">📁 SETOR: ${setor}</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Servidor</th>
+                  <th style="width:65px">Matrícula</th>
+                  <th style="width:65px">Tipo</th>
+                  <th style="width:72px">Início</th>
+                  <th style="width:72px">Retorno</th>
+                  <th style="width:72px">Ref.</th>
+                  <th>Observações</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${grupos[mIdx][setor].map(p => {
+                  const srv = servidores.find(s => s.id === p.srvId);
+                  const ret = p.retorno || (p.fim ? addDays(p.fim, 1) : '-');
+                  return `<tr>
+                    <td class="bold">${srv?.nome || 'N/A'}</td>
+                    <td class="text-mono">${srv?.matricula || '-'}</td>
+                    <td class="text-center">${p.tipo === 'anual' ? '<span class="badge-anual">Anual</span>' : '<span class="badge-premio">Prêmio</span>'}</td>
+                    <td class="text-center">${fmtDate(p.inicio)}</td>
+                    <td class="text-center">${fmtDate(ret)}</td>
+                    <td class="text-center text-sm">${p.periodo || '-'}</td>
+                    <td class="text-sm">${p.obs || '-'}</td>
+                  </tr>`;
+                }).join('')}
+              </tbody>
+            </table>
+          `;
+        });
+      });
+    } else {
+      // IMPRESSÃO NORMAL (FILTRADA POR MÊS OU BUSCA)
+      htmlTabela = `
+        <div class="section-title-print">📅 Programações — Total: ${progsFiltradas.length}${filtSetor ? ' | Setor: '+filtSetor : ''}${filtTipo ? ' | Tipo: '+(filtTipo==='anual'?'Anual':'Prêmio') : ''}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Servidor</th>
+              <th style="width:65px">Matrícula</th>
+              <th style="width:65px">Tipo</th>
+              <th style="width:72px">Início</th>
+              <th style="width:72px">Retorno</th>
+              <th style="width:72px">Ref.</th>
+              <th>Setor</th>
+              <th>Observações</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${progsFiltradas.map(p => {
+              const srv = servidores.find(s => s.id === p.srvId);
+              const ret = p.retorno || (p.fim ? addDays(p.fim, 1) : '-');
+              return `<tr>
+                <td class="bold">${srv?.nome || 'N/A'}</td>
+                <td class="text-mono">${srv?.matricula || '-'}</td>
+                <td class="text-center">${p.tipo === 'anual' ? '<span class="badge-anual">Anual</span>' : '<span class="badge-premio">Prêmio</span>'}</td>
+                <td class="text-center">${fmtDate(p.inicio)}</td>
+                <td class="text-center">${fmtDate(ret)}</td>
+                <td class="text-center text-sm">${p.periodo || '-'}</td>
+                <td>${srv?.setor || '-'}</td>
+                <td class="text-sm">${p.obs || '-'}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      `;
+    }
+  } else if (tipo === 'sem_ferias') {
+    const filtSetor = document.getElementById('filtro-setor-rel')?.value || '';
+    const filtVinculo = document.getElementById('filtro-vinculo-rel')?.value || '';
+    
+    // Filtrar servidores que NÃO possuem nenhuma programação futura ou pendente
+    const semProgs = servidores.filter(s => {
+      const hasProg = programacoes.some(p => p.srvId === s.id);
+      const vSrv = s.vinculo || 'efetivo';
+      return !hasProg && 
+             (!filtSetor || s.setor === filtSetor) &&
+             (!filtVinculo || vSrv === filtVinculo);
+    }).sort((a,b) => a.nome.localeCompare(b.nome));
+
+    titulo = 'Servidores Sem Férias Programadas';
     htmlTabela = `
-      <div class="section-title-print">📅 Programações — Total: ${progsFiltradas.length}${filtSetor ? ' | Setor: '+filtSetor : ''}${filtTipo ? ' | Tipo: '+(filtTipo==='anual'?'Anual':'Prêmio') : ''}</div>
+      <div class="section-title-print">⚠️ Servidores Sem Programação — Total: ${semProgs.length}${filtSetor ? ' | Setor: '+filtSetor : ''}${filtVinculo ? ' | Vínculo: '+filtVinculo : ''}</div>
       <table>
         <thead>
           <tr>
-            <th>Servidor</th>
-            <th style="width:65px">Matrícula</th>
-            <th style="width:65px">Tipo</th>
-            <th style="width:72px">Início</th>
-            <th style="width:72px">Retorno</th>
-            <th style="width:72px">Ref.</th>
+            <th style="width:70px">Matrícula</th>
+            <th>Nome Completo</th>
             <th>Setor</th>
-            <th>Observações</th>
+            <th>Cargo</th>
+            <th style="width:80px">Admissão</th>
+            <th style="width:70px">Vínculo</th>
+            <th style="width:40px;text-align:center">Reg.</th>
+            <th style="width:50px;text-align:center">Prêmio</th>
           </tr>
         </thead>
         <tbody>
-          ${progsFiltradas.map(p => {
-            const srv = servidores.find(s => s.id === p.srvId);
-            return `<tr>
-              <td class="bold">${srv?.nome || 'N/A'}</td>
-              <td class="text-mono">${srv?.matricula || '-'}</td>
-              <td class="text-center">${p.tipo === 'anual' ? '<span class="badge-anual">Anual</span>' : '<span class="badge-premio">Prêmio</span>'}</td>
-              <td class="text-center">${fmtDate(p.inicio)}</td>
-              <td class="text-center">${fmtDate(p.retorno)}</td>
-              <td class="text-center text-sm">${p.periodo || '-'}</td>
-              <td>${srv?.setor || '-'}</td>
-              <td class="text-sm">${p.obs || '-'}</td>
-            </tr>`;
-          }).join('')}
+          ${semProgs.map(s => `
+            <tr>
+              <td class="bold text-mono">${s.matricula}</td>
+              <td class="bold">${s.nome}</td>
+              <td>${s.setor || '-'}</td>
+              <td class="text-sm">${s.cargo || '-'}</td>
+              <td class="text-center">${fmtDate(s.admissao)}</td>
+              <td class="text-center" style="text-transform:capitalize">${s.vinculo || 'efetivo'}</td>
+              <td class="text-center bold">${s.feriasReg || 0}</td>
+              <td class="text-center bold">${s.feriasPrem || 0}</td>
+            </tr>
+          `).join('')}
         </tbody>
       </table>
+      <div style="margin-top: 20px; font-style: italic; font-size: 9px; color: #666;">
+        * Lista de servidores que não possuem nenhum registro de férias programadas no sistema.
+      </div>
     `;
   } else if (tipo === 'folgas') {
     titulo = 'Relatório de Bancos de Folgas';
