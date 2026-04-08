@@ -4445,12 +4445,13 @@ function renderListaAlertas(containerId, lista, tipo) {
   el.innerHTML = lista.map(item => {
     const urgente = item.diff <= 7;
     const tag = urgente ? 'tag-red' : item.diff <= 15 ? 'tag-warn' : 'tag-blue';
+    const retorno = item.retorno || (item.fim ? addDays(item.fim, 1) : '-');
     return `<div class="alert-card ${tipo}">
       <div class="alert-icon">${tipo === 'anual' ? '🌴' : '🏆'}</div>
       <div class="alert-info">
         <h4>${item.srv.nome} <span style="font-weight:400;color:var(--muted);font-size:.85rem">(Mat. ${item.srv.matricula})</span></h4>
         <p>📍 ${item.srv.setor || 'Setor não informado'} — ${item.srv.cargo || ''}</p>
-        <p>📅 Início: <strong>${fmtDate(item.inicio)}</strong> | Retorno: <strong>${fmtDate(item.retorno)}</strong></p>
+        <p>📅 Início: <strong>${fmtDate(item.inicio)}</strong> | Retorno: <strong>${fmtDate(retorno)}</strong></p>
         <p>📞 ${item.srv.telefone ? item.srv.telefone : '<span style="color:var(--danger)">Telefone não cadastrado</span>'}</p>
         <p>🏖️ Fér. Reg. Acum.: <strong>${item.srv.feriasReg}</strong> | Fér. Prêmio Acum.: <strong>${item.srv.feriasPrem}</strong></p>
         <span class="days-badge ${tag}">${item.diff === 0 ? '🚨 HOJE' : `⏳ ${item.diff} dia(s) restante(s)`}</span>
@@ -4482,8 +4483,9 @@ function prepararWhatsApp(srvId, progId) {
   const prog = DB.programacoes().find(p => p.id === progId);
   const cfg = DB.config();
   if (!srv) return;
+  const retorno = prog?.retorno || (prog?.fim ? addDays(prog.fim, 1) : '-');
   const decreto = cfg.decreto || '[Decreto não configurado - acesse a aba Configurações]';
-  const msg = `Olá, ${srv.nome}!\n\nInformamos que suas férias ${prog?.tipo === 'premio' ? 'prêmio' : 'anuais'} estão com início programado para ${fmtDate(prog?.inicio)} e seu retorno previsto é em ${fmtDate(prog?.retorno)}.\n\nVocê deve comparecer à Coordenação para solicitar suas férias, conforme:\n\n${decreto}\n\nSetor: ${srv.setor || 'Não informado'}\nMatrícula: ${srv.matricula}\nFérias Regulamentares Acumuladas: ${srv.feriasReg}\nFérias Prêmio Acumuladas: ${srv.feriasPrem}\n\nAtenciosamente,\nCoordenação da APS`;
+  const msg = `Olá, ${srv.nome}!\n\nInformamos que suas férias ${prog?.tipo === 'premio' ? 'prêmio' : 'anuais'} estão com início programado para ${fmtDate(prog?.inicio)} e seu retorno previsto é em ${fmtDate(retorno)}.\n\nVocê deve comparecer à Coordenação para solicitar suas férias, conforme:\n\n${decreto}\n\nSetor: ${srv.setor || 'Não informado'}\nMatrícula: ${srv.matricula}\nFérias Regulamentares Acumuladas: ${srv.feriasReg}\nFérias Prêmio Acumuladas: ${srv.feriasPrem}\n\nAtenciosamente,\nCoordenação da APS`;
   document.getElementById('wa-msg').value = msg;
   document.getElementById('wa-tel').value = srv.telefone || '';
   document.getElementById('modal-whatsapp').classList.add('open');
