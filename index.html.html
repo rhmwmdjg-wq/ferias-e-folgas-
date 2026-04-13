@@ -2648,7 +2648,7 @@ function setupRealtime() {
         // Debounce: espera 600ms sem novas mudanças antes de re-sincronizar
         clearTimeout(_realtimeDebounce);
         _realtimeDebounce = setTimeout(async () => {
-          await syncComSupabase();
+          await syncComSupabase(true); // silencioso: sem skeletons
           renderAposSync(tabela);
         }, 600);
       }
@@ -2666,36 +2666,47 @@ function setupRealtime() {
 }
 
 function renderAposSync(tabelaAlterada) {
-  // Renderizar apenas o que é relevante conforme a tabela alterada
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
-  if (!sessaoStr) return; // Não está logado
+  if (!sessaoStr) return;
   const sessao = JSON.parse(sessaoStr);
   const isAdminOuGestor = sessao.role === 'admin' || sessao.role === 'gestor';
 
-  if (tabelaAlterada === 'solicitacoes') {
-    atualizarBadgeSolicitacoes();
-    // Re-render se a aba de solicitações estiver ativa
-    const painelAtivo = document.querySelector('.tab-panel.active');
-    if (painelAtivo?.id === 'panel-solicitacoes') renderSolicitacoes();
-  }
-
-  if (['servidores', 'programacoes'].includes(tabelaAlterada) && isAdminOuGestor) {
+  // Sempre atualizar badges e dashboard relevantes
+  if (isAdminOuGestor) {
     atualizarBadge();
+    atualizarBadgeSolicitacoes();
+    atualizarBadgeFolgas?.();
     renderDashboard();
-    const painelAtivo = document.querySelector('.tab-panel.active');
-    if (painelAtivo?.id === 'panel-servidores') renderTabela();
-    if (painelAtivo?.id === 'panel-ferias') renderRelatorio?.();
-    if (painelAtivo?.id === 'panel-calendario') renderCalendario?.();
-  }
-
-  if (tabelaAlterada === 'folgas' && isAdminOuGestor) {
-    atualizarBadgeFolgas();
-    const painelAtivo = document.querySelector('.tab-panel.active');
-    if (painelAtivo?.id === 'panel-folgas') renderHistoricoFolgas?.();
   }
 
   if (tabelaAlterada === 'configuracoes') {
     aplicarConfiguracoesSalvas();
+  }
+
+  // SEMPRE re-renderizar o painel ativo — independente de qual tabela mudou
+  // Isso garante que skeletons nunca fiquem presos na tela
+  const painelAtivo = document.querySelector('.tab-panel.active');
+  if (!painelAtivo) return;
+
+  switch (painelAtivo.id) {
+    case 'panel-servidores':
+      renderTabela();
+      break;
+    case 'panel-ferias':
+      if (typeof renderRelatorio === 'function') renderRelatorio();
+      break;
+    case 'panel-calendario':
+      if (typeof renderCalendario === 'function') renderCalendario();
+      break;
+    case 'panel-folgas':
+      if (typeof renderHistoricoFolgas === 'function') renderHistoricoFolgas();
+      break;
+    case 'panel-solicitacoes':
+      renderSolicitacoes();
+      break;
+    case 'panel-alertas':
+      // Dashboard já foi re-renderizado acima
+      break;
   }
 
   // Indicador visual discreto
@@ -2926,11 +2937,11 @@ let _remoteData = {
   config: {}
 };
 
-async function syncComSupabase() {
-  console.log("🔄 Sincronizando com Supabase...");
+async function syncComSupabase(silencioso = false) {
+  console.log(silencioso ? '🔄 Sync silencioso (Realtime)...' : '🔄 Sincronizando com Supabase...');
   
-  // Ativar Skeletons se estiver logado e na área principal
-  if (sessionStorage.getItem('ferias_sessao')) {
+  // Skeletons apenas na carga inicial (nunca durante sync do Realtime)
+  if (!silencioso && sessionStorage.getItem('ferias_sessao')) {
     mostrarSkeletonsDashboard();
     mostrarSkeletonsTabela('tbody-servidores', 11);
     mostrarSkeletonsTabela('tbody-relatorio', 9);
