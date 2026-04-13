@@ -1599,10 +1599,14 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 <div class="tab-panel active" id="panel-alertas">
   <div class="section-title">📊 Dashboard de Gestão</div>
   
-  <div class="grid-3" style="margin-bottom:24px">
-    <div class="stat"><div class="val" id="stat-count-anual">0</div><div class="lbl">Férias Anuais Próximas</div></div>
-    <div class="stat"><div class="val" id="stat-count-premium">0</div><div class="lbl">Férias Prêmio Próximas</div></div>
-    <div class="stat"><div class="val" id="stat-total">0</div><div class="lbl">Total de Servidores</div></div>
+  <div class="grid-4" style="margin-bottom:24px">
+    <div class="stat"><div class="val" id="stat-count-anual">0</div><div class="lbl">Anuais Próximas</div></div>
+    <div class="stat"><div class="val" id="stat-count-premium">0</div><div class="lbl">Prêmio Próximas</div></div>
+    <div class="stat" style="background:var(--success)11; border:1px solid var(--success)22">
+       <div class="val" id="stat-count-hoje" style="color:var(--success)">0</div>
+       <div class="lbl">Em Gozo HOJE</div>
+    </div>
+    <div class="stat"><div class="val" id="stat-total">0</div><div class="lbl">Total Servidores</div></div>
   </div>
 
   <!-- Gráficos -->
@@ -1634,6 +1638,11 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <!-- Lista de alertas resumida -->
       </div>
     </div>
+  </div>
+  
+  <div class="section-title" style="color:var(--success)"><span class="icon">🌴</span> Servidores em Gozo Atualmente (HOJE)</div>
+  <div id="lista-em-gozo-hoje" style="margin-bottom:30px">
+    <div class="empty"><div class="icon">🌴</div><p>Nenhum servidor em gozo de férias hoje.</p></div>
   </div>
 
   <div class="section-title">⚠️ Detalhamento de Alertas (Anuais)</div>
@@ -4623,10 +4632,18 @@ function renderAlertas() {
   const programacoes = getProgramacoesAcessiveis();
   const servidores = getServidoresAcessiveis();
 
-  const anuais = [], premium = [];
+  const anuais = [], premium = [], emGozoHoje = [];
+  const hojeIso = hoje.toISOString().split('T')[0];
+
   programacoes.forEach(p => {
     const srv = servidores.find(s => s.id === p.srvId);
     if (!srv) return;
+
+    // Verificar se está em gozo HOJE
+    if (!p.concluido && p.inicio <= hojeIso && (p.fim >= hojeIso)) {
+       emGozoHoje.push({ ...p, srv });
+    }
+
     if (p.concluido) return;
     const diff = diffDays(p.inicio);
     const limite = p.tipo === 'anual' ? 35 : 65;
@@ -4639,15 +4656,41 @@ function renderAlertas() {
 
   document.getElementById('stat-count-anual').textContent = anuais.length;
   document.getElementById('stat-count-premium').textContent = premium.length;
+  document.getElementById('stat-count-hoje').textContent = emGozoHoje.length;
   document.getElementById('stat-total').textContent = servidores.length;
 
+  renderListaGozoHoje(emGozoHoje);
   renderListaAlertas('lista-alertas-anual', anuais, 'anual');
   renderListaAlertas('lista-alertas-premium', premium, 'premium');
   document.getElementById('badge-alertas').textContent = anuais.length + premium.length;
 }
 
+function renderListaGozoHoje(lista) {
+  const el = document.getElementById('lista-em-gozo-hoje');
+  if (!el) return;
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">🌴</div><p>Nenhum servidor em gozo de férias hoje.</p></div>`;
+    return;
+  }
+
+  el.innerHTML = lista.map(item => {
+    const retorno = item.retorno || (item.fim ? addDays(item.fim, 1) : '-');
+    return `<div class="alert-card gozo" style="border-left: 4px solid var(--success)">
+      <div class="alert-icon" style="background:var(--success)22; color:var(--success)">🌴</div>
+      <div class="alert-info">
+        <h4>${item.srv.nome} <span style="font-weight:400;color:var(--muted);font-size:.85rem">(Mat. ${item.srv.matricula})</span></h4>
+        <p>📍 ${item.srv.setor || 'Setor não informado'} — ${item.srv.cargo || ''}</p>
+        <p>📅 Período: <strong>${fmtDate(item.inicio)}</strong> até <strong>${fmtDate(item.fim)}</strong></p>
+        <p style="color:var(--success)">🚀 Data de Retorno: <strong>${fmtDate(retorno)}</strong></p>
+      </div>
+      <div class="alert-actions">
+         <button class="btn btn-primary btn-sm" onclick="toggleConcluidoProg('${item.id}')">✅ Dar Baixa</button>
+      </div>
+    </div>`;
+  }).join('');
 function renderListaAlertas(containerId, lista, tipo) {
   const el = document.getElementById(containerId);
+  if (!el) return;
   if (!lista.length) {
     el.innerHTML = `<div class="empty"><div class="icon">✅</div><p>Nenhum alerta de ${tipo==='anual'?'férias anuais':'férias prêmio'} no momento.</p></div>`;
     return;
