@@ -4680,10 +4680,11 @@ function renderListaAlertas(containerId, lista, tipo) {
         <p>🏖️ Fér. Reg. Acum.: <strong>${item.srv.feriasReg}</strong> | Fér. Prêmio Acum.: <strong>${item.srv.feriasPrem}</strong></p>
         <span class="days-badge ${tag}">${item.diff === 0 ? '🚨 HOJE' : `⏳ ${item.diff} dia(s) restante(s)`}</span>
       </div>
-      <div class="alert-actions">
+      <div class="alert-actions" style="display:flex; gap:8px">
         ${item.srv.telefone
-          ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsApp('${item.srv.id}','${item.id}')">💬 WhatsApp</button>`
+          ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsApp('${item.srv.id}','${item.id}')" title="Enviar lembrete via WhatsApp">💬 WhatsApp</button>`
           : `<button class="btn btn-ghost btn-sm" title="Cadastre o telefone do servidor" disabled>📵 Sem Tel.</button>`}
+        <button class="btn btn-primary btn-sm" onclick="toggleConcluidoProg('${item.id}')" title="Marcar como concluído/entregue">✅ Dar Baixa</button>
       </div>
     </div>`;
   }).join('');
