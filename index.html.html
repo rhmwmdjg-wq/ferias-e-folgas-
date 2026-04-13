@@ -7558,32 +7558,40 @@ function renderCalendario() {
   const hoje          = new Date();
   hoje.setHours(0,0,0,0);
 
-  // Primeiro dia do mês e quantas semanas
+  // Primeiro dia do mês e preparação do grid (42 dias para cobrir semanas completas)
   const primeiroDia = new Date(calAno, calMes, 1);
-  const ultimoDia   = new Date(calAno, calMes + 1, 0);
   const inicioCel   = new Date(primeiroDia);
   inicioCel.setDate(inicioCel.getDate() - primeiroDia.getDay());
 
-  // Filtrar programações relevantes
-  const progsDoMes = programacoes.filter(p => {
+  // Preparar programações para processamento eficiente
+  const progsProcessadas = programacoes.filter(p => {
     if (filtroTipo && p.tipo !== filtroTipo) return false;
     const srv = servidores.find(s => s.id === p.srvId);
     if (!srv) return false;
     if (filtroSetor && srv.setor !== filtroSetor) return false;
-    // Múltiplos períodos: verificar se algum deles cai neste mês
-    const periodos = p.periodos || [{ inicio: p.inicio, retorno: p.retorno }];
-    return periodos.some(per => {
-      if (!per.inicio) return false;
-      const ini = new Date(per.inicio + 'T00:00:00');
-      const fim = per.retorno ? new Date(per.retorno + 'T00:00:00') : new Date(per.inicio + 'T00:00:00');
-      return ini <= new Date(calAno, calMes + 1, 0) && fim >= new Date(calAno, calMes, 1);
-    });
+    return true;
+  }).map(p => {
+    const srv = servidores.find(s => s.id === p.srvId);
+    // Extrai todos os períodos (suporta parcelamento)
+    const periodos = (p.periodos && p.periodos.length) 
+      ? p.periodos 
+      : [{ inicio: p.inicio, fim: p.fim, retorno: p.retorno }];
+    
+    return { ...p, srv, periodosTratados: periodos.map(per => {
+      const dIni = per.inicio ? new Date(per.inicio + 'T00:00:00') : null;
+      // Se não tem fim/retorno, assume 1 dia
+      let dFim = per.retorno ? new Date(per.retorno + 'T00:00:00') : (per.fim ? new Date(per.fim + 'T00:00:00') : dIni);
+      
+      // Ajuste: A data de retorno é o dia que ele VOLTA, então as férias acabam um dia antes
+      const dFimReal = dFim ? new Date(dFim) : null;
+      if (dFimReal && per.retorno) dFimReal.setDate(dFimReal.getDate() - 1);
+
+      return { ini: dIni, fim: dFimReal };
+    })};
   });
 
   let html = '';
-  const totalCelulas = 42;
-
-  for (let i = 0; i < totalCelulas; i++) {
+  for (let i = 0; i < 42; i++) {
     const dia = new Date(inicioCel);
     dia.setDate(inicioCel.getDate() + i);
 
@@ -7591,21 +7599,20 @@ function renderCalendario() {
     const ehHoje   = dia.getTime() === hoje.getTime();
     const diaISO   = dia.toISOString().split('T')[0];
 
-    // Programações neste dia
+    // Buscar quem está de férias neste dia específico
     const eventosDia = [];
-    progsDoMes.forEach(p => {
-      const srv = servidores.find(s => s.id === p.srvId);
-      if (!srv) return;
-      const periodos = p.periodos || [{ inicio: p.inicio, retorno: p.retorno }];
-      periodos.forEach(per => {
-        if (!per.inicio) return;
-        const ini = new Date(per.inicio + 'T00:00:00');
-        const fim = per.retorno ? new Date(per.retorno + 'T00:00:00') : ini;
-        // retorno é dia de volta, então férias vão até retorno - 1 dia
-        const fimReal = new Date(fim);
-        fimReal.setDate(fimReal.getDate() - 1);
-        if (dia >= ini && dia <= fimReal) {
-          eventosDia.push({ nome: srv.nome.split(' ')[0], tipo: p.tipo, id: p.id, srvNome: srv.nome, setor: srv.setor, concluido: !!p.concluido });
+    progsProcessadas.forEach(p => {
+      p.periodosTratados.forEach(per => {
+        if (per.ini && per.fim && dia >= per.ini && dia <= per.fim) {
+          eventosDia.push({
+            id: p.id,
+            srvId: p.srvId,
+            nome: p.srv.nome.split(' ')[0],
+            srvNome: p.srv.nome,
+            tipo: p.tipo,
+            concluido: !!p.concluido,
+            setor: p.srv.setor
+          });
         }
       });
     });
@@ -7614,15 +7621,20 @@ function renderCalendario() {
     const visiveis = eventosDia.slice(0, MAX_SHOW);
     const extras   = eventosDia.length - MAX_SHOW;
 
-    html += `<div class="cal-day${outroMes ? ' outro-mes' : ''}${ehHoje ? ' hoje' : ''}" data-date="${diaISO}">`;
-    html += `<div class="cal-day-num">${dia.getDate()}</div>`;
-    visiveis.forEach(ev => {
-      html += `<span class="cal-evento ${ev.tipo} ${ev.concluido ? 'concluido' : ''}" title="${ev.srvNome} — ${ev.setor || ''} ${ev.concluido ? '(Concluído)' : ''}">${ev.nome}</span>`;
-    });
-    if (extras > 0) {
-      html += `<span class="cal-mais">+${extras} mais</span>`;
-    }
-    html += `</div>`;
+    html += `
+      <div class="cal-day${outroMes ? ' outro-mes' : ''}${ehHoje ? ' hoje' : ''}" data-date="${diaISO}">
+        <div class="cal-day-num">${dia.getDate()}</div>
+        <div class="cal-event-container">
+          ${visiveis.map(ev => `
+            <div class="cal-evento ${ev.tipo === 'anual' ? 'anual' : 'premio'} ${ev.concluido ? 'concluido' : ''}" 
+                 onclick="abrirGerenciarFérias('${ev.srvId}')"
+                 title="${ev.srvNome} (${ev.setor || 'N/I'})">
+              ${ev.nome}
+            </div>
+          `).join('')}
+          ${extras > 0 ? `<div class="cal-mais">+${extras}</div>` : ''}
+        </div>
+      </div>`;
   }
 
   grid.innerHTML = html;
