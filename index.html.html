@@ -3377,23 +3377,10 @@ const DB = {
   saveProgramacoes: async (d) => {
     _remoteData.programacoes = d;
     localStorage.setItem('srv_programacoes', JSON.stringify(d));
-    
-    // Tenta salvar completo
     const { error } = await supabaseClient.from('programacoes').upsert(d);
-    
     if (error) {
-       console.warn("⚠️ Erro ao salvar programações completo. Tentando modo seguro...");
-       // Fallback: Se der erro de coluna, tenta salvar sem o campo 'concluido'
-       if (error.message?.includes('concluido')) {
-         const safeData = d.map(p => {
-           const { concluido, ...rest } = p;
-           return rest;
-         });
-         await supabaseClient.from('programacoes').upsert(safeData);
-       } else {
-         console.error("Erro Supabase (programacoes):", error);
-         toastMsg("Erro ao sincronizar programações: " + error.message, "error");
-       }
+       console.error("Erro Supabase (programacoes):", error);
+       toastMsg("Erro ao sincronizar programações: " + error.message, "error");
     }
   },
   deleteProgramacao: async (id) => {
