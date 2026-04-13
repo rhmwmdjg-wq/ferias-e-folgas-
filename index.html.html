@@ -3026,17 +3026,27 @@ async function verificarSessao() {
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
   const appContainer = document.querySelector('.app-container');
   const loginScreen = document.getElementById('login-screen');
-  
-  // SEMPRE sincronizar com Supabase ao carregar a página para ter dados de login
+  const bnav = document.getElementById('bottom-nav');
+
+  // Se já existe sessão: mostrar o app IMEDIATAMENTE, sem esperar o sync
+  // Isso evita o flash da tela de login após o login bem-sucedido
+  if (sessaoStr) {
+    if (appContainer) appContainer.style.display = 'flex';
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (bnav) bnav.style.display = '';
+  }
+
+  // Sincronizar em background (skeletons já aparecem dentro do app)
   const syncOk = await syncComSupabase();
   if (!syncOk && !sessaoStr) {
-     toastMsg("⚠️ Erro de conexão. Verifique sua internet.", "warning");
+    toastMsg("\u26a0\ufe0f Erro de conex\u00e3o. Verifique sua internet.", "warning");
   }
 
   if (sessaoStr) {
     const sessao = JSON.parse(sessaoStr);
     if (appContainer) appContainer.style.display = 'flex';
-    if (loginScreen) loginScreen.style.display = 'none'; const bnav1 = document.getElementById('bottom-nav'); if(bnav1) bnav1.style.display = '';
+    if (loginScreen) loginScreen.style.display = 'none';
+    if (bnav) bnav.style.display = '';
     
     // Atualiza nome na UI
     const nameEl = document.getElementById('display-user-name');
@@ -3320,11 +3330,14 @@ async function migrarDadosParaSupabase() {
 }
 
 function logadoComSucesso() {
-  document.getElementById('successOverlayLogin').classList.add('show');
-  setTimeout(() => {
-    document.getElementById('successOverlayLogin').classList.remove('show');
-    verificarSessao();
-  }, 1500);
+  // Esconder login e ir direto para o app (sync acontece em background com skeletons)
+  const loginScreen = document.getElementById('login-screen');
+  const appContainer = document.querySelector('.app-container');
+  const bnav = document.getElementById('bottom-nav');
+  if (loginScreen) loginScreen.style.display = 'none';
+  if (appContainer) appContainer.style.display = 'flex';
+  if (bnav) bnav.style.display = '';
+  verificarSessao();
 }
 
 function setVinculo(v) {
