@@ -1466,7 +1466,10 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <button class="btn btn-ghost btn-sm" onclick="abrirModalAlterarSenha()" style="padding:4px 9px;font-size:.68rem">
           <i class="fa-solid fa-key"></i> Trocar Senha
         </button>
-        <div class="status-dot">v2.1</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <div class="status-dot">v2.1</div>
+          <div id="realtime-badge" title="Sincronização em tempo real ativa" style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);opacity:0;transition:opacity 0.4s;flex-shrink:0;"></div>
+        </div>
       </div>
     </div>
   </aside>
@@ -2621,6 +2624,97 @@ const SB_URL = "https://svzsdaaidmdmyitsrjau.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enNkYWFpZG1kbXlpdHNyamF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMzc1NDAsImV4cCI6MjA5MDkxMzU0MH0.g2ZklKFxXzko7mGvgjuXpepACqLmGUBEUJiDoi9GC1Y";
 const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 
+// ===================== SUPABASE REALTIME =====================
+let _realtimeChannel = null;
+let _realtimeDebounce = null;
+
+function setupRealtime() {
+  // Limpar canal anterior se existir
+  if (_realtimeChannel) {
+    supabaseClient.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+  }
+
+  const TABELAS = ['servidores', 'programacoes', 'folgas', 'solicitacoes', 'gestores', 'configuracoes'];
+
+  _realtimeChannel = supabaseClient.channel('sync-global');
+
+  TABELAS.forEach(tabela => {
+    _realtimeChannel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: tabela },
+      (payload) => {
+        console.log(`🔄 Realtime: mudança em [${tabela}]`, payload.eventType);
+        // Debounce: espera 600ms sem novas mudanças antes de re-sincronizar
+        clearTimeout(_realtimeDebounce);
+        _realtimeDebounce = setTimeout(async () => {
+          await syncComSupabase();
+          renderAposSync(tabela);
+        }, 600);
+      }
+    );
+  });
+
+  _realtimeChannel.subscribe((status) => {
+    if (status === 'SUBSCRIBED') {
+      console.log('✅ Realtime conectado — atualizações em tempo real ativas!');
+    } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+      console.warn('⚠️ Realtime desconectado. Tentando reconectar...');
+      setTimeout(setupRealtime, 5000); // Reconectar em 5s
+    }
+  });
+}
+
+function renderAposSync(tabelaAlterada) {
+  // Renderizar apenas o que é relevante conforme a tabela alterada
+  const sessaoStr = sessionStorage.getItem('ferias_sessao');
+  if (!sessaoStr) return; // Não está logado
+  const sessao = JSON.parse(sessaoStr);
+  const isAdminOuGestor = sessao.role === 'admin' || sessao.role === 'gestor';
+
+  if (tabelaAlterada === 'solicitacoes') {
+    atualizarBadgeSolicitacoes();
+    // Re-render se a aba de solicitações estiver ativa
+    const painelAtivo = document.querySelector('.tab-panel.active');
+    if (painelAtivo?.id === 'panel-solicitacoes') renderSolicitacoes();
+  }
+
+  if (['servidores', 'programacoes'].includes(tabelaAlterada) && isAdminOuGestor) {
+    atualizarBadge();
+    renderDashboard();
+    const painelAtivo = document.querySelector('.tab-panel.active');
+    if (painelAtivo?.id === 'panel-servidores') renderTabela();
+    if (painelAtivo?.id === 'panel-ferias') renderRelatorio?.();
+    if (painelAtivo?.id === 'panel-calendario') renderCalendario?.();
+  }
+
+  if (tabelaAlterada === 'folgas' && isAdminOuGestor) {
+    atualizarBadgeFolgas();
+    const painelAtivo = document.querySelector('.tab-panel.active');
+    if (painelAtivo?.id === 'panel-folgas') renderHistoricoFolgas?.();
+  }
+
+  if (tabelaAlterada === 'configuracoes') {
+    aplicarConfiguracoesSalvas();
+  }
+
+  // Indicador visual discreto
+  const badge = document.getElementById('realtime-badge');
+  if (badge) {
+    badge.style.opacity = '1';
+    setTimeout(() => badge.style.opacity = '0', 2000);
+  }
+}
+
+function teardownRealtime() {
+  if (_realtimeChannel) {
+    supabaseClient.removeChannel(_realtimeChannel);
+    _realtimeChannel = null;
+    console.log('🔕 Realtime desconectado.');
+  }
+  clearTimeout(_realtimeDebounce);
+}
+
 /* ===================== STORAGE & IMAGES ===================== */
 /**
  * Redimensiona uma imagem Base64 para um tamanho quadrado padrão (400x400)
@@ -3446,6 +3540,7 @@ function showTab(tab) {
 // ===================== SAIR =====================
 function sairSistema() {
   if (confirm('Deseja realmente sair do sistema?')) {
+    teardownRealtime(); // Encerrar conexão Realtime antes de sair
     sessionStorage.removeItem('ferias_sessao');
     verificarSessao();
   }
@@ -6310,6 +6405,9 @@ function initApp() {
   initFlatpickrFolga();
   initFlatpickrSolicitacao();
   renderDashboard();
+
+  // Iniciar sincronização em tempo real
+  setupRealtime();
 }
 
 // ===================== SOLICITAÇÕES =====================
