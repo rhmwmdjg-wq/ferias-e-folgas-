@@ -3031,15 +3031,32 @@ async function tentarLogin() {
       return;
     }
 
-    // 1. Verificar ADMIN
-    const salvas = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
-    const creds = salvas.length ? salvas : CREDENCIAIS_PADRAO;
-    const matchAdmin = creds.find(c => c.usuario.toLowerCase() === user.toLowerCase() && c.senha === pass);
-    
-    if (matchAdmin) {
+    // 1. Verificar ADMIN — checa Supabase primeiro, depois fallback local
+    const adminNoSupabase = _remoteData.gestores.find(g => 
+      (g.role === 'admin' || g.usuario === 'admin') &&
+      g.usuario.toLowerCase() === user.toLowerCase() && 
+      g.senha === pass
+    );
+    if (!adminNoSupabase) {
+      // fallback: credenciais locais (para casos sem internet ou primeiro uso)
+      const salvas = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
+      const creds = salvas.length ? salvas : CREDENCIAIS_PADRAO;
+      const matchLocal = creds.find(c => c.usuario.toLowerCase() === user.toLowerCase() && c.senha === pass);
+      if (matchLocal) {
+        sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
+          usuario: matchLocal.usuario, 
+          nome: matchLocal.nome || 'Administrador', 
+          role: 'admin',
+          loginAt: new Date().toISOString() 
+        }));
+        logadoComSucesso();
+        return;
+      }
+    } else {
       sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
-        usuario: matchAdmin.usuario, 
-        nome: matchAdmin.nome || 'Administrador', 
+        id: adminNoSupabase.id,
+        usuario: adminNoSupabase.usuario, 
+        nome: adminNoSupabase.nome || 'Administrador', 
         role: 'admin',
         loginAt: new Date().toISOString() 
       }));
@@ -3881,7 +3898,7 @@ function abrirModalAlterarSenha() {
   document.getElementById('modal-alterar-senha').classList.add('open');
 }
 
-function alterarMinhaSenha() {
+async function alterarMinhaSenha() {
   const nova = document.getElementById('mn-nova-senha').value.trim();
   const conf = document.getElementById('mn-conf-senha').value.trim();
   
@@ -3890,28 +3907,53 @@ function alterarMinhaSenha() {
   
   const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao'));
   if (sessao.role === 'servidor') {
+    // Servidor: salva na tabela servidores
     let lista = DB.servidores();
     const idx = lista.findIndex(s => s.id === sessao.id);
     if (idx >= 0) {
       lista[idx].senha = nova;
-      DB.saveServidores(lista);
+      await DB.saveServidores(lista);
       toastMsg('Senha alterada com sucesso!');
       fecharModal('modal-alterar-senha');
     }
   } else {
-    // Admin alterando sua senha (salva no localStorage de credenciais)
-    let creds = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
-    const idx = creds.findIndex(c => c.usuario === sessao.usuario);
-    if (idx >= 0) {
-      creds[idx].senha = nova;
-      if (!creds[idx].nome) creds[idx].nome = sessao.nome || 'Administrador';
-      localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
+    // Admin/Gestor: salva na tabela gestores do Supabase + localStorage de fallback
+    const gestores = DB.gestores();
+    const idxGestor = gestores.findIndex(g => g.usuario.toLowerCase() === sessao.usuario.toLowerCase());
+
+    if (idxGestor >= 0) {
+      // Já existe na tabela gestores — apenas atualiza a senha
+      gestores[idxGestor].senha = nova;
+      await DB.saveGestores(gestores);
     } else {
-      // Caso não tenha credenciais personalizadas ainda
-      creds.push({ usuario: sessao.usuario, senha: nova, nome: sessao.nome });
-      localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
+      // Admin padrão (não está na tabela gestores ainda) — criar o registro
+      const uid_admin = 'admin-' + Date.now();
+      const novoAdmin = {
+        id: sessao.id || uid_admin,
+        usuario: sessao.usuario,
+        nome: sessao.nome || 'Administrador',
+        senha: nova,
+        role: 'admin',
+        setores: []
+      };
+      gestores.push(novoAdmin);
+      await DB.saveGestores(gestores);
+      // Atualizar id na sessão
+      sessao.id = novoAdmin.id;
+      sessionStorage.setItem('ferias_sessao', JSON.stringify(sessao));
     }
-    toastMsg('Senha de administrador alterada!');
+
+    // Fallback local (para acesso offline)
+    let creds = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
+    const idxLocal = creds.findIndex(c => c.usuario.toLowerCase() === sessao.usuario.toLowerCase());
+    if (idxLocal >= 0) {
+      creds[idxLocal].senha = nova;
+    } else {
+      creds.push({ usuario: sessao.usuario, senha: nova, nome: sessao.nome || 'Administrador' });
+    }
+    localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
+
+    toastMsg('✅ Senha de administrador alterada e salva no banco de dados!');
     fecharModal('modal-alterar-senha');
   }
 }
