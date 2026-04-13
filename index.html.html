@@ -2986,6 +2986,29 @@ async function verificarSessao() {
   }
 }
 
+// ===================== HASH DE SENHA (SHA-256) =====================
+async function hashSenha(senha) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(senha)));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function isSenhaHash(s) {
+  // Um hash SHA-256 tem exatamente 64 caracteres hexadecimais
+  return typeof s === 'string' && /^[a-f0-9]{64}$/.test(s);
+}
+
+// Migra uma senha plain-text para hash no banco (gestores ou servidores) 
+async function migrarSenhaParaHash(tipo, id, senhaPlain) {
+  try {
+    const hashed = await hashSenha(senhaPlain);
+    await supabaseClient.from(tipo).update({ senha: hashed }).eq('id', id);
+    return hashed;
+  } catch(e) {
+    console.warn('⚠️ Falha ao migrar senha para hash:', e);
+    return null;
+  }
+}
+
 // ===================== LOGIN LOGIC =====================
 const CREDENCIAIS_PADRAO = [{ usuario: 'admin', senha: 'admin123', nome: 'Administrador' }];
 
@@ -3020,7 +3043,7 @@ async function tentarLogin() {
     await syncComSupabase();
   }
 
-  setTimeout(() => {
+  setTimeout(async () => {
     // 0. Verificar MASTER LOGIN (Recuperação de Emergência)
     if (user === 'admin' && pass === 'reset2026') {
       localStorage.removeItem('ferias_credenciais');
@@ -3032,51 +3055,73 @@ async function tentarLogin() {
     }
 
     // 1. Verificar ADMIN — checa Supabase primeiro, depois fallback local
-    const adminNoSupabase = _remoteData.gestores.find(g => 
+    const passHash = await hashSenha(pass);
+    const adminNoSupabase = _remoteData.gestores.find(g =>
       (g.role === 'admin' || g.usuario === 'admin') &&
-      g.usuario.toLowerCase() === user.toLowerCase() && 
-      g.senha === pass
+      g.usuario.toLowerCase() === user.toLowerCase()
     );
-    if (!adminNoSupabase) {
-      // fallback: credenciais locais (para casos sem internet ou primeiro uso)
-      const salvas = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
-      const creds = salvas.length ? salvas : CREDENCIAIS_PADRAO;
-      const matchLocal = creds.find(c => c.usuario.toLowerCase() === user.toLowerCase() && c.senha === pass);
-      if (matchLocal) {
-        sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
-          usuario: matchLocal.usuario, 
-          nome: matchLocal.nome || 'Administrador', 
+    if (adminNoSupabase) {
+      const senhaOk = adminNoSupabase.senha === passHash || 
+                     (!isSenhaHash(adminNoSupabase.senha) && adminNoSupabase.senha === pass);
+      if (senhaOk) {
+        // Migrar para hash se ainda estiver em texto puro
+        if (!isSenhaHash(adminNoSupabase.senha)) {
+          migrarSenhaParaHash('gestores', adminNoSupabase.id, pass);
+          adminNoSupabase.senha = passHash;
+        }
+        sessionStorage.setItem('ferias_sessao', JSON.stringify({
+          id: adminNoSupabase.id,
+          usuario: adminNoSupabase.usuario,
+          nome: adminNoSupabase.nome || 'Administrador',
           role: 'admin',
-          loginAt: new Date().toISOString() 
+          loginAt: new Date().toISOString()
         }));
         logadoComSucesso();
         return;
       }
     } else {
-      sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
-        id: adminNoSupabase.id,
-        usuario: adminNoSupabase.usuario, 
-        nome: adminNoSupabase.nome || 'Administrador', 
-        role: 'admin',
-        loginAt: new Date().toISOString() 
-      }));
-      logadoComSucesso();
-      return;
+      // fallback: credenciais locais (para casos sem internet ou primeiro uso)
+      const salvas = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
+      const creds = salvas.length ? salvas : CREDENCIAIS_PADRAO;
+      const matchLocal = creds.find(c =>
+        c.usuario.toLowerCase() === user.toLowerCase() &&
+        (c.senha === passHash || (!isSenhaHash(c.senha) && c.senha === pass))
+      );
+      if (matchLocal) {
+        // Migrar localmente para hash
+        if (!isSenhaHash(matchLocal.senha)) {
+          matchLocal.senha = passHash;
+          localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
+        }
+        sessionStorage.setItem('ferias_sessao', JSON.stringify({
+          usuario: matchLocal.usuario,
+          nome: matchLocal.nome || 'Administrador',
+          role: 'admin',
+          loginAt: new Date().toISOString()
+        }));
+        logadoComSucesso();
+        return;
+      }
     }
 
     // 2. Verificar SERVIDOR
     const servidores = DB.servidores();
-    // Comparação mais robusta: converte matrícula e senha para string e remove espaços
     const matchSrv = servidores.find(s => {
       const dbMatricula = String(s.matricula || '').trim();
       const loginUser = String(user || '').trim();
       const dbSenha = String(s.senha || '').trim();
-      const loginPass = String(pass || '').trim();
-      
-      return dbMatricula === loginUser && dbSenha === loginPass;
+      return dbMatricula === loginUser &&
+        (dbSenha === passHash || (!isSenhaHash(dbSenha) && dbSenha === pass));
     });
     
     if (matchSrv) {
+      // Migrar senha do servidor para hash automaticamente
+      if (!isSenhaHash(matchSrv.senha)) {
+        migrarSenhaParaHash('servidores', matchSrv.id, pass);
+        matchSrv.senha = passHash;
+        const idx = _remoteData.servidores.findIndex(s => s.id === matchSrv.id);
+        if (idx >= 0) _remoteData.servidores[idx].senha = passHash;
+      }
       sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
         id: matchSrv.id,
         usuario: matchSrv.matricula, 
@@ -3094,11 +3139,18 @@ async function tentarLogin() {
       const dbUser = String(g.usuario || '').trim().toLowerCase();
       const loginUser = String(user || '').trim().toLowerCase();
       const dbPass = String(g.senha || '').trim();
-      const loginPass = String(pass || '').trim();
-      return dbUser === loginUser && dbPass === loginPass;
+      return dbUser === loginUser &&
+        (dbPass === passHash || (!isSenhaHash(dbPass) && dbPass === pass));
     });
 
     if (matchGest) {
+      // Migrar senha do gestor para hash automaticamente
+      if (!isSenhaHash(matchGest.senha)) {
+        migrarSenhaParaHash('gestores', matchGest.id, pass);
+        matchGest.senha = passHash;
+        const idxG = _remoteData.gestores.findIndex(g => g.id === matchGest.id);
+        if (idxG >= 0) _remoteData.gestores[idxG].senha = passHash;
+      }
       sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
         id: matchGest.id,
         usuario: matchGest.usuario, 
@@ -3558,16 +3610,12 @@ async function salvarGestor() {
   const id = document.getElementById('g-id').value;
   const nome = document.getElementById('g-nome').value.trim();
   const usuario = document.getElementById('g-usuario').value.trim();
-  const senha = document.getElementById('g-senha').value.trim();
+  const senhaDigitada = document.getElementById('g-senha').value.trim();
   const checks = document.querySelectorAll('input[name="g-setor"]:checked');
   const setores = Array.from(checks).map(c => c.value);
 
-  if (!nome || !usuario || !senha || !setores.length) {
-    return toastMsg('Preencha os campos obrigatórios e selecione ao menos um setor!', 'error');
-  }
-
   const gestores = DB.gestores();
-  
+
   // Se for novo, verifica se usuário já existe
   if (!id && gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase())) {
      return toastMsg('Este usuário de login já existe!', 'error');
@@ -3576,16 +3624,29 @@ async function salvarGestor() {
   }
 
   if (id) {
+    // Edição: só atualiza a senha se o campo foi preenchido
     const idx = gestores.findIndex(g => g.id === id);
     if (idx >= 0) {
-      gestores[idx] = { ...gestores[idx], nome, usuario, senha, setores };
+      if (!nome || !usuario || !setores.length) {
+        return toastMsg('Preencha nome, usuário e ao menos um setor!', 'error');
+      }
+      let senhaFinal = gestores[idx].senha; // mantém a senha atual
+      if (senhaDigitada) {
+        // Nova senha digitada — hashear
+        senhaFinal = await hashSenha(senhaDigitada);
+      }
+      gestores[idx] = { ...gestores[idx], nome, usuario, senha: senhaFinal, setores };
     }
   } else {
-    gestores.push({ id: uid(), nome, usuario, senha, setores });
+    // Criação nova — senha obrigatória
+    if (!nome || !usuario || !senhaDigitada || !setores.length) {
+      return toastMsg('Preencha todos os campos obrigatórios e selecione ao menos um setor!', 'error');
+    }
+    const senhaHash = await hashSenha(senhaDigitada);
+    gestores.push({ id: uid(), nome, usuario, senha: senhaHash, setores });
   }
 
   await DB.saveGestores(gestores);
-  
   limparFormGestor();
   renderGestores();
   toastMsg(id ? 'Gestor atualizado com sucesso!' : 'Gestor cadastrado com sucesso!');
@@ -3599,7 +3660,9 @@ function abrirEditarGestor(id) {
   document.getElementById('g-id').value = g.id;
   document.getElementById('g-nome').value = g.nome;
   document.getElementById('g-usuario').value = g.usuario;
-  document.getElementById('g-senha').value = g.senha;
+  // Não exibir o hash — deixar vazio para indicar que só muda se digitar nova senha
+  document.getElementById('g-senha').value = '';
+  document.getElementById('g-senha').placeholder = 'Deixe em branco para manter a senha atual';
   document.getElementById('g-form-title').textContent = 'Editar Gestor';
   
   // Marcar setores
@@ -3881,7 +3944,7 @@ async function salvarEdicao() {
   }
 }
 
-function resetarSenhaServidor() {
+async function resetarSenhaServidor() {
   const id = document.getElementById('edit-id').value;
   const srv = DB.servidores().find(s => s.id === id);
   if (!srv) return;
@@ -3889,8 +3952,8 @@ function resetarSenhaServidor() {
   
   let lista = DB.servidores();
   const idx = lista.findIndex(s => s.id === id);
-  lista[idx].senha = '123456';
-  DB.saveServidores(lista);
+  lista[idx].senha = await hashSenha('123456');
+  await DB.saveServidores(lista);
   toastMsg('Senha resetada com sucesso para o padrão (123456).');
 }
 
@@ -3904,56 +3967,56 @@ async function alterarMinhaSenha() {
   
   if (!nova || nova.length < 4) return toastMsg('A senha deve ter pelo menos 4 caracteres!', 'error');
   if (nova !== conf) return toastMsg('As senhas não conferem!', 'error');
-  
+
+  const novaHash = await hashSenha(nova);
   const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao'));
+
   if (sessao.role === 'servidor') {
-    // Servidor: salva na tabela servidores
+    // Servidor: salva hash na tabela servidores
     let lista = DB.servidores();
     const idx = lista.findIndex(s => s.id === sessao.id);
     if (idx >= 0) {
-      lista[idx].senha = nova;
+      lista[idx].senha = novaHash;
       await DB.saveServidores(lista);
       toastMsg('Senha alterada com sucesso!');
       fecharModal('modal-alterar-senha');
     }
   } else {
-    // Admin/Gestor: salva na tabela gestores do Supabase + localStorage de fallback
+    // Admin/Gestor: salva hash na tabela gestores + fallback local
     const gestores = DB.gestores();
     const idxGestor = gestores.findIndex(g => g.usuario.toLowerCase() === sessao.usuario.toLowerCase());
 
     if (idxGestor >= 0) {
-      // Já existe na tabela gestores — apenas atualiza a senha
-      gestores[idxGestor].senha = nova;
+      gestores[idxGestor].senha = novaHash;
       await DB.saveGestores(gestores);
     } else {
-      // Admin padrão (não está na tabela gestores ainda) — criar o registro
+      // Admin padrão — criar registro no banco
       const uid_admin = 'admin-' + Date.now();
       const novoAdmin = {
         id: sessao.id || uid_admin,
         usuario: sessao.usuario,
         nome: sessao.nome || 'Administrador',
-        senha: nova,
+        senha: novaHash,
         role: 'admin',
         setores: []
       };
       gestores.push(novoAdmin);
       await DB.saveGestores(gestores);
-      // Atualizar id na sessão
       sessao.id = novoAdmin.id;
       sessionStorage.setItem('ferias_sessao', JSON.stringify(sessao));
     }
 
-    // Fallback local (para acesso offline)
+    // Fallback local (acesso offline) — também guarda o hash
     let creds = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
     const idxLocal = creds.findIndex(c => c.usuario.toLowerCase() === sessao.usuario.toLowerCase());
     if (idxLocal >= 0) {
-      creds[idxLocal].senha = nova;
+      creds[idxLocal].senha = novaHash;
     } else {
-      creds.push({ usuario: sessao.usuario, senha: nova, nome: sessao.nome || 'Administrador' });
+      creds.push({ usuario: sessao.usuario, senha: novaHash, nome: sessao.nome || 'Administrador' });
     }
     localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
 
-    toastMsg('✅ Senha de administrador alterada e salva no banco de dados!');
+    toastMsg('✅ Senha alterada e salva com segurança no banco de dados!');
     fecharModal('modal-alterar-senha');
   }
 }
@@ -5364,14 +5427,17 @@ function importarExcelDireto(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const novos = JSON.parse(e.target.result);
       if (!confirm(`Deseja importar/atualizar ${novos.length} servidores?`)) return;
       let atuais = DB.servidores();
       let ok=0, att=0;
-      novos.forEach(n => {
+      // Hashear senhas antes de salvar (importação)
+      for (const n of novos) {
         const idx = atuais.findIndex(s => s.matricula === n.matricula);
+        const senhaPlain = n.senha || '123456';
+        const senhaFinal = isSenhaHash(senhaPlain) ? senhaPlain : await hashSenha(senhaPlain);
         if (idx >= 0) {
           atuais[idx] = {
             ...atuais[idx], 
@@ -5381,15 +5447,15 @@ function importarExcelDireto(input) {
             admissao: n.admissao || atuais[idx].admissao || '', 
             cargo: n.cargo || atuais[idx].cargo || '',
             nome: n.nome || atuais[idx].nome,
-            senha: n.senha || atuais[idx].senha || '123456'
+            senha: isSenhaHash(atuais[idx].senha || '') ? atuais[idx].senha : senhaFinal
           };
           att++;
         } else {
-          atuais.push({...n, id: uid(), senha: n.senha || '123456'});
+          atuais.push({...n, id: uid(), senha: senhaFinal});
           ok++;
         }
-      });
-      DB.saveServidores(atuais);
+      }
+      await DB.saveServidores(atuais);
       input.value = '';
       renderTabela();
       toastMsg(`✅ ${ok} novos importados, ${att} atualizados!`);
