@@ -1025,6 +1025,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 .orb-2 { width:500px;height:500px; background:radial-gradient(circle,#8557f5,transparent 70%); bottom:-150px;right:-100px; animation-delay:-4s; opacity:0.12; }
 .orb-3 { width:300px;height:300px; background:radial-gradient(circle,#0fd488,transparent 70%); top:60%;left:60%; animation-delay:-8s; opacity:0.09; }
 @keyframes floatOrb { 0%,100%{transform:translate(0,0) scale(1);} 33%{transform:translate(30px,-25px) scale(1.05);} 66%{transform:translate(-20px,20px) scale(0.97);} }
+@keyframes pulse { 0% { opacity: 0.6; transform: scale(0.95); } 50% { opacity: 1; transform: scale(1); } 100% { opacity: 0.6; transform: scale(0.95); } }
 
 .login-wrapper { position:relative; z-index:10; width:100%; max-width:420px; padding:20px; animation:loginIn 0.45s cubic-bezier(0.16,1,0.3,1); }
 @keyframes loginIn { from{opacity:0;transform:translateY(24px);} to{opacity:1;transform:translateY(0);} }
@@ -2521,9 +2522,13 @@ Coordenação de RH
       <label>Observações</label>
       <textarea id="ep-obs" placeholder="Observações..."></textarea>
     </div>
-    <div class="field" style="margin-top:14px; display:flex; align-items:center; gap:8px; background:var(--surface); padding:10px; border-radius:var(--r-sm); border:1px solid var(--border-mid)">
-      <input type="checkbox" id="ep-concluido" style="width:18px; height:18px; cursor:pointer">
-      <label for="ep-concluido" style="margin:0; cursor:pointer; font-weight:700; color:var(--text)">✅ Marcar como: Servidor já usufruiu/saiu de férias</label>
+    <div class="field" style="margin-top:14px;">
+      <label style="font-weight:700; color:var(--text)">Status do Processo</label>
+      <select id="ep-status" style="width:100%; padding:10px; border-radius:8px; border:1px solid var(--border); background:var(--surface); color:var(--text)">
+        <option value="programado">📅 Programado (Aguardando Assinatura)</option>
+        <option value="assinou">✍️ Servidor já Assinou Autorização</option>
+        <option value="concluido">✅ Concluído / Já Usufruído</option>
+      </select>
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="fecharModal('modal-editar-prog')">Cancelar</button>
@@ -4372,6 +4377,7 @@ async function salvarProgramacao() {
       inicio,
       fim,
       obs: obs + (diasPorPeriodo.length > 1 ? ` (Período ${i}/${diasPorPeriodo.length})` : ''),
+      status: 'programado',
       concluido: false,
       criadoEm: new Date().toISOString()
     });
@@ -4443,33 +4449,58 @@ function renderProgramacoes() {
   }
   
   const servidores = DB.servidores();
+  const hojeIso = new Date().toISOString().split('T')[0];
+
   container.innerHTML = lista.map(p => {
     const srv = servidores.find(s => s.id === p.srvId);
     const retorno = p.fim ? addDays(p.fim, 1) : '';
-    const diff = p.inicio ? diffDays(p.inicio) : 0;
+    const status = p.status || (p.concluido ? 'concluido' : 'programado');
     
+    // Lógica de "Em Gozo" automática
+    const emGozo = status !== 'concluido' && p.inicio <= hojeIso && p.fim >= hojeIso;
+    
+    let statusClass = 'tag-blue';
+    let statusLabel = '📅 Programado';
+    let btnIcon = 'fa-pen-nib';
+    let btnTitle = 'Confirmar Assinatura';
+    let btnClass = 'btn-ghost';
+
+    if (status === 'assinou') {
+      statusClass = 'tag-warn';
+      statusLabel = '✍️ Assinou';
+      btnIcon = 'fa-check-double';
+      btnTitle = 'Concluir / Dar Baixa';
+      btnClass = 'btn-primary';
+    } else if (status === 'concluido') {
+      statusClass = 'tag-green';
+      statusLabel = '✅ Concluído';
+      btnIcon = 'fa-rotate-left';
+      btnTitle = 'Resetar Status';
+      btnClass = 'btn-success';
+    }
+
     return `
-      <div class="card" style="margin-bottom:12px;padding:16px">
+      <div class="card" style="margin-bottom:12px;padding:16px; border-left: 4px solid ${emGozo ? 'var(--success)' : 'transparent'}">
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1">
-            <h4 style="font-size:.9rem;margin-bottom:4px">${srv?.nome || 'Servidor'}</h4>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px">
+               <h4 style="font-size:.9rem;margin:0">${srv?.nome || 'Servidor'}</h4>
+               ${emGozo ? '<span class="tag tag-green" style="animation: pulse 2s infinite; font-size:10px">🌴 EM GOZO HOJE</span>' : ''}
+            </div>
             <div style="font-size:.78rem;color:var(--muted)">
               <i class="fa-solid fa-calendar"></i> <strong>${fmtDate(p.inicio)}</strong> → <strong>${fmtDate(p.fim)}</strong>
               <span style="margin-left:8px;color:var(--success);font-weight:600">Retorno: ${fmtDate(retorno)}</span>
             </div>
-            <div style="margin-top:8px">
+            <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
               <span class="tag ${p.tipo==='anual'?'tag-blue':'tag-purple'}">${p.tipo==='anual'?'🌴 Anual':'🏆 Prêmio'}</span>
-              ${p.periodoRef ? `<span class="tag tag-warn" style="margin-left:4px">Ref: ${p.periodoRef}</span>` : ''}
-              <span class="tag ${p.concluido ? 'tag-green' : (diff >= 0 ? 'tag-green' : 'tag-red')}" style="margin-left:4px">
-                ${p.concluido ? '✅ Concluído' : (diff === 0 ? '🚨 Hoje' : diff > 0 ? `⏳ Em ${diff} dias` : '✅ Concluído')}
-              </span>
-              ${p.concluido ? '<span class="tag tag-blue" style="margin-left:4px">✓ Já Usufruído</span>' : ''}
+              ${p.periodoRef ? `<span class="tag tag-warn">Ref: ${p.periodoRef}</span>` : ''}
+              <span class="tag ${statusClass}">${statusLabel}</span>
             </div>
             ${p.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${p.obs}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px">
-            <button class="btn ${p.concluido ? 'btn-success' : 'btn-ghost'} btn-sm" onclick="toggleConcluidoProg('${p.id}')" title="${p.concluido ? 'Marcar como não concluído' : 'Confirmar que já usufruiu'}">
-              <i class="fa-solid ${p.concluido ? 'fa-check-double' : 'fa-check'}"></i>
+            <button class="btn ${btnClass} btn-sm" onclick="avancarStatusProg('${p.id}')" title="${btnTitle}">
+              <i class="fa-solid ${btnIcon}"></i>
             </button>
             <button class="btn btn-ghost btn-sm" onclick="abrirEditarProg('${p.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
             <button class="btn btn-danger btn-sm" onclick="excluirProg('${p.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
@@ -4499,17 +4530,31 @@ async function excluirProg(id) {
   DB.saveLog('Exclusão', `Excluiu uma programação de férias (ID: ${id})`, 'programacoes', id);
 }
 
-async function toggleConcluidoProg(id) {
+async function avancarStatusProg(id) {
   const lista = DB.programacoes();
   const idx = lista.findIndex(p => p.id === id);
   if (idx < 0) return;
   
-  lista[idx].concluido = !lista[idx].concluido;
-  await DB.saveProgramacoes(lista);
+  const statusAtual = lista[idx].status || (lista[idx].concluido ? 'concluido' : 'programado');
   
+  if (statusAtual === 'programado') {
+    lista[idx].status = 'assinou';
+    lista[idx].concluido = false;
+    toastMsg('Status atualizado: Servidor assinou a autorização! ✍️');
+  } else if (statusAtual === 'assinou') {
+    lista[idx].status = 'concluido';
+    lista[idx].concluido = true;
+    toastMsg('Status atualizado: Férias concluídas / Baixa dada! ✅');
+  } else {
+    lista[idx].status = 'programado';
+    lista[idx].concluido = false;
+    toastMsg('Status resetado para Programado.');
+  }
+  
+  await DB.saveProgramacoes(lista);
   renderProgramacoes();
   renderDashboard();
-  toastMsg(lista[idx].concluido ? 'Marcado como concluído!' : 'Status resetado.');
+  atualizarBadge();
 }
 
 // ===================== EDITAR PROGRAMAÇÃO =====================
@@ -4526,7 +4571,11 @@ function abrirEditarProg(id) {
   document.getElementById('ep-inicio').value = p.inicio;
   document.getElementById('ep-fim').value = p.fim || '';
   document.getElementById('ep-obs').value = p.obs || '';
-  document.getElementById('ep-concluido').checked = !!p.concluido;
+  
+  // Adicionar seletor de status na edição se não existir
+  let statusEl = document.getElementById('ep-status');
+  if (statusEl) statusEl.value = p.status || (p.concluido ? 'concluido' : 'programado');
+  
   recalcRetornoEdicao();
   document.getElementById('modal-editar-prog').classList.add('open');
 }
@@ -4587,7 +4636,8 @@ async function salvarEdicaoProg() {
     fim: document.getElementById('ep-fim').value,
     retorno: addDays(inicio, 30),
     obs: document.getElementById('ep-obs').value,
-    concluido: document.getElementById('ep-concluido').checked
+    status: document.getElementById('ep-status')?.value || 'programado',
+    concluido: document.getElementById('ep-status')?.value === 'concluido'
   };
   await DB.saveProgramacoes(lista);
   fecharModal('modal-editar-prog');
