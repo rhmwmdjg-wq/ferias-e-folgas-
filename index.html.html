@@ -7101,7 +7101,6 @@ async function adicionarFolga() {
   toastMsg(`+${qtdReal} dia(s) adicionado(s) ao banco!`);
   DB.saveLog('Crédito Folga', `Adicionou +${qtdReal} dia(s) de folga para (SrvID: ${srvId}). Motivo: ${motivo}`, 'folgas', srvId);
 }
-}
 
 async function registrarUsufrutoFolga() {
   const srvId = document.getElementById('fg-srv-deb').value;
