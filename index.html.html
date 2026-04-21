@@ -1428,6 +1428,10 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-calendar-days"></i>
         <span class="tab-label">Programar Férias</span>
       </button>
+      <button class="tab-btn" onclick="abrirModalAutorizacao()" id="tab-emitir-aut" style="color:var(--primary)">
+        <i class="fa-solid fa-file-pdf"></i>
+        <span class="tab-label" style="font-weight:800">Emitir Autorização</span>
+      </button>
       <button class="tab-btn" onclick="showTab('calendario')" id="tab-calendario">
         <i class="fa-solid fa-calendar-week"></i>
         <span class="tab-label">Calendário Visual</span>
@@ -1780,9 +1784,6 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 <div class="tab-panel" id="panel-ferias">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:12px">
     <div class="section-title" style="margin:0">📅 Programar Férias</div>
-    <button class="btn btn-primary" onclick="abrirModalAutorizacao()" style="background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 4px 20px rgba(79,125,255,0.35)">
-      📄 Emitir Autorização de Concessão de Férias
-    </button>
   </div>
 
   <div class="grid-2">
