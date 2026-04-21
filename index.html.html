@@ -1844,7 +1844,13 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     </div>
 
     <div class="card">
-      <h3><span class="icon">📋</span> Programações Recentes</h3>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px">
+        <h3 style="margin:0"><span class="icon">📋</span> Programações</h3>
+        <div class="input-wrap" style="flex:1; min-width:180px; max-width:280px">
+          <input type="text" id="fp-busca-nome" placeholder="🔍 Pesquisar servidor..." oninput="renderProgramacoes()" style="padding:8px 12px 8px 35px; font-size:0.82rem">
+          <i class="fa-solid fa-magnifying-glass field-icon" style="left:12px"></i>
+        </div>
+      </div>
       <div id="lista-programacoes"><div class="empty"><div class="icon">📅</div><p>Nenhuma programação cadastrada.</p></div></div>
     </div>
   </div>
@@ -4442,14 +4448,25 @@ function limparFormFerias() {
 }
 
 function renderProgramacoes() {
-  const lista = DB.programacoes().slice(-10).reverse();
+  let lista = DB.programacoes().reverse();
+  const busca = document.getElementById('fp-busca-nome')?.value.toLowerCase().trim();
+  const servidores = DB.servidores();
   const container = document.getElementById('lista-programacoes');
+
+  if (busca) {
+    lista = lista.filter(p => {
+      const srv = servidores.find(s => s.id === p.srvId);
+      return srv?.nome.toLowerCase().includes(busca) || srv?.matricula?.includes(busca);
+    });
+  } else {
+    lista = lista.slice(0, 10);
+  }
+
   if (!lista.length) { 
-    container.innerHTML = '<div class="empty"><div class="icon">📅</div><p>Nenhuma programação cadastrada.</p></div>'; 
+    container.innerHTML = `<div class="empty"><div class="icon">🔍</div><p>${busca ? 'Nenhum servidor encontrado com este nome.' : 'Nenhuma programação cadastrada.'}</p></div>`; 
     return; 
   }
   
-  const servidores = DB.servidores();
   const hojeIso = new Date().toISOString().split('T')[0];
 
   container.innerHTML = lista.map(p => {
