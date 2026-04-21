@@ -4838,7 +4838,7 @@ function renderListaGozoHoje(lista) {
         <p style="color:var(--success)">🚀 Data de Retorno: <strong>${fmtDate(retorno)}</strong></p>
       </div>
       <div class="alert-actions">
-         <button class="btn btn-primary btn-sm" onclick="toggleConcluidoProg('${item.id}')">✅ Dar Baixa</button>
+         <button class="btn btn-primary btn-sm" onclick="avancarStatusProg('${item.id}')">✅ Dar Baixa</button>
       </div>
     </div>`;
   }).join('');
@@ -4870,7 +4870,7 @@ function renderListaAlertas(containerId, lista, tipo) {
         ${item.srv.telefone
           ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsApp('${item.srv.id}','${item.id}')" title="Enviar lembrete via WhatsApp">💬 WhatsApp</button>`
           : `<button class="btn btn-ghost btn-sm" title="Cadastre o telefone do servidor" disabled>📵 Sem Tel.</button>`}
-        <button class="btn btn-primary btn-sm" onclick="toggleConcluidoProg('${item.id}')" title="Marcar como concluído/entregue">✅ Dar Baixa</button>
+        <button class="btn btn-primary btn-sm" onclick="avancarStatusProg('${item.id}')" title="Marcar como concluído/entregue">✅ Dar Baixa</button>
       </div>
     </div>`;
   }).join('');
