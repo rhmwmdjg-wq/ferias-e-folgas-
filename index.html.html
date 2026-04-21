@@ -1404,9 +1404,13 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-gear"></i>
         <span class="tab-label">Configurações do Sistema</span>
       </button>
-      <button class="tab-btn" onclick="showTab('gestores')" id="tab-gestores" style="display:none; margin-bottom:10px">
+      <button class="tab-btn" onclick="showTab('gestores')" id="tab-gestores" style="display:none">
         <i class="fa-solid fa-user-shield"></i>
         <span class="tab-label">Gerenciar Gestores</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('auditoria')" id="tab-auditoria" style="display:none; margin-bottom:10px">
+        <i class="fa-solid fa-clipboard-list"></i>
+        <span class="tab-label">Logs de Auditoria</span>
       </button>
 
       <div class="sidebar-section-label">Menu Principal</div>
@@ -2363,6 +2367,33 @@ Coordenação de RH
       <p style="font-size:0.7rem; color:var(--muted); margin-top:8px">ℹ️ Após migrar, o sistema passará a ler e salvar tudo na nuvem.</p>
     </div>
   </div> <!-- close panel-config -->
+
+  <!-- ======================= ABA AUDITORIA ======================= -->
+  <div class="tab-panel" id="panel-auditoria">
+    <div class="section-title">📋 Logs de Auditoria</div>
+    <div class="card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px">
+        <p style="font-size:.82rem;color:var(--muted)">Registro de todas as ações importantes realizadas no sistema para garantir transparência e segurança.</p>
+        <button class="btn btn-ghost btn-sm" onclick="renderAuditoria()">🔄 Atualizar Logs</button>
+      </div>
+      <div class="table-wrap">
+        <table id="tabela-auditoria" class="modern-table">
+          <thead>
+            <tr>
+              <th style="width:180px">Data/Hora</th>
+              <th style="width:180px">Usuário</th>
+              <th style="width:200px">Ação</th>
+              <th>Detalhes</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-auditoria">
+            <tr><td colspan="4" style="text-align:center;padding:40px">Clique em "Atualizar Logs" para carregar os dados de auditoria...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
 </div> <!-- close content-area -->
 </div> <!-- close app-container -->
 
@@ -3074,7 +3105,7 @@ async function verificarSessao() {
     const isGestor = role === 'gestor';
     
     // Controle de abas por role
-    const adminTabs = ['tab-config', 'tab-gestores', 'label-admin-section'];
+    const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
     const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-solicitacoes'];
     
     adminTabs.forEach(id => {
@@ -3511,6 +3542,36 @@ const DB = {
   deleteSolicitacao: async (id) => {
     const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
     if (error) throw error;
+  },
+
+  saveLog: async (acao, detalhes, tabela = '', registroId = '') => {
+    const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
+    const log = {
+      id: uid(),
+      usuarioId: sessao.id || 'sistema',
+      usuarioNome: sessao.nome || 'Sistema',
+      usuarioRole: sessao.role || 'anon',
+      acao,
+      detalhes,
+      tabela,
+      registroId,
+      criadoEm: new Date().toISOString()
+    };
+    try {
+      await supabaseClient.from('logs').insert(log);
+    } catch (e) {
+      console.error("Erro ao salvar log:", e);
+    }
+    return log;
+  },
+
+  getLogs: async (limit = 100) => {
+    const { data, error } = await supabaseClient.from('logs').select('*').order('criadoEm', { ascending: false }).limit(limit);
+    if (error) {
+      console.error("Erro ao buscar logs:", error);
+      return [];
+    }
+    return data;
   }
 };
 
@@ -3552,6 +3613,7 @@ function showTab(tab) {
     if (!fpGozo) initFlatpickrFolga();
   }
   if (tab === 'solicitacoes') renderSolicitacoes();
+  if (tab === 'auditoria') renderAuditoria();
   if (tab === 'config') carregarConfig();
   
   currentPage = 1;
@@ -3765,6 +3827,7 @@ async function salvarGestor() {
   limparFormGestor();
   renderGestores();
   toastMsg(id ? 'Gestor atualizado com sucesso!' : 'Gestor cadastrado com sucesso!');
+  DB.saveLog(id ? 'Edição' : 'Criação', `${id ? 'Editou' : 'Criou'} o gestor ${nome} (Login: ${usuario})`, 'gestores', id || 'novo');
 }
 
 function abrirEditarGestor(id) {
@@ -3824,6 +3887,7 @@ async function excluirGestor(id) {
 
   renderGestores();
   toastMsg('Gestor removido permanentemente.');
+  DB.saveLog('Exclusão', `Excluiu o gestor (ID: ${id})`, 'gestores', id);
 }
 
 function limparFormGestor() {
@@ -3880,6 +3944,7 @@ async function salvarServidor() {
     renderTabela();
     atualizarBadge();
     
+    DB.saveLog('Criação', `Criou o servidor ${nome} (Matrícula: ${matricula})`, 'servidores', servidor.id);
     alert(`Servidor cadastrado!\n\nID de Acesso: ${matricula}\nSenha Inicial: ${senhaAuto}\n\nInforme estes dados ao servidor.`);
   } catch (err) {
     console.error(err);
@@ -3982,6 +4047,39 @@ function renderTabela() {
   }).join('');
 }
 
+async function renderAuditoria() {
+  const tbody = document.getElementById('tbody-auditoria');
+  if (!tbody) return;
+  
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px"><i class="fa-solid fa-spinner fa-spin"></i> Buscando logs no Supabase...</td></tr>';
+  
+  try {
+    const logs = await DB.getLogs(150);
+    if (!logs || !logs.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted)">Nenhum log encontrado.</td></tr>';
+      return;
+    }
+    
+    tbody.innerHTML = logs.map(l => {
+      const dataFmt = new Date(l.criadoEm).toLocaleString('pt-BR');
+      return `
+        <tr>
+          <td style="font-size:0.75rem; color:var(--muted)">${dataFmt}</td>
+          <td>
+            <div style="font-weight:700; font-size:0.82rem">${l.usuarioNome}</div>
+            <div style="font-size:0.65rem; color:var(--muted)">${l.usuarioRole.toUpperCase()}</div>
+          </td>
+          <td><span class="tag ${l.acao.toLowerCase().includes('excluir') ? 'tag-danger' : 'tag-blue'}" style="font-size:0.65rem">${l.acao}</span></td>
+          <td style="font-size:0.78rem; line-height:1.4">${l.detalhes}</td>
+        </tr>
+      `;
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--danger)">Erro ao carregar logs: ${e.message}</td></tr>`;
+  }
+}
+
+
 function abrirEditar(id) {
   const s = DB.servidores().find(x => x.id === id);
   if (!s) return;
@@ -4051,6 +4149,7 @@ async function salvarEdicao() {
     fecharModal('modal-editar');
     renderTabela();
     toastMsg('Servidor atualizado!');
+    DB.saveLog('Edição', `Editou dados do servidor ${lista[idx].nome} (Matrícula: ${lista[idx].matricula})`, 'servidores', id);
   } catch (err) {
     console.error(err);
     toastMsg("Erro ao atualizar: " + err.message, "error");
@@ -4070,6 +4169,7 @@ async function resetarSenhaServidor() {
   lista[idx].senha = await hashSenha('123456');
   await DB.saveServidores(lista);
   toastMsg('Senha resetada com sucesso para o padrão (123456).');
+  DB.saveLog('Segurança', `Resetou a senha do servidor ${srv.nome} (Matrícula: ${srv.matricula})`, 'servidores', id);
 }
 
 function abrirModalAlterarSenha() {
@@ -4176,6 +4276,7 @@ async function excluirServidor(id) {
   renderDashboard();
   atualizarBadge();
   toastMsg('Servidor e registros vinculados excluídos permanentemente!');
+  DB.saveLog('Exclusão', `Excluiu o servidor (ID: ${id}) e todos os seus registros vinculados.`, 'servidores', id);
 }
 
 // ===================== FOTO DE PERFIL =====================
@@ -4311,6 +4412,7 @@ async function salvarProgramacao() {
   renderProgramacoes();
   atualizarBadge();
   toastMsg(`${novasProg.length} período(s) de férias programado(s)!`);
+  DB.saveLog('Programação', `Programou férias para (SrvID: ${srvId}): ${novasProg.length} período(s)`, 'programacoes', srvId);
 }
 
 function limparFormFerias() {
@@ -4394,6 +4496,7 @@ async function excluirProg(id) {
   renderDashboard();
   atualizarBadge();
   toastMsg('Programação excluída permanentemente.');
+  DB.saveLog('Exclusão', `Excluiu uma programação de férias (ID: ${id})`, 'programacoes', id);
 }
 
 async function toggleConcluidoProg(id) {
@@ -4492,6 +4595,7 @@ async function salvarEdicaoProg() {
   renderDashboard();
   atualizarBadge();
   toastMsg('Programação atualizada!');
+  DB.saveLog('Edição', `Atualizou programação de férias (ID: ${id})`, 'programacoes', id);
 }
 
 // ===================== DASHBOARD & GRAFICOS =====================
@@ -5141,6 +5245,7 @@ async function salvarConfig() {
   atualizarPreview();
   atualizarSelectsSetores();
   toastMsg('Configurações salvas!');
+  DB.saveLog('Configuração', `Atualizou as configurações gerais do sistema`, 'configuracoes', 'geral');
 }
 
 async function adicionarSetor() {
@@ -6839,6 +6944,7 @@ async function resolverSolicitacao(id, novoStatus) {
   renderSolicitacoes();
   await atualizarBadgeSolicitacoes();
   toastMsg(`Solicitação ${novoStatus === 'autorizado' ? 'autorizada' : 'negada'}!`);
+  DB.saveLog('Solicitação', `Resolveu solicitação (ID: ${id}) para status: ${novoStatus.toUpperCase()}`, 'solicitacoes', id);
 }
 
 async function excluirSolicitacao(id) {
@@ -6878,6 +6984,7 @@ async function excluirSolicitacao(id) {
   renderSolicitacoes();
   await atualizarBadgeSolicitacoes();
   toastMsg('Solicitação e registros vinculados removidos.');
+  DB.saveLog('Exclusão', `Excluiu solicitação (ID: ${id})`, 'solicitacoes', id);
 }
 
 function atualizarBadgeSolicitacoes() {
@@ -6992,6 +7099,8 @@ async function adicionarFolga() {
   renderHistoricoFolgas();
   atualizarBadgeFolgas();
   toastMsg(`+${qtdReal} dia(s) adicionado(s) ao banco!`);
+  DB.saveLog('Crédito Folga', `Adicionou +${qtdReal} dia(s) de folga para (SrvID: ${srvId}). Motivo: ${motivo}`, 'folgas', srvId);
+}
 }
 
 async function registrarUsufrutoFolga() {
@@ -7040,6 +7149,7 @@ async function registrarUsufrutoFolga() {
   renderHistoricoFolgas();
   atualizarBadgeFolgas();
   toastMsg(`Usufruto de ${qtd} dia(s) registrado.`);
+  DB.saveLog('Usufruto Folga', `Registrou usufruto de ${qtd} dia(s) para (SrvID: ${srvId})`, 'folgas', srvId);
   if(confirm('Imprimir comprovante?')) imprimirComprovanteFolga(novaFolga.id);
 }
 
@@ -7124,6 +7234,7 @@ async function excluirFolga(id) {
   atualizarBadgeFolgas();
   renderDashboard();
   toastMsg('Lançamento excluído permanentemente.');
+  DB.saveLog('Exclusão Folga', `Excluiu lançamento de folga (ID: ${id})`, 'folgas', id);
 }
 
 function atualizarBadgeFolgas() {
@@ -7261,6 +7372,7 @@ function gerarAutorizacaoFerias() {
 
   imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, textoAutorizacao, tipoFerias);
   fecharModal('modal-autorizacao');
+  DB.saveLog('Documento', `Gerou Autorização de Férias para ${srv.nome} (${tipoFerias === 'premio' ? 'Prêmio' : 'Regulamentar'})`, 'servidores', srv.id);
 }
 
 function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, textoAutorizacao, tipoFerias) {
