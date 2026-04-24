@@ -2585,7 +2585,7 @@ Coordenação de RH
     <!-- Tipo de Férias -->
     <div class="field" style="margin-bottom:14px">
       <label>Tipo de Férias * <small style="color:var(--danger)">(obrigatório)</small></label>
-      <select id="aut-tipo-ferias">
+      <select id="aut-tipo-ferias" onchange="toggleTercoSection()">
         <option value="">Selecione o tipo...</option>
         <option value="regulamentar">🌴 Férias Regulamentares</option>
         <option value="premio">🏆 Férias Prêmio</option>
@@ -7349,6 +7349,18 @@ function atualizarDadosAutorizacao() {
   `;
 }
 
+function toggleTercoSection() {
+  const tipo = document.getElementById('aut-tipo-ferias').value;
+  const section = document.getElementById('aut-terco-section');
+  // Só mostra se for regulamentar E se já tiver selecionado um parcelamento (autTipoPeriodo > 0)
+  if (tipo === 'regulamentar' && autTipoPeriodo > 0) {
+    section.style.display = 'block';
+  } else {
+    section.style.display = 'none';
+    document.getElementById('aut-terco-mes').value = '';
+  }
+}
+
 function selecionarTipoPeriodo(tipo) {
   autTipoPeriodo = tipo;
   document.querySelectorAll('.periodo-option').forEach(o => o.classList.remove('selected'));
@@ -7384,8 +7396,8 @@ function selecionarTipoPeriodo(tipo) {
   html += '</div>';
   section.innerHTML = html;
 
-  // Mostrar seção de 1/3 de férias (seleção por mês)
-  document.getElementById('aut-terco-section').style.display = 'block';
+  // Atualizar visibilidade do 1/3 de férias
+  toggleTercoSection();
 }
 
 function calcularFimPeriodo(num, dias) {
@@ -7430,7 +7442,9 @@ function gerarAutorizacaoFerias() {
   }
 
   const tercoMes = document.getElementById('aut-terco-mes').value;
-  if (!tercoMes) return toastMsg('Selecione o mês para recebimento do 1/3 de férias!', 'error');
+  if (tipoFerias === 'regulamentar' && !tercoMes) {
+    return toastMsg('Selecione o mês para recebimento do 1/3 de férias!', 'error');
+  }
 
   const periodoRef = document.getElementById('aut-periodo-ref').value.trim();
   const obs = document.getElementById('aut-obs').value.trim();
@@ -7574,7 +7588,8 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
           </tbody>
         </table>
 
-        <!-- 1/3 FÉRIAS -->
+        <!-- 1/3 FÉRIAS (Apenas para regulamentares) -->
+        ${tipoFerias === 'regulamentar' ? `
         <div class="terco-box">
           <span class="terco-icon">💰</span>
           <div class="terco-text" style="text-transform: uppercase;">
@@ -7582,6 +7597,7 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
             <strong>${tercoMes}</strong>.
           </div>
         </div>
+        ` : ''}
 
         <!-- OBSERVAÇÕES -->
         ${obs ? `
