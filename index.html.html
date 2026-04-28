@@ -1478,6 +1478,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <div style="display:flex;align-items:center;gap:6px">
           <div class="status-dot">v2.1</div>
           <div id="realtime-badge" title="Sincronização em tempo real ativa" style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);opacity:0;transition:opacity 0.4s;flex-shrink:0;"></div>
+          <div id="sync-pending-badge" title="Dados pendentes de sincronização" style="display:none;cursor:pointer;width:8px;height:8px;border-radius:50%;background:var(--warning);box-shadow:0 0 6px var(--warning);flex-shrink:0;" onclick="forcarSync()"></div>
         </div>
       </div>
     </div>
@@ -2680,6 +2681,147 @@ const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
 let _realtimeChannel = null;
 let _realtimeDebounce = null;
 
+// ===================== SISTEMA DE SINCRONIZAÇÃO OFFLINE =====================
+let _quotaBloqueado = false;
+let _syncQueue = [];
+let _syncTimer = null;
+
+function isQuotaError(error) {
+  if (!error) return false;
+  const msg = (error.message || "").toLowerCase();
+  return msg.includes('exceed_egress') || msg.includes('service for this project is restricted') || msg.includes('quota');
+}
+
+function saveToSyncQueue(tabela, dados) {
+  const queueItem = { tabela, dados, timestamp: Date.now() };
+  _syncQueue.push(queueItem);
+  localStorage.setItem('srv_sync_queue', JSON.stringify(_syncQueue));
+  console.log(`📦 Adicionado à fila de sync: ${tabela} (${_syncQueue.length} itens pendentes)`);
+  atualizarBadgeSync();
+}
+
+function loadSyncQueue() {
+  try {
+    _syncQueue = JSON.parse(localStorage.getItem('srv_sync_queue') || '[]');
+  } catch (e) {
+    _syncQueue = [];
+  }
+}
+
+async function processSyncQueue() {
+  if (_quotaBloqueado || _syncQueue.length === 0) return;
+  
+  console.log(`🔄 Processando fila de sync: ${_syncQueue.length} itens...`);
+  const queueCopy = [..._syncQueue];
+  let sucesso = 0;
+  let falhou = 0;
+  
+  for (const item of queueCopy) {
+    try {
+      const tabela = item.tabela;
+      const dados = item.dados;
+      
+      if (tabela === 'configuracoes') {
+        const configArray = Object.entries(dados)
+          .filter(([key]) => !key.startsWith('img_'))
+          .map(([key, value]) => ({
+            chave: key,
+            valor: typeof value === 'string' ? value : JSON.stringify(value)
+          }));
+        const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
+        if (error) {
+          if (isQuotaError(error)) throw error;
+          console.error(`Erro ao sync config:`, error);
+        }
+      } else {
+        const { error } = await supabaseClient.from(tabela).upsert(dados);
+        if (error) {
+          if (isQuotaError(error)) throw error;
+          console.error(`Erro ao sync ${tabela}:`, error);
+        }
+      }
+      
+      _syncQueue = _syncQueue.filter(q => q !== item);
+      sucesso++;
+    } catch (e) {
+      if (isQuotaError(e)) {
+        _quotaBloqueado = true;
+        toastMsg("⚠️ Limite de banda excedido. Dados salvos localmente e serão sincronizados automaticamente.", "warning");
+        break;
+      }
+      console.error(`Erro ao processar item da fila:`, e);
+      falhou++;
+    }
+  }
+  
+  localStorage.setItem('srv_sync_queue', JSON.stringify(_syncQueue));
+  
+  if (sucesso > 0) {
+    console.log(`✅ Sync concluído: ${sucesso} itens sincronizados, ${falhou} falharam`);
+    if (sucesso === queueCopy.length) {
+      toastMsg("✅ Sincronização automática concluída!", "success");
+    }
+  }
+}
+
+function iniciarSyncTimer() {
+  if (_syncTimer) clearInterval(_syncTimer);
+  
+  _syncTimer = setInterval(async () => {
+    if (_quotaBloqueado) {
+      console.log("⚠️ Tentando sync após bloqueio de quota...");
+      try {
+        const { error } = await supabaseClient.from('configuracoes').select('chave').limit(1);
+        if (error) {
+          if (isQuotaError(error)) {
+            console.log("Quota ainda bloqueada, tentando novamente em 1 minuto...");
+            return;
+          }
+        }
+        _quotaBloqueado = false;
+        toastMsg("🔄 Conexão restaurada! Sincronizando dados...", "info");
+        await processSyncQueue();
+      } catch (e) {
+        if (isQuotaError(e)) {
+          console.log("Quota ainda bloqueada, tentando novamente em 1 minuto...");
+          return;
+        }
+        _quotaBloqueado = false;
+      }
+    } else if (_syncQueue.length > 0) {
+      await processSyncQueue();
+    }
+  }, 60000);
+}
+
+loadSyncQueue();
+iniciarSyncTimer();
+
+function atualizarBadgeSync() {
+  const badge = document.getElementById('sync-pending-badge');
+  if (badge) {
+    if (_syncQueue.length > 0 || _quotaBloqueado) {
+      badge.style.display = 'block';
+      badge.title = `⚠️ ${_syncQueue.length} itens pendentes de sincronização`;
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+}
+
+async function forcarSync() {
+  if (_syncQueue.length === 0) {
+    toastMsg("Nada para sincronizar!", "info");
+    return;
+  }
+  toastMsg("🔄 Forçando sincronização...", "info");
+  _quotaBloqueado = false;
+  await processSyncQueue();
+  atualizarBadgeSync();
+}
+
+setInterval(atualizarBadgeSync, 5000);
+
 function setupRealtime() {
   // Limpar canal anterior se existir
   if (_realtimeChannel) {
@@ -3348,39 +3490,44 @@ async function migrarDadosParaSupabase() {
     const gestores = DB.gestores();
     const config = DB.config();
 
-    // 1. Limpar e Inserir Servidores
-    if (servidores.length) {
-      await supabaseClient.from('servidores').insert(servidores);
+    async function salvarComHandleError(tabela, dados) {
+      try {
+        if (tabela === 'configuracoes') {
+          const configArray = Object.entries(dados)
+            .filter(([key]) => !key.startsWith('img_'))
+            .map(([key, value]) => ({
+              chave: key,
+              valor: typeof value === 'string' ? value : JSON.stringify(value)
+            }));
+          await supabaseClient.from('configuracoes').upsert(configArray);
+        } else {
+          await supabaseClient.from(tabela).upsert(dados);
+        }
+      } catch (e) {
+        if (isQuotaError(e)) {
+          saveToSyncQueue(tabela, dados);
+        }
+        throw e;
+      }
     }
-
-    // 2. Programações
-    if (programacoes.length) await supabaseClient.from('programacoes').insert(programacoes);
-
-    // 3. Folgas
-    if (folgas.length) await supabaseClient.from('folgas').insert(folgas);
-
-    // 4. Solicitações
-    if (solicitacoes.length) await supabaseClient.from('solicitacoes').insert(solicitacoes);
-
-    // 5. Gestores
-    if (gestores.length) await supabaseClient.from('gestores').insert(gestores);
-
-    // 6. Configurações (batch upsert) - excluir imagens
-    const configArray = Object.entries(config)
-      .filter(([key]) => !key.startsWith('img_'))
-      .map(([key, value]) => ({
-        chave: key,
-        valor: typeof value === 'string' ? value : JSON.stringify(value)
-      }));
-    if (configArray.length > 0) {
-      await supabaseClient.from('configuracoes').upsert(configArray);
-    }
-
+    
+    if (servidores.length) await salvarComHandleError('servidores', servidores);
+    if (programacoes.length) await salvarComHandleError('programacoes', programacoes);
+    if (folgas.length) await salvarComHandleError('folgas', folgas);
+    if (solicitacoes.length) await salvarComHandleError('solicitacoes', solicitacoes);
+    if (gestores.length) await salvarComHandleError('gestores', gestores);
+    await salvarComHandleError('configuracoes', config);
+    
     toastMsg("✅ Migração concluída com sucesso! Recarregando...");
     setTimeout(() => location.reload(), 2000);
   } catch (err) {
     console.error(err);
-    toastMsg("❌ Erro na migração: " + err.message, "error");
+    const msg = err.message || "";
+    if (isQuotaError(err)) {
+      toastMsg("⚠️Quota excedido. Dados salvos localmente.", "warning");
+    } else {
+      toastMsg("❌ Erro na migração: " + msg, "error");
+    }
   }
 }
 
@@ -3417,30 +3564,66 @@ const DB = {
   saveServidores: async (d) => {
     _remoteData.servidores = d;
     localStorage.setItem('srv_servidores', JSON.stringify(d));
-    const { error } = await supabaseClient.from('servidores').upsert(d);
-    if (error) {
-       console.error("Erro Supabase (servidores):", error);
-       toastMsg("Erro ao salvar servidores na nuvem: " + error.message, "error");
+    try {
+      const { error } = await supabaseClient.from('servidores').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue('servidores', d);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else {
+          console.error("Erro Supabase (servidores):", error);
+          toastMsg("Erro ao salvar servidores na nuvem: " + error.message, "error");
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('servidores', d);
+        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+      } else {
+        throw e;
+      }
     }
   },
   deleteServidor: async (id) => {
     const { error } = await supabaseClient.from('servidores').delete().eq('id', id);
-    if (error) toastMsg("Erro ao excluir servidor na nuvem: " + error.message, "error");
+    if (error) {
+      if (!isQuotaError(error)) {
+        toastMsg("Erro ao excluir servidor na nuvem: " + error.message, "error");
+      }
+    }
   },
 
   programacoes: () => _remoteData.programacoes.length ? _remoteData.programacoes : JSON.parse(localStorage.getItem('srv_programacoes') || '[]'),
   saveProgramacoes: async (d) => {
     _remoteData.programacoes = d;
     localStorage.setItem('srv_programacoes', JSON.stringify(d));
-    const { error } = await supabaseClient.from('programacoes').upsert(d);
-    if (error) {
-       console.error("Erro Supabase (programacoes):", error);
-       toastMsg("Erro ao sincronizar programações: " + error.message, "error");
+    try {
+      const { error } = await supabaseClient.from('programacoes').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue('programacoes', d);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else {
+          console.error("Erro Supabase (programacoes):", error);
+          toastMsg("Erro ao sincronizar programações: " + error.message, "error");
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('programacoes', d);
+        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+      } else {
+        throw e;
+      }
     }
   },
   deleteProgramacao: async (id) => {
     const { error } = await supabaseClient.from('programacoes').delete().eq('id', id);
-    if (error) toastMsg("Erro ao excluir programação na nuvem: " + error.message, "error");
+    if (error) {
+      if (!isQuotaError(error)) {
+        toastMsg("Erro ao excluir programação na nuvem: " + error.message, "error");
+      }
+    }
   },
 
   config: () => {
@@ -3450,8 +3633,6 @@ const DB = {
   saveConfig: async (d) => {
     _remoteData.config = d;
     localStorage.setItem('srv_config', JSON.stringify(d));
-    // Converter para array de objetos para fazer um único upsert em batch
-    // Excluir imagens base64 para economizar egress
     const configArray = Object.entries(d)
       .filter(([key]) => !key.startsWith('img_'))
       .map(([key, value]) => ({
@@ -3460,8 +3641,24 @@ const DB = {
       }));
     
     if (configArray.length > 0) {
-      const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
-      if (error) toastMsg("Erro ao salvar configuração: " + error.message, "error");
+      try {
+        const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
+        if (error) {
+          if (isQuotaError(error)) {
+            saveToSyncQueue('configuracoes', d);
+            toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+          } else {
+            toastMsg("Erro ao salvar configuração: " + error.message, "error");
+          }
+        }
+      } catch (e) {
+        if (isQuotaError(e)) {
+          saveToSyncQueue('configuracoes', d);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else {
+          toastMsg("Erro ao salvar configuração: " + e.message, "error");
+        }
+      }
     }
   },
 
@@ -3469,15 +3666,33 @@ const DB = {
   saveFolgas: async (d) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
-    const { error } = await supabaseClient.from('folgas').upsert(d);
-    if (error) {
-       console.error("Erro Supabase (folgas):", error);
-       toastMsg("Erro ao salvar folgas na nuvem: " + error.message, "error");
+    try {
+      const { error } = await supabaseClient.from('folgas').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue('folgas', d);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else {
+          console.error("Erro Supabase (folgas):", error);
+          toastMsg("Erro ao salvar folgas na nuvem: " + error.message, "error");
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('folgas', d);
+        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+      } else {
+        throw e;
+      }
     }
   },
   deleteFolga: async (id) => {
     const { error } = await supabaseClient.from('folgas').delete().eq('id', id);
-    if (error) toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
+    if (error) {
+      if (!isQuotaError(error)) {
+        toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
+      }
+    }
   },
 
   gestores: () => {
@@ -3487,27 +3702,42 @@ const DB = {
   saveGestores: async (d) => {
     _remoteData.gestores = d;
     localStorage.setItem('srv_gestores', JSON.stringify(d));
-    const { error } = await supabaseClient.from('gestores').upsert(d);
-    if (error) {
-      if (error.code === '23505') toastMsg("Erro: Usuário de Login já existe!", "error");
-      else toastMsg("Erro ao salvar gestores na nuvem: " + error.message, "error");
+    try {
+      const { error } = await supabaseClient.from('gestores').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue('gestores', d);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else {
+          if (error.code === '23505') toastMsg("Erro: Usuário de Login já existe!", "error");
+          else toastMsg("Erro ao salvar gestores na nuvem: " + error.message, "error");
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('gestores', d);
+        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+      } else {
+        throw e;
+      }
     }
   },
   deleteGestor: async (id) => {
     const { error } = await supabaseClient.from('gestores').delete().eq('id', id);
-    if (error) toastMsg("Erro ao excluir gestor na nuvem: " + error.message, "error");
+    if (error) {
+      if (!isQuotaError(error)) {
+        toastMsg("Erro ao excluir gestor na nuvem: " + error.message, "error");
+      }
+    }
   },
 
   solicitacoes: () => _remoteData.solicitacoes.length ? _remoteData.solicitacoes : JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]'),
   saveSolicitacao: async (obj) => {
-    // 1. Atualizar cache local (sempre funciona)
     const idx = _remoteData.solicitacoes.findIndex(s => s.id === obj.id);
     if (idx >= 0) _remoteData.solicitacoes[idx] = obj;
     else _remoteData.solicitacoes.push(obj);
     localStorage.setItem('srv_solicitacoes', JSON.stringify(_remoteData.solicitacoes));
     
-    // 2. Tentar enviar ao Supabase
-    // Modo ultra-seguro: apenas os campos que certamente existem em qualquer versão da tabela
     const fieldsToSaveSafe = {
       id: obj.id,
       srvId: obj.srvId,
@@ -3519,24 +3749,39 @@ const DB = {
     if (obj.srvNome) fieldsToSaveSafe.srvNome = obj.srvNome;
 
     try {
-      // Tenta salvar o objeto completo primeiro
       const { error } = await supabaseClient.from('solicitacoes').upsert(obj);
       
       if (error) {
         const msg = (error.message || "").toLowerCase();
-        // Se o erro for coluna não encontrada ( PostgREST usa "Could not find" ou "not found")
+        if (isQuotaError(error)) {
+          saveToSyncQueue('solicitacoes', obj);
+          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+          return { success: true, mode: 'queued' };
+        }
         if (msg.includes('column') && (msg.includes('not find') || msg.includes('not found') || msg.includes('não encontrada'))) {
           console.warn("⚠️ Colunas extras não encontradas. Usando modo seguro...");
           const { error: retryError } = await supabaseClient.from('solicitacoes').upsert(fieldsToSaveSafe);
-          if (retryError) throw retryError;
+          if (retryError) {
+            if (isQuotaError(retryError)) {
+              saveToSyncQueue('solicitacoes', obj);
+              toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+              return { success: true, mode: 'queued' };
+            }
+            throw retryError;
+          }
           return { success: true, mode: 'safe' };
         }
         throw error;
       }
       return { success: true, mode: 'full' };
     } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('solicitacoes', obj);
+        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        return { success: true, mode: 'queued' };
+      }
       console.error("❌ Erro ao salvar solicitação:", e);
-      throw e; // Lança para ser capturado pela UI
+      throw e;
     }
   },
   saveSolicitacoes: async (d) => { 
@@ -3546,26 +3791,37 @@ const DB = {
     try {
       const { error } = await supabaseClient.from('solicitacoes').upsert(d);
       if (error) {
-        console.warn("⚠️ Erro no salvamento em lote de solicitações. Tentando modo seguro...");
-        // Fallback para lote: Garante campos básicos
-        const safeBatch = d.map(obj => ({
-          id: obj.id,
-          srvId: obj.srvId,
-          tipo: obj.tipo,
-          status: obj.status,
-          criadoEm: obj.criadoEm || new Date().toISOString(),
-          obs: obj.obs || '',
-          srvNome: obj.srvNome || ''
-        }));
-        await supabaseClient.from('solicitacoes').upsert(safeBatch);
+        if (isQuotaError(error)) {
+          saveToSyncQueue('solicitacoes', d);
+        } else {
+          console.warn("⚠️ Erro no salvamento em lote de solicitações. Tentando modo seguro...");
+          const safeBatch = d.map(obj => ({
+            id: obj.id,
+            srvId: obj.srvId,
+            tipo: obj.tipo,
+            status: obj.status,
+            criadoEm: obj.criadoEm || new Date().toISOString(),
+            obs: obj.obs || '',
+            srvNome: obj.srvNome || ''
+          }));
+          await supabaseClient.from('solicitacoes').upsert(safeBatch);
+        }
       }
     } catch (e) {
-      console.error("Erro grave ao salvar solicitações:", e);
+      if (isQuotaError(e)) {
+        saveToSyncQueue('solicitacoes', d);
+      } else {
+        console.error("Erro grave ao salvar solicitações:", e);
+      }
     }
   },
   deleteSolicitacao: async (id) => {
     const { error } = await supabaseClient.from('solicitacoes').delete().eq('id', id);
-    if (error) throw error;
+    if (error) {
+      if (!isQuotaError(error)) {
+        throw error;
+      }
+    }
   },
 
   saveLog: async (acao, detalhes, tabela = '', registroId = '') => {
