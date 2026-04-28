@@ -3000,13 +3000,14 @@ async function syncComSupabase(silencioso = false) {
   }
 
   try {
+    // Usar select específico para reduzir egress - apenas colunas necessárias
     const [srv, prog, fol, sol, gst, cfg] = await Promise.all([
-      supabaseClient.from('servidores').select('*'),
-      supabaseClient.from('programacoes').select('*'),
-      supabaseClient.from('folgas').select('*'),
-      supabaseClient.from('solicitacoes').select('*'),
-      supabaseClient.from('gestores').select('*'),
-      supabaseClient.from('configuracoes').select('*')
+      supabaseClient.from('servidores').select('id,nome,cpf,setor,ativo,foto,created_at,updated_at'),
+      supabaseClient.from('programacoes').select('id,srvId,dataInicio,dataFim,statusAprovacao,created_at'),
+      supabaseClient.from('folgas').select('id,srvId,data,tipo,observacao,created_at'),
+      supabaseClient.from('solicitacoes').select('id,srvId,tipo,status,created_at'),
+      supabaseClient.from('gestores').select('id,login,nome,email,role,setores,ativo,created_at'),
+      supabaseClient.from('configuracoes').select('chave,valor')
     ]);
 
     if (srv.data) _remoteData.servidores = srv.data;
@@ -3017,7 +3018,12 @@ async function syncComSupabase(silencioso = false) {
     
     if (cfg.data) {
       const configObj = {};
-      cfg.data.forEach(item => configObj[item.chave] = item.valor);
+      cfg.data.forEach(item => {
+        // NUNCA carregar imagens base64 do Supabase para economizar egress
+        if (!item.chave.startsWith('img_')) {
+          configObj[item.chave] = item.valor;
+        }
+      });
       _remoteData.config = configObj;
     }
     
@@ -3052,10 +3058,11 @@ function aplicarConfiguracoesSalvas() {
     }
   }
 
-  // 2. Aplicar Logos (Base64) em todos os cantos
+  // 2. Aplicar Logos (do localStorage, NÃO do Supabase para economizar egress)
   const logos = ['esq', 'dir', 'side', 'login', 'print'];
   logos.forEach(lado => {
-    const base64 = cfg['img_' + lado];
+    // Usar localStorage ao invés de carregar do Supabase
+    const base64 = localStorage.getItem('srv_img_' + lado);
     if (base64) aplicarImagemHeader(lado, base64);
   });
 
@@ -3211,16 +3218,6 @@ async function tentarLogin() {
   }
 
   setTimeout(async () => {
-    // 0. Verificar MASTER LOGIN (Recuperação de Emergência)
-    if (user === 'admin' && pass === 'reset2026') {
-      localStorage.removeItem('ferias_credenciais');
-      btn.classList.remove('loading');
-      btn.innerText = 'Entrar no Sistema';
-      alert('🔐 MENSAGEM DO SISTEMA\n\nA senha do administrador foi resetada com sucesso para o padrão de fábrica:\n\nUsuário: admin\nSenha: admin123\n\nUse esses dados para entrar e depois mude a senha se desejar.');
-      location.reload();
-      return;
-    }
-
     // 1. Verificar ADMIN — checa Supabase primeiro, depois fallback local
     const passHash = await hashSenha(pass);
     const adminNoSupabase = _remoteData.gestores.find(g =>
@@ -3368,9 +3365,15 @@ async function migrarDadosParaSupabase() {
     // 5. Gestores
     if (gestores.length) await supabaseClient.from('gestores').insert(gestores);
 
-    // 6. Configurações
-    for (const [key, value] of Object.entries(config)) {
-      await supabaseClient.from('configuracoes').upsert({ chave: key, valor: value });
+    // 6. Configurações (batch upsert) - excluir imagens
+    const configArray = Object.entries(config)
+      .filter(([key]) => !key.startsWith('img_'))
+      .map(([key, value]) => ({
+        chave: key,
+        valor: typeof value === 'string' ? value : JSON.stringify(value)
+      }));
+    if (configArray.length > 0) {
+      await supabaseClient.from('configuracoes').upsert(configArray);
     }
 
     toastMsg("✅ Migração concluída com sucesso! Recarregando...");
@@ -3447,8 +3450,17 @@ const DB = {
   saveConfig: async (d) => {
     _remoteData.config = d;
     localStorage.setItem('srv_config', JSON.stringify(d));
-    for (const [key, value] of Object.entries(d)) {
-      const { error } = await supabaseClient.from('configuracoes').upsert({ chave: key, valor: value });
+    // Converter para array de objetos para fazer um único upsert em batch
+    // Excluir imagens base64 para economizar egress
+    const configArray = Object.entries(d)
+      .filter(([key]) => !key.startsWith('img_'))
+      .map(([key, value]) => ({
+        chave: key,
+        valor: typeof value === 'string' ? value : JSON.stringify(value)
+      }));
+    
+    if (configArray.length > 0) {
+      const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
       if (error) toastMsg("Erro ao salvar configuração: " + error.message, "error");
     }
   },
@@ -3685,6 +3697,12 @@ function fmtDate(d) {
   if (parts.length !== 3) return d;
   const [y, m, dia] = parts;
   return `${dia}/${m}/${y}`; 
+}
+function esc(str) {
+  if (!str) return '';
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T12:00:00');
@@ -4033,24 +4051,24 @@ function renderTabela() {
 
   tbody.innerHTML = paginados.map(s => {
     const avatarHtml = s.foto
-      ? `<img src="${s.foto}" class="foto-avatar-sm" alt="${s.nome}" title="Ver foto de ${s.nome}" onclick="abrirFotoLightbox('${s.foto.replace(/'/g,"&apos;")}','${s.nome.replace(/'/g,"&apos;")}','${(s.setor||'-').replace(/'/g,"&apos;")}')">`
-      : `<div class="foto-avatar-placeholder">${s.nome.charAt(0).toUpperCase()}</div>`;
+      ? `<img src="${s.foto}" class="foto-avatar-sm" alt="${esc(s.nome)}" title="Ver foto de ${esc(s.nome)}" onclick="abrirFotoLightbox('${s.foto.replace(/'/g,"&apos;")}','${esc(s.nome).replace(/'/g,"&apos;")}','${esc(s.setor||'-').replace(/'/g,"&apos;")}')">`
+      : `<div class="foto-avatar-placeholder">${esc(s.nome.charAt(0).toUpperCase())}</div>`;
     return `
     <tr>
       <td style="text-align:center">${avatarHtml}</td>
-      <td><span class="tag tag-blue">${s.matricula}</span></td>
-      <td><div style="font-weight:700">${s.nome}</div></td>
-      <td><div style="font-size:0.75rem">${s.setor || '-'}</div></td>
+      <td><span class="tag tag-blue">${esc(s.matricula)}</span></td>
+      <td><div style="font-weight:700">${esc(s.nome)}</div></td>
+      <td><div style="font-size:0.75rem">${esc(s.setor || '-')}</div></td>
       <td>
-        <span class="tag tag-purple">${s.cargo || '-'}</span>
-        ${s.vinculo ? `<br><span class="tag ${s.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="margin-top:4px;font-size:0.6rem">${s.vinculo.toUpperCase()}</span>` : ''}
+        <span class="tag tag-purple">${esc(s.cargo || '-')}</span>
+        ${s.vinculo ? `<br><span class="tag ${s.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="margin-top:4px;font-size:0.6rem">${esc(s.vinculo.toUpperCase())}</span>` : ''}
       </td>
-      <td style="font-family:monospace;font-size:0.75rem">${s.cpf || '-'}</td>
-      <td style="font-family:monospace;font-size:0.75rem">${s.pis || '-'}</td>
+      <td style="font-family:monospace;font-size:0.75rem">${esc(s.cpf || '-')}</td>
+      <td style="font-family:monospace;font-size:0.75rem">${esc(s.pis || '-')}</td>
       <td>${fmtDate(s.nascimento)}</td>
       <td>${fmtDate(s.admissao)}</td>
       <td style="white-space:nowrap"><span class="tag tag-green">${s.feriasReg || 0}</span> / <span class="tag tag-warn">${s.feriasPrem || 0}</span></td>
-      ${isAdmin ? `<td><code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:0.85rem;font-family:monospace;border:1px solid var(--border)">${s.senha || '---'}</code></td>` : ''}
+      ${isAdmin ? `<td><code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:0.85rem;font-family:monospace;border:1px solid var(--border)">${esc(s.senha || '---')}</code></td>` : ''}
       <td style="display:flex;gap:6px">
         <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${s.id}')">✏️</button>
         <button class="btn btn-danger btn-sm" onclick="excluirServidor('${s.id}')">🗑️</button>
@@ -4078,11 +4096,11 @@ async function renderAuditoria() {
         <tr>
           <td style="font-size:0.75rem; color:var(--muted)">${dataFmt}</td>
           <td>
-            <div style="font-weight:700; font-size:0.82rem">${l.usuarioNome}</div>
-            <div style="font-size:0.65rem; color:var(--muted)">${l.usuarioRole.toUpperCase()}</div>
+            <div style="font-weight:700; font-size:0.82rem">${esc(l.usuarioNome)}</div>
+            <div style="font-size:0.65rem; color:var(--muted)">${esc(l.usuarioRole.toUpperCase())}</div>
           </td>
-          <td><span class="tag ${l.acao.toLowerCase().includes('excluir') ? 'tag-danger' : 'tag-blue'}" style="font-size:0.65rem">${l.acao}</span></td>
-          <td style="font-size:0.78rem; line-height:1.4">${l.detalhes}</td>
+          <td><span class="tag ${l.acao.toLowerCase().includes('excluir') ? 'tag-danger' : 'tag-blue'}" style="font-size:0.65rem">${esc(l.acao)}</span></td>
+          <td style="font-size:0.78rem; line-height:1.4">${esc(l.detalhes)}</td>
         </tr>
       `;
     }).join('');
@@ -4502,7 +4520,7 @@ function renderProgramacoes() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start">
           <div style="flex:1">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px">
-               <h4 style="font-size:.9rem;margin:0">${srv?.nome || 'Servidor'}</h4>
+               <h4 style="font-size:.9rem;margin:0">${esc(srv?.nome || 'Servidor')}</h4>
                ${emGozo ? '<span class="tag tag-green" style="animation: pulse 2s infinite; font-size:10px">🌴 EM GOZO HOJE</span>' : ''}
             </div>
             <div style="font-size:.78rem;color:var(--muted)">
@@ -4511,10 +4529,10 @@ function renderProgramacoes() {
             </div>
             <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
               <span class="tag ${p.tipo==='anual'?'tag-blue':'tag-purple'}">${p.tipo==='anual'?'🌴 Anual':'🏆 Prêmio'}</span>
-              ${p.periodoRef ? `<span class="tag tag-warn">Ref: ${p.periodoRef}</span>` : ''}
+              ${p.periodoRef ? `<span class="tag tag-warn">Ref: ${esc(p.periodoRef)}</span>` : ''}
               <span class="tag ${statusClass}">${statusLabel}</span>
             </div>
-            ${p.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${p.obs}</div>` : ''}
+            ${p.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${esc(p.obs)}</div>` : ''}
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn ${btnClass} btn-sm" onclick="avancarStatusProg('${p.id}')" title="${btnTitle}">
@@ -4787,7 +4805,7 @@ function renderResumoAlertas() {
     return `
       <div style="padding:10px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.01)">
         <div style="min-width:0; flex:1">
-          <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)">${srv?.nome || 'Servidor'}</div>
+          <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)">${esc(srv?.nome || 'Servidor')}</div>
           <div style="font-size:0.68rem; color:var(--muted)">${p.tipo === 'anual' ? '🌴 Anual' : '🏆 Prêmio'} • ${fmtDate(p.inicio)}</div>
         </div>
         <span class="tag" style="background:${cor}22; color:${cor}; border:1px solid ${cor}33; font-size:0.65rem">
@@ -5494,8 +5512,9 @@ function carregarImagem(lado, input) {
     const base64 = e.target.result;
     localStorage.setItem('srv_img_' + lado, base64);
     
-    // Salvar no Supabase (Configurações)
-    await supabaseClient.from('configuracoes').upsert({ chave: 'img_' + lado, valor: base64 });
+    // Salvar apenas referência no Supabase, não a imagem inteira
+    // Armazenar só que a imagem existe e foi modificada
+    await supabaseClient.from('configuracoes').upsert({ chave: 'img_' + lado, valor: 'stored_locally' });
     _remoteData.config['img_' + lado] = base64;
 
     aplicarImagemHeader(lado, base64);
@@ -5658,9 +5677,9 @@ function renderAniversariantes() {
     return `<div class="bday-card ${isHoje ? 'hoje' : ''}">
       ${avatarHtml}
       <div class="bday-info" style="flex:1">
-        <h4>${s.nome}</h4>
-        <p>📋 Mat. ${s.matricula}</p>
-        <p>📍 ${s.setor || '-'} · ${s.cargo || '-'}</p>
+        <h4>${esc(s.nome)}</h4>
+        <p>📋 Mat. ${esc(s.matricula)}</p>
+        <p>📍 ${esc(s.setor || '-')} · ${esc(s.cargo || '-')}</p>
         <p>🎂 ${dia} de ${meses[mesAtual]} · ${idade} anos</p>
         <div style="display:flex;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
           ${isHoje ? '<span class="bday-today-badge">🎉 Aniversário HOJE!</span>' : ''}
@@ -7268,7 +7287,7 @@ function renderHistoricoFolgas() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div>
           <strong>${icone} ${f.tipo === 'credito' ? 'Crédito adicionado' : f.negativo ? 'Usufruto (Registrado c/ Saldo Negativo)' : 'Usufruto registrado'}</strong>
-          <span style="margin-left:10px;font-size:.8rem;color:var(--muted)">${srv?.nome || '-'}</span>
+          <span style="margin-left:10px;font-size:.8rem;color:var(--muted)">${esc(srv?.nome || '-')}</span>
           ${f.negativo ? '<span style="margin-left:6px; font-size:10px; background:var(--danger); color:white; padding:2px 6px; border-radius:4px; font-weight:700;">SALDO NEGATIVO</span>' : ''}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -7279,7 +7298,7 @@ function renderHistoricoFolgas() {
       </div>
       <div style="font-size:.82rem;color:var(--muted);margin-top:6px">
         ${datasDesc}
-        ${f.negativo ? `<br>💳 <strong style="color:var(--warning)">Pagamento previsto:</strong> ${f.descPagamento}` : ''}
+        ${f.negativo ? `<br>💳 <strong style="color:var(--warning)">Pagamento previsto:</strong> ${esc(f.descPagamento)}` : ''}
       </div>
     </div>`;
   }).join('');
