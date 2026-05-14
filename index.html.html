@@ -3878,7 +3878,7 @@ function showTab(tab) {
   if (document.getElementById('busca-servidor')) document.getElementById('busca-servidor').value = '';
   if (document.getElementById('filtro-setor')) document.getElementById('filtro-setor').value = '';
 
-  if (tab === 'alertas') renderAlertas();
+  if (tab === 'alertas') renderDashboard();
   if (tab === 'servidores') {
     renderTabela();
     atualizarSelectsSetores();
@@ -4948,52 +4948,56 @@ function renderDashboard() {
   const servidores = getServidoresAcessiveis();
   const programacoes = getProgramacoesAcessiveis();
   const folgas = getFolgasAcessiveis();
-  
-  // 1. Férias por Mês (Próximos 6 meses)
-  const hoje = new Date();
-  const labelsMeses = [];
-  const dadosMeses = [];
-  const nomesMeses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-  
-  for (let i = 0; i < 6; i++) {
-    const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
-    const m = d.getMonth();
-    const y = d.getFullYear();
-    labelsMeses.push(`${nomesMeses[m]}/${y.toString().slice(-2)}`);
-    
-    const count = programacoes.filter(p => {
-      const pDate = new Date(p.inicio + 'T00:00:00');
-      return pDate.getMonth() === m && pDate.getFullYear() === y;
-    }).length;
-    dadosMeses.push(count);
+  const painelVisivel = document.getElementById('panel-alertas')?.classList.contains('active');
+
+  // Se o painel estiver visível, renderiza os gráficos normalmente
+  if (painelVisivel) {
+    // 1. Férias por Mês (Próximos 6 meses)
+    const hoje = new Date();
+    const labelsMeses = [];
+    const dadosMeses = [];
+    const nomesMeses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      const m = d.getMonth();
+      const y = d.getFullYear();
+      labelsMeses.push(`${nomesMeses[m]}/${y.toString().slice(-2)}`);
+
+      const count = programacoes.filter(p => {
+        const pDate = new Date(p.inicio + 'T00:00:00');
+        return pDate.getMonth() === m && pDate.getFullYear() === y;
+      }).length;
+      dadosMeses.push(count);
+    }
+
+    // 2. Distribuição por Setor
+    const setoresMap = {};
+    servidores.forEach(s => {
+      const setor = s.setor || 'Não Informado';
+      setoresMap[setor] = (setoresMap[setor] || 0) + 1;
+    });
+    const labelsSetores = Object.keys(setoresMap);
+    const dadosSetores = Object.values(setoresMap);
+
+    // 3. Maiores Saldos de Folga (Top 10)
+    const saldos = servidores.map(s => {
+      const saldo = saldoFolgas(s.id);
+      return { nome: s.nome, saldo };
+    }).filter(s => s.saldo > 0).sort((a,b) => b.saldo - a.saldo).slice(0, 10);
+
+    const labelsFolgas = saldos.map(s => s.nome.split(' ')[0]);
+    const dadosFolgas = saldos.map(s => s.saldo);
+
+    // Renderização
+    renderChart('chart-ferias-mes', 'bar', labelsMeses, dadosMeses, 'Férias', 'ferias', '#4d7bff');
+    renderChart('chart-setores', 'doughnut', labelsSetores, dadosSetores, 'Servidores', 'setores');
+    renderChart('chart-folgas-saldo', 'bar', labelsFolgas, dadosFolgas, 'Dias', 'folgas', '#0fd488');
   }
 
-  // 2. Distribuição por Setor
-  const setoresMap = {};
-  servidores.forEach(s => {
-    const setor = s.setor || 'Não Informado';
-    setoresMap[setor] = (setoresMap[setor] || 0) + 1;
-  });
-  const labelsSetores = Object.keys(setoresMap);
-  const dadosSetores = Object.values(setoresMap);
-
-  // 3. Maiores Saldos de Folga (Top 10)
-  const saldos = servidores.map(s => {
-    const saldo = saldoFolgas(s.id);
-    return { nome: s.nome, saldo };
-  }).filter(s => s.saldo > 0).sort((a,b) => b.saldo - a.saldo).slice(0, 10);
-  
-  const labelsFolgas = saldos.map(s => s.nome.split(' ')[0]);
-  const dadosFolgas = saldos.map(s => s.saldo);
-
-  // Renderização
-  renderChart('chart-ferias-mes', 'bar', labelsMeses, dadosMeses, 'Férias', 'ferias', '#4d7bff');
-  renderChart('chart-setores', 'doughnut', labelsSetores, dadosSetores, 'Servidores', 'setores');
-  renderChart('chart-folgas-saldo', 'bar', labelsFolgas, dadosFolgas, 'Dias', 'folgas', '#0fd488');
-  
   renderResumoAlertas();
   renderAlertas();
-  
+
   const statTotal = document.getElementById('stat-total');
   if (statTotal) statTotal.textContent = servidores.length;
 }
