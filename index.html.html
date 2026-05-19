@@ -3142,21 +3142,36 @@ async function syncComSupabase(silencioso = false) {
   }
 
   try {
-    // Usar select específico para reduzir egress - apenas colunas necessárias
+    // Sincroniza todas as colunas necessárias para o correto funcionamento do sistema localmente
     const [srv, prog, fol, sol, gst, cfg] = await Promise.all([
-      supabaseClient.from('servidores').select('id,nome,cpf,setor,ativo,foto,created_at,updated_at'),
-      supabaseClient.from('programacoes').select('id,srvId,dataInicio,dataFim,statusAprovacao,created_at'),
-      supabaseClient.from('folgas').select('id,srvId,data,tipo,observacao,created_at'),
-      supabaseClient.from('solicitacoes').select('id,srvId,tipo,status,created_at'),
-      supabaseClient.from('gestores').select('id,login,nome,email,role,setores,ativo,created_at'),
+      supabaseClient.from('servidores').select('*'),
+      supabaseClient.from('programacoes').select('*'),
+      supabaseClient.from('folgas').select('*'),
+      supabaseClient.from('solicitacoes').select('*'),
+      supabaseClient.from('gestores').select('*'),
       supabaseClient.from('configuracoes').select('chave,valor')
     ]);
 
-    if (srv.data) _remoteData.servidores = srv.data;
-    if (prog.data) _remoteData.programacoes = prog.data;
-    if (fol.data) _remoteData.folgas = fol.data;
-    if (sol.data) _remoteData.solicitacoes = sol.data;
-    if (gst.data) _remoteData.gestores = gst.data;
+    if (srv.data) {
+      _remoteData.servidores = srv.data;
+      localStorage.setItem('srv_servidores', JSON.stringify(srv.data));
+    }
+    if (prog.data) {
+      _remoteData.programacoes = prog.data;
+      localStorage.setItem('srv_programacoes', JSON.stringify(prog.data));
+    }
+    if (fol.data) {
+      _remoteData.folgas = fol.data;
+      localStorage.setItem('srv_folgas', JSON.stringify(fol.data));
+    }
+    if (sol.data) {
+      _remoteData.solicitacoes = sol.data;
+      localStorage.setItem('srv_solicitacoes', JSON.stringify(sol.data));
+    }
+    if (gst.data) {
+      _remoteData.gestores = gst.data;
+      localStorage.setItem('srv_gestores', JSON.stringify(gst.data));
+    }
     
     if (cfg.data) {
       const configObj = {};
@@ -3167,6 +3182,7 @@ async function syncComSupabase(silencioso = false) {
         }
       });
       _remoteData.config = configObj;
+      localStorage.setItem('srv_config', JSON.stringify(configObj));
     }
     
     console.log("✅ Dados sincronizados!");
