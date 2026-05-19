@@ -3304,7 +3304,15 @@ async function syncComSupabase(silencioso = false) {
     const configObj = {};
     data.forEach(item => {
       if (!item.chave.startsWith('img_')) {
-        configObj[item.chave] = item.valor;
+        let val = item.valor;
+        if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
+          try {
+            val = JSON.parse(val);
+          } catch (e) {
+            console.warn('Falha ao fazer parse do valor da config:', item.chave, e);
+          }
+        }
+        configObj[item.chave] = val;
       }
     });
     _remoteData.config = configObj;
