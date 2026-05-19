@@ -3245,25 +3245,13 @@ async function verificarSessao() {
   const loginScreen = document.getElementById('login-screen');
   const bnav = document.getElementById('bottom-nav');
 
-  // Se já existe sessão: mostrar o app IMEDIATAMENTE, sem esperar o sync
-  // Isso evita o flash da tela de login após o login bem-sucedido
   if (sessaoStr) {
+    // 1. Mostrar o app IMEDIATAMENTE (Offline-First com cache local)
     if (appContainer) appContainer.style.display = 'flex';
     if (loginScreen) loginScreen.style.display = 'none';
     if (bnav) bnav.style.display = '';
-  }
 
-  // Sincronizar em background (skeletons já aparecem dentro do app)
-  const syncOk = await syncComSupabase();
-  if (!syncOk && !sessaoStr) {
-    toastMsg("\u26a0\ufe0f Erro de conex\u00e3o. Verifique sua internet.", "warning");
-  }
-
-  if (sessaoStr) {
     const sessao = JSON.parse(sessaoStr);
-    if (appContainer) appContainer.style.display = 'flex';
-    if (loginScreen) loginScreen.style.display = 'none';
-    if (bnav) bnav.style.display = '';
     
     // Atualiza nome na UI
     const nameEl = document.getElementById('display-user-name');
@@ -3308,13 +3296,33 @@ async function verificarSessao() {
       }
     }
     
+    // Inicializa a interface imediatamente com o cache local (instantâneo)
     initApp();
+
+    // 2. Sincroniza com o Supabase em background sem travar o carregamento inicial
+    syncComSupabase(true).then((syncOk) => {
+      if (syncOk) {
+        // Recarrega o painel ativo suavemente com as novidades
+        const painelAtivo = document.querySelector('.tab-panel.active');
+        if (painelAtivo) {
+          renderAposSync(painelAtivo.id.replace('panel-', ''));
+        }
+      }
+    });
+
   } else {
+    // Exibe tela de login instantaneamente
     if (appContainer) appContainer.style.display = 'none';
-    if (loginScreen) loginScreen.style.display = 'flex'; const bnav2 = document.getElementById('bottom-nav'); if(bnav2) bnav2.style.display = 'none';
+    if (loginScreen) loginScreen.style.display = 'flex'; 
+    const bnav2 = document.getElementById('bottom-nav'); 
+    if (bnav2) bnav2.style.display = 'none';
+    
     document.getElementById('inputUser').value = '';
     document.getElementById('inputPass').value = '';
     document.getElementById('inputUser').focus();
+
+    // Inicia a sincronização das credenciais em background para o login ser instantâneo
+    syncComSupabase(true);
   }
 }
 
