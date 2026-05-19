@@ -3141,63 +3141,98 @@ async function syncComSupabase(silencioso = false) {
     mostrarSkeletonsTabela('tbody-relatorio', 9);
   }
 
-  try {
-    // Sincroniza todas as colunas necessárias para o correto funcionamento do sistema localmente
-    const [srv, prog, fol, sol, gst, cfg] = await Promise.all([
-      supabaseClient.from('servidores').select('*'),
-      supabaseClient.from('programacoes').select('*'),
-      supabaseClient.from('folgas').select('*'),
-      supabaseClient.from('solicitacoes').select('*'),
-      supabaseClient.from('gestores').select('*'),
-      supabaseClient.from('configuracoes').select('chave,valor')
-    ]);
+  let erros = 0;
+  let sucessos = 0;
 
-    if (srv.data) {
-      _remoteData.servidores = srv.data;
-      localStorage.setItem('srv_servidores', JSON.stringify(srv.data));
+  // Função auxiliar para sincronizar uma tabela individualmente
+  const syncTabela = async (tabela, colunas, processarDados) => {
+    try {
+      const query = supabaseClient.from(tabela).select(colunas);
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error(`❌ Erro ao buscar ${tabela}:`, error.message || error);
+        erros++;
+        return false;
+      }
+      
+      if (data) {
+        processarDados(data);
+        console.log(`✅ ${tabela}: ${data.length} registros carregados`);
+        sucessos++;
+        return true;
+      }
+      console.warn(`⚠️ ${tabela}: resposta vazia (sem data)`);
+      erros++;
+      return false;
+    } catch (e) {
+      console.error(`❌ Falha ao sincronizar ${tabela}:`, e.message || e);
+      erros++;
+      return false;
     }
-    if (prog.data) {
-      _remoteData.programacoes = prog.data;
-      localStorage.setItem('srv_programacoes', JSON.stringify(prog.data));
-    }
-    if (fol.data) {
-      _remoteData.folgas = fol.data;
-      localStorage.setItem('srv_folgas', JSON.stringify(fol.data));
-    }
-    if (sol.data) {
-      _remoteData.solicitacoes = sol.data;
-      localStorage.setItem('srv_solicitacoes', JSON.stringify(sol.data));
-    }
-    if (gst.data) {
-      _remoteData.gestores = gst.data;
-      localStorage.setItem('srv_gestores', JSON.stringify(gst.data));
-    }
-    
-    if (cfg.data) {
-      const configObj = {};
-      cfg.data.forEach(item => {
-        // NUNCA carregar imagens base64 do Supabase para economizar egress
-        if (!item.chave.startsWith('img_')) {
-          configObj[item.chave] = item.valor;
-        }
-      });
-      _remoteData.config = configObj;
-      localStorage.setItem('srv_config', JSON.stringify(configObj));
-    }
-    
-    console.log("✅ Dados sincronizados!");
-    
-    // Aplicar configurações visuais (cores e logos) vindas da nuvem
-    aplicarConfiguracoesSalvas();
+  };
 
-    // Migrar fotos Base64 para Storage automaticamente
-    migrarFotosLegado();
+  // Sincroniza cada tabela individualmente para evitar que um erro bloqueie todas
+  await syncTabela('servidores', '*', (data) => {
+    _remoteData.servidores = data;
+    if (data.length > 0) localStorage.setItem('srv_servidores', JSON.stringify(data));
+  });
+
+  await syncTabela('programacoes', '*', (data) => {
+    _remoteData.programacoes = data;
+    if (data.length > 0) localStorage.setItem('srv_programacoes', JSON.stringify(data));
+  });
+
+  await syncTabela('folgas', '*', (data) => {
+    _remoteData.folgas = data;
+    if (data.length > 0) localStorage.setItem('srv_folgas', JSON.stringify(data));
+  });
+
+  await syncTabela('solicitacoes', '*', (data) => {
+    _remoteData.solicitacoes = data;
+    if (data.length > 0) localStorage.setItem('srv_solicitacoes', JSON.stringify(data));
+  });
+
+  await syncTabela('gestores', '*', (data) => {
+    _remoteData.gestores = data;
+    if (data.length > 0) localStorage.setItem('srv_gestores', JSON.stringify(data));
+  });
+
+  await syncTabela('configuracoes', 'chave,valor', (data) => {
+    const configObj = {};
+    data.forEach(item => {
+      if (!item.chave.startsWith('img_')) {
+        configObj[item.chave] = item.valor;
+      }
+    });
+    _remoteData.config = configObj;
+    localStorage.setItem('srv_config', JSON.stringify(configObj));
+  });
     
-    return true;
-  } catch (err) {
-    console.error("❌ Erro na sincronização:", err);
+  if (erros > 0 && sucessos === 0) {
+    console.error("❌ Nenhuma tabela sincronizada.");
+    if (!silencioso) {
+      toastMsg("Erro ao conectar com o servidor. Verifique sua internet.", "error");
+    }
     return false;
   }
+
+  if (erros > 0) {
+    console.warn(`⚠️ Sincronização parcial: ${sucessos} OK, ${erros} falhas`);
+    if (!silencioso) {
+      toastMsg(`⚠️ Alguns dados não puderam ser carregados (${erros} tabela(s)).`, "warning");
+    }
+  } else {
+    console.log(`✅ Sincronização completa: ${sucessos} tabelas carregadas`);
+  }
+    
+  // Aplicar configurações visuais (cores e logos) vindas da nuvem
+  aplicarConfiguracoesSalvas();
+
+  // Migrar fotos Base64 para Storage automaticamente
+  migrarFotosLegado();
+    
+  return true;
 }
 
 // Função para aplicar todas as configurações visuais salvas no Supabase
@@ -3225,13 +3260,13 @@ function aplicarConfiguracoesSalvas() {
   });
 
   // 3. Aplicar Textos de Branding (Sidebar)
-  const titSidebar = document.getElementById('sidebar-title');
-  const subSidebar = document.getElementById('sidebar-subtitle');
+  const titSidebar = document.getElementById('display-sidebar-title');
+  const subSidebar = document.getElementById('display-sidebar-sub');
   if (titSidebar && cfg.tituloSidebar) titSidebar.textContent = cfg.tituloSidebar;
   if (subSidebar && cfg.subtituloSidebar) subSidebar.textContent = cfg.subtituloSidebar;
   
   // 4. Aplicar Textos de Branding (Cabeçalho/Dashboard)
-  const titOrg = document.getElementById('header-org-name');
+  const titOrg = document.getElementById('display-org-name-header');
   if (titOrg && cfg.nomeOrganizacao) {
     titOrg.textContent = cfg.nomeOrganizacao;
     if (cfg.tamanhoFonteOrg) titOrg.style.fontSize = cfg.tamanhoFonteOrg + 'px';
@@ -3300,15 +3335,24 @@ async function verificarSessao() {
     initApp();
 
     // 2. Sincroniza com o Supabase em background sem travar o carregamento inicial
-    syncComSupabase(true).then((syncOk) => {
+    // Com retry automático em caso de falha (até 3 tentativas)
+    const tentarSyncComRetry = async (tentativa = 1) => {
+      const syncOk = await syncComSupabase(true);
       if (syncOk) {
-        // Recarrega o painel ativo suavemente com as novidades
         const painelAtivo = document.querySelector('.tab-panel.active');
         if (painelAtivo) {
           renderAposSync(painelAtivo.id.replace('panel-', ''));
         }
+      } else if (tentativa < 3) {
+        console.warn(`⚠️ Sync falhou (tentativa ${tentativa}/3). Retentando em ${tentativa * 2}s...`);
+        await new Promise(r => setTimeout(r, tentativa * 2000));
+        return tentarSyncComRetry(tentativa + 1);
+      } else {
+        console.error("❌ Sync falhou após 3 tentativas. Usando dados locais.");
+        toastMsg("Não foi possível carregar dados da nuvem. Usando dados locais.", "warning");
       }
-    });
+    };
+    tentarSyncComRetry();
 
   } else {
     // Exibe tela de login instantaneamente
