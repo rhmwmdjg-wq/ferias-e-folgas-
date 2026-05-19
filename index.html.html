@@ -2865,6 +2865,12 @@ function renderAposSync(tabelaAlterada) {
   const sessao = JSON.parse(sessaoStr);
   const isAdminOuGestor = sessao.role === 'admin' || sessao.role === 'gestor';
 
+  // Atualizar dropdowns e seletores com os dados recém-sincronizados
+  if (typeof renderListaSetores === 'function') renderListaSetores();
+  if (typeof atualizarSelectsSetores === 'function') atualizarSelectsSetores();
+  if (typeof popularSelects === 'function') popularSelects();
+  if (typeof popularSelectsFolgas === 'function') popularSelectsFolgas();
+
   // Sempre atualizar badges e dashboard relevantes
   if (isAdminOuGestor) {
     atualizarBadge();
@@ -3122,6 +3128,59 @@ function removerSkeletonsCharts() {
   });
 }
 
+function normalizarCamposObjeto(obj) {
+  if (!obj) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(normalizarCamposObjeto);
+  }
+  if (typeof obj !== 'object') return obj;
+
+  const keysMap = {
+    srvid: 'srvId',
+    datainicio: 'dataInicio',
+    datafim: 'dataFim',
+    statusaprovacao: 'statusAprovacao',
+    criadoem: 'criadoEm',
+    srvnome: 'srvNome',
+    dataitems: 'dataItems',
+    solid: 'solId',
+    feriasreg: 'feriasReg',
+    feriasprem: 'feriasPrem',
+    periodoref: 'periodoRef'
+  };
+
+  const novoObj = {};
+  for (const [k, v] of Object.entries(obj)) {
+    novoObj[k] = v;
+  }
+  for (const [k, v] of Object.entries(obj)) {
+    const camelKey = keysMap[k.toLowerCase()];
+    if (camelKey && (novoObj[camelKey] === undefined || novoObj[camelKey] === null)) {
+      novoObj[camelKey] = v;
+    }
+  }
+  return novoObj;
+}
+
+async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
+  if (!pendentes || !Array.isArray(pendentes) || pendentes.length === 0) return;
+  console.log(`📤 Enviando ${pendentes.length} registros locais de [${tabela}] para o Supabase...`);
+  try {
+    const chunks = [];
+    const chunkSize = 50;
+    for (let i = 0; i < pendentes.length; i += chunkSize) {
+      chunks.push(pendentes.slice(i, i + chunkSize));
+    }
+    for (const chunk of chunks) {
+      const { error } = await supabaseClient.from(tabela).upsert(chunk);
+      if (error) throw error;
+    }
+    console.log(`✅ ${pendentes.length} registros locais de [${tabela}] sincronizados com sucesso na nuvem!`);
+  } catch (e) {
+    console.warn(`⚠️ Erro ao enviar registros locais de [${tabela}]:`, e.message || e);
+  }
+}
+
 let _remoteData = {
   servidores: [],
   programacoes: [],
@@ -3157,7 +3216,8 @@ async function syncComSupabase(silencioso = false) {
       }
       
       if (data) {
-        processarDados(data);
+        const dadosNormalizados = normalizarCamposObjeto(data);
+        processarDados(dadosNormalizados);
         console.log(`✅ ${tabela}: ${data.length} registros carregados`);
         sucessos++;
         return true;
@@ -3174,23 +3234,55 @@ async function syncComSupabase(silencioso = false) {
 
   // Sincroniza cada tabela individualmente para evitar que um erro bloqueie todas
   await syncTabela('servidores', '*', (data) => {
-    _remoteData.servidores = data;
-    if (data.length > 0) localStorage.setItem('srv_servidores', JSON.stringify(data));
+    const locais = JSON.parse(localStorage.getItem('srv_servidores') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    
+    if (pendentes.length > 0) {
+      migrarDadosLocaisParaNuvem('servidores', pendentes);
+    }
+    const unificados = [...data, ...pendentes];
+    _remoteData.servidores = unificados;
+    localStorage.setItem('srv_servidores', JSON.stringify(unificados));
   });
 
   await syncTabela('programacoes', '*', (data) => {
-    _remoteData.programacoes = data;
-    if (data.length > 0) localStorage.setItem('srv_programacoes', JSON.stringify(data));
+    const locais = JSON.parse(localStorage.getItem('srv_programacoes') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    
+    if (pendentes.length > 0) {
+      migrarDadosLocaisParaNuvem('programacoes', pendentes);
+    }
+    const unificados = [...data, ...pendentes];
+    _remoteData.programacoes = unificados;
+    localStorage.setItem('srv_programacoes', JSON.stringify(unificados));
   });
 
   await syncTabela('folgas', '*', (data) => {
-    _remoteData.folgas = data;
-    if (data.length > 0) localStorage.setItem('srv_folgas', JSON.stringify(data));
+    const locais = JSON.parse(localStorage.getItem('srv_folgas') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    
+    if (pendentes.length > 0) {
+      migrarDadosLocaisParaNuvem('folgas', pendentes);
+    }
+    const unificados = [...data, ...pendentes];
+    _remoteData.folgas = unificados;
+    localStorage.setItem('srv_folgas', JSON.stringify(unificados));
   });
 
   await syncTabela('solicitacoes', '*', (data) => {
-    _remoteData.solicitacoes = data;
-    if (data.length > 0) localStorage.setItem('srv_solicitacoes', JSON.stringify(data));
+    const locais = JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    
+    if (pendentes.length > 0) {
+      migrarDadosLocaisParaNuvem('solicitacoes', pendentes);
+    }
+    const unificados = [...data, ...pendentes];
+    _remoteData.solicitacoes = unificados;
+    localStorage.setItem('srv_solicitacoes', JSON.stringify(unificados));
   });
 
   await syncTabela('gestores', '*', (data) => {
