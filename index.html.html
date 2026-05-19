@@ -2330,6 +2330,16 @@ Coordenação de RH
     <button class="btn btn-primary" onclick="salvarTextoAutorizacao()">💾 Salvar Texto da Autorização</button>
   </div>
 
+  <!-- Nuvem Supabase -->
+  <div class="card" style="margin-top:20px; border: 1px solid rgba(77, 123, 255, 0.35); background: rgba(77, 123, 255, 0.04)">
+    <h3><span class="icon">☁️</span> Nuvem Supabase</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Force a sincronização manual de duas vias com o banco de dados Supabase na nuvem. Todos os seus dados locais e dados da nuvem serão mesclados e sincronizados.</p>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" id="btn-sync-supabase-manual" onclick="forçarSincronizacaoSupabase()">🔄 Importar/Sincronizar Supabase</button>
+    </div>
+    <div id="supabase-sync-status" style="margin-top:12px;font-size:.82rem;padding:10px 14px;border-radius:var(--r-sm);background:var(--surface);display:none"></div>
+  </div>
+
   <!-- Backup -->
   <div class="card" style="margin-top:20px">
     <h3><span class="icon">💾</span> Backup de Dados</h3>
@@ -6122,6 +6132,49 @@ function prepararWhatsAppAniversario(id) {
   document.getElementById('wa-tel').value = s.telefone.replace(/\D/g,'');
   const modal = document.getElementById('modal-whatsapp');
   if (modal) modal.classList.add('open');
+}
+
+async function forçarSincronizacaoSupabase() {
+  const btn = document.getElementById('btn-sync-supabase-manual');
+  const statusEl = document.getElementById('supabase-sync-status');
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<i class="fa fa-spinner fa-spin"></i> Sincronizando...';
+  }
+  if (statusEl) {
+    statusEl.style.display = 'block';
+    statusEl.innerHTML = '⏳ Conectando ao banco de dados e mesclando dados...';
+    statusEl.style.color = 'var(--text-mid)';
+  }
+  
+  try {
+    toastMsg("Iniciando sincronização forçada com o Supabase...", "info");
+    const ok = await syncComSupabase(false);
+    if (ok) {
+      const painelAtivo = document.querySelector('.tab-panel.active');
+      if (painelAtivo) {
+        renderAposSync(painelAtivo.id.replace('panel-', ''));
+      }
+      
+      toastMsg("Sincronização concluída com sucesso!", "success");
+      if (statusEl) {
+        statusEl.innerHTML = `<span style="color:var(--success)">✅ <strong>Sincronização Completa!</strong> Todos os dados locais (servidores, programações, folgas e solicitações) foram mesclados e salvos com sucesso na nuvem Supabase.</span>`;
+      }
+    } else {
+      throw new Error("Erro desconhecido na sincronização.");
+    }
+  } catch (e) {
+    console.error("Erro no sync manual:", e);
+    toastMsg("Falha na sincronização manual.", "error");
+    if (statusEl) {
+      statusEl.innerHTML = `<span style="color:var(--danger)">❌ <strong>Falha na Sincronização:</strong> ${e.message || e}. Por favor, verifique sua conexão com a internet e tente novamente.</span>`;
+    }
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.innerHTML = '🔄 Importar/Sincronizar Supabase';
+    }
+  }
 }
 
 // ===================== BACKUP =====================
