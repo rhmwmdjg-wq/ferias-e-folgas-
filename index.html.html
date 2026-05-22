@@ -1577,6 +1577,12 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <label>Referente à Folga (selecione do banco)</label>
         <select id="fg-ref-deb"><option value="">Selecionar folga do banco...</option></select>
       </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>Quem cobrirá a ausência? (Cobertura)</label>
+        <select id="fg-cobertura-deb">
+          <option value="">Selecione o servidor primeiro...</option>
+        </select>
+      </div>
       <div class="field" style="margin-bottom:14px">
         <label>Observação</label>
         <textarea id="fg-obs-deb" placeholder="Observações sobre o usufruto..." style="min-height:60px"></textarea>
@@ -2493,6 +2499,27 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ======================= MODAL DEFINIR COBERTURA ======================= -->
+<div class="modal-bg" id="modal-cobertura">
+  <div class="modal">
+    <h3>👥 Definir Cobertura de Ausência</h3>
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px;line-height:1.5">
+      Você está autorizando a ausência de <strong id="mc-servidor-nome" style="color:var(--text)">[Servidor]</strong>.<br>
+      Quem ficará responsável por cobrir as atividades deste servidor durante o período?
+    </p>
+    <div class="field" style="margin-bottom:12px">
+      <label>Substituto (Cobertura)</label>
+      <select id="mc-cobertura-select">
+        <option value="">Selecione quem fará a cobertura...</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModal('modal-cobertura'); currentResolvingSolId = null;">Cancelar</button>
+      <button class="btn btn-primary" onclick="confirmarCoberturaEAutorizar()">✅ Confirmar e Autorizar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= MODAL WHATSAPP ======================= -->
 <div class="modal-bg" id="modal-whatsapp">
   <div class="modal">
@@ -2669,6 +2696,13 @@ Coordenação de RH
       <button class="btn btn-ghost" onclick="fecharModal('modal-autorizacao')">Cancelar</button>
       <button class="btn btn-primary" onclick="gerarAutorizacaoFerias()" style="background:linear-gradient(135deg,var(--primary),var(--accent));box-shadow:0 4px 20px rgba(79,125,255,0.35)">📄 Gerar Autorização</button>
     </div>
+  </div>
+</div>
+
+<!-- ===================== MODAL HISTÓRICO COMPLETO DO SERVIDOR ===================== -->
+<div class="modal-bg" id="modal-historico">
+  <div class="modal" style="max-width:920px">
+    <div id="hist-conteudo"></div>
   </div>
 </div>
 
@@ -4138,6 +4172,18 @@ function esc(str) {
   div.textContent = str;
   return div.innerHTML;
 }
+function parseFolgaObs(obsStr) {
+  if (!obsStr) return { coberturaNome: '', coberturaId: '', obs: '' };
+  const match = obsStr.match(/^\[Cobertura:\s*(.*?)\s*\(ID:\s*(.*?)\)\s*\]\s*(.*)/s);
+  if (match) {
+    return {
+      coberturaNome: match[1],
+      coberturaId: match[2],
+      obs: match[3]
+    };
+  }
+  return { coberturaNome: '', coberturaId: '', obs: obsStr };
+}
 function addDays(dateStr, days) {
   const d = new Date(dateStr + 'T12:00:00');
   d.setDate(d.getDate() + days);
@@ -4504,8 +4550,9 @@ function renderTabela() {
       <td style="white-space:nowrap"><span class="tag tag-green">${s.feriasReg || 0}</span> / <span class="tag tag-warn">${s.feriasPrem || 0}</span></td>
       ${isAdmin ? `<td><code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:0.85rem;font-family:monospace;border:1px solid var(--border)">${esc(s.senha || '---')}</code></td>` : ''}
       <td style="display:flex;gap:6px">
-        <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${s.id}')">✏️</button>
-        <button class="btn btn-danger btn-sm" onclick="excluirServidor('${s.id}')">🗑️</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${s.id}')" title="Editar">✏️</button>
+        <button class="btn btn-ghost btn-sm" onclick="abrirHistoricoCompleto('${s.id}')" title="Histórico Completo">📋</button>
+        <button class="btn btn-danger btn-sm" onclick="excluirServidor('${s.id}')" title="Excluir">🗑️</button>
       </td>
     </tr>`;
   }).join('');
@@ -4572,6 +4619,143 @@ function abrirEditar(id) {
     prevEl.innerHTML = '<span style="font-size:22px">📷</span><span>Foto</span>';
   }
   document.getElementById('modal-editar').classList.add('open');
+}
+
+function abrirHistoricoCompleto(id) {
+  const srv = DB.servidores().find(s => s.id === id);
+  if (!srv) return toastMsg('Servidor não encontrado.', 'error');
+
+  const programacoes = DB.programacoes().filter(p => p.srvId === id).sort((a, b) => new Date(b.inicio) - new Date(a.inicio));
+  const folgas = DB.folgas().filter(f => f.srvId === id).sort((a, b) => new Date(b.data) - new Date(a.data));
+  const solicitacoes = DB.solicitacoes().filter(s => s.srvId === id).sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
+
+  const saldoFolgas = folgas.reduce((acc, f) => {
+    const q = parseFloat(f.qtd) || 0;
+    return (f.tipo === 'credito') ? acc + q : acc - q;
+  }, 0);
+
+  const avatarHtml = srv.foto
+    ? `<img src="${srv.foto}" style="width:60px;height:60px;border-radius:50%;object-fit:cover;border:3px solid var(--primary)">`
+    : `<div style="width:60px;height:60px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-size:1.5rem;font-weight:700;color:#fff;border:3px solid var(--primary)">${srv.nome.charAt(0).toUpperCase()}</div>`;
+
+  const progHtml = programacoes.length
+    ? programacoes.map(p => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${p.tipo === 'premio' ? '#a78bfa' : '#4d7bff'}">
+        <div>
+          <span style="font-weight:600;font-size:.85rem">${p.tipo === 'premio' ? '🏆 Prêmio' : '🌴 Anual'}</span>
+          <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${fmtDate(p.inicio)} → ${fmtDate(p.fim)}</span>
+        </div>
+        <span class="tag ${p.concluido ? 'tag-green' : p.status === 'programado' ? 'tag-blue' : 'tag-warn'}">${p.concluido ? 'Concluído' : p.status || 'Programado'}</span>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhuma programação de férias.</p>';
+
+  const folgasHtml = folgas.length
+    ? folgas.map(f => {
+        const isCredito = f.tipo === 'credito';
+        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${isCredito ? 'var(--success)' : 'var(--danger)'}">
+          <div>
+            <span style="font-weight:600;font-size:.85rem">${fmtDate(f.data)}</span>
+            <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${f.motivo || (isCredito ? 'Crédito' : 'Débito')}</span>
+          </div>
+          <span class="tag ${isCredito ? 'tag-green' : 'tag-red'}">${isCredito ? '+' : '-'}${parseFloat(f.qtd) || 0} dia(s)</span>
+        </div>`;
+      }).join('')
+    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhum registro de folgas.</p>';
+
+  const solHtml = solicitacoes.length
+    ? solicitacoes.map(s => `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${s.status === 'aprovado' ? 'var(--success)' : s.status === 'rejeitado' ? 'var(--danger)' : 'var(--warning)'}">
+        <div>
+          <span style="font-weight:600;font-size:.85rem">${s.tipo === 'folga' ? '🏖️ Folga' : '🌴 Férias'}</span>
+          <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${fmtDate(s.criadoEm)}</span>
+          ${s.obs ? `<br><small style="color:var(--muted)">${esc(s.obs)}</small>` : ''}
+        </div>
+        <span class="tag ${s.status === 'aprovado' ? 'tag-green' : s.status === 'rejeitado' ? 'tag-red' : 'tag-warn'}">${s.status || 'pendente'}</span>
+      </div>`).join('')
+    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhuma solicitação.</p>';
+
+  const fecharBtn = '<button class="btn btn-ghost" onclick="fecharModal(\'modal-historico\')">Fechar</button>';
+
+  document.getElementById('hist-conteudo').innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
+      <h3 style="margin:0">📋 Histórico Completo</h3>
+      ${fecharBtn}
+    </div>
+
+    <div style="display:flex;gap:16px;align-items:center;padding:16px;background:var(--surface);border-radius:12px;margin-bottom:20px;border:1px solid var(--border-low)">
+      ${avatarHtml}
+      <div style="flex:1">
+        <div style="font-size:1.2rem;font-weight:700">${esc(srv.nome)}</div>
+        <div style="font-size:.82rem;color:var(--muted);margin-top:2px">
+          Mat. ${esc(srv.matricula)} · ${esc(srv.setor || '-')} · ${esc(srv.cargo || '-')}
+          ${srv.vinculo ? ` · <span class="tag ${srv.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="font-size:0.6rem">${srv.vinculo.toUpperCase()}</span>` : ''}
+        </div>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary btn-sm" onclick="fecharModal('modal-historico');abrirEditar('${srv.id}')">✏️ Editar</button>
+      </div>
+    </div>
+
+    <div class="grid-3" style="margin-bottom:20px">
+      <div class="saldo-box ${srv.feriasReg > 0 ? 'positivo' : 'zero'}">
+        <span class="saldo-num" style="color:var(--primary)">${srv.feriasReg || 0}</span>
+        <div><strong>Férias Reg.</strong><br><small style="color:var(--muted)">Períodos acumulados</small></div>
+      </div>
+      <div class="saldo-box ${srv.feriasPrem > 0 ? 'positivo' : 'zero'}">
+        <span class="saldo-num" style="color:#a78bfa">${srv.feriasPrem || 0}</span>
+        <div><strong>Férias Prêmio</strong><br><small style="color:var(--muted)">Períodos acumulados</small></div>
+      </div>
+      <div class="saldo-box ${saldoFolgas > 0 ? 'positivo' : saldoFolgas < 0 ? 'negativo' : 'zero'}">
+        <span class="saldo-num">${saldoFolgas > 0 ? '+' : ''}${saldoFolgas}</span>
+        <div><strong>Saldo Folgas</strong><br><small style="color:var(--muted)">${saldoFolgas === 0 ? 'Zerado' : saldoFolgas > 0 ? 'Disponível' : 'Negativo'}</small></div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card" style="padding:14px;margin:0">
+        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--text)">📅 Dados Pessoais</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.82rem">
+          <span style="color:var(--muted)">CPF:</span><span>${esc(srv.cpf || '-')}</span>
+          <span style="color:var(--muted)">PIS:</span><span>${esc(srv.pis || '-')}</span>
+          <span style="color:var(--muted)">Nascimento:</span><span>${fmtDate(srv.nascimento)}</span>
+          <span style="color:var(--muted)">Admissão:</span><span>${fmtDate(srv.admissao)}</span>
+          <span style="color:var(--muted)">Telefone:</span><span>${esc(srv.telefone || '-')}</span>
+        </div>
+      </div>
+      <div class="card" style="padding:14px;margin:0">
+        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--text)">🏖️ Resumo Férias</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.82rem">
+          <span style="color:var(--muted)">Programações:</span><span>${programacoes.length}</span>
+          <span style="color:var(--muted)">Concluídas:</span><span>${programacoes.filter(p => p.concluido).length}</span>
+          <span style="color:var(--muted)">Férias Reg.:</span><span>${srv.feriasReg || 0} períodos</span>
+          <span style="color:var(--muted)">Férias Prêmio:</span><span>${srv.feriasPrem || 0} períodos</span>
+          <span style="color:var(--muted)">Solicitações:</span><span>${solicitacoes.length}</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+      <div class="card" style="padding:14px;margin:0">
+        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--primary)">🌴 Programações de Férias</div>
+        ${progHtml}
+      </div>
+      <div class="card" style="padding:14px;margin:0">
+        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--success)">💰 Banco de Folgas</div>
+        ${folgasHtml}
+      </div>
+    </div>
+
+    <div class="card" style="padding:14px;margin:0">
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--warning)">📨 Solicitações</div>
+      ${solHtml}
+    </div>
+
+    <div class="modal-footer" style="border:none;margin-top:16px;padding-top:0">
+      ${fecharBtn}
+    </div>
+  `;
+
+  document.getElementById('modal-historico').classList.add('open');
 }
 
 async function salvarEdicao() {
@@ -4966,7 +5150,12 @@ function renderProgramacoes() {
               ${p.periodoRef ? `<span class="tag tag-warn">Ref: ${esc(p.periodoRef)}</span>` : ''}
               <span class="tag ${statusClass}">${statusLabel}</span>
             </div>
-            ${p.obs ? `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${esc(p.obs)}</div>` : ''}
+            ${(() => {
+              if (!p.obs) return '';
+              const parsed = parseFolgaObs(p.obs);
+              const tagCob = parsed.coberturaNome ? `<br style="margin-bottom:4px"><span class="tag tag-purple" style="display:inline-block;margin-top:4px">👥 Substituto (Cobertura): ${esc(parsed.coberturaNome)}</span>` : '';
+              return `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${esc(parsed.obs || '-')}${tagCob}</div>`;
+            })()}
           </div>
           <div style="display:flex;gap:6px">
             <button class="btn ${btnClass} btn-sm" onclick="avancarStatusProg('${p.id}')" title="${btnTitle}">
@@ -6710,7 +6899,14 @@ function imprimirRelatorioIndividual(srvId, tipo) {
             <td style="text-align:center">${fmtDate(f.data)}</td>
             <td style="text-align:center">${f.tipo === 'credito' ? 'CRÉDITO' : 'USUFRUTO'}</td>
             <td style="font-weight: 700; text-align:center;">${f.tipo === 'credito' ? '+' : '-'}${f.qtd}</td>
-            <td style="font-size: 10px;">${f.tipo === 'credito' ? f.motivo : f.obs || '-'} ${f.negativo ? ` (PAGAMENTO EM: ${f.descPagamento})` : ''}</td>
+            <td style="font-size: 10px;">
+              ${f.tipo === 'credito' ? f.motivo : (() => {
+                const parsed = parseFolgaObs(f.obs);
+                const cobText = parsed.coberturaNome ? ` [Substituto: ${parsed.coberturaNome}]` : '';
+                return (parsed.obs || '-') + cobText;
+              })()}
+              ${f.negativo ? ` (PAGAMENTO EM: ${f.descPagamento})` : ''}
+            </td>
           </tr>
         `).join('')}
       </tbody>
@@ -6769,6 +6965,9 @@ function imprimirComprovanteFolga(folgaId) {
   const srv = DB.servidores().find(s => s.id === folga.srvId);
   if (!srv) return;
 
+  const parsed = parseFolgaObs(folga.obs);
+  const rowSubstituto = parsed.coberturaNome ? `<div class="data-row"><span class="label">Substituto (Cobertura):</span><span class="value" style="color: #6366f1;">👥 ${parsed.coberturaNome}</span></div>` : '';
+
   const win = window.open('', '_blank');
   const hoje = new Date();
   const imgPrint = getImg('print');
@@ -6823,7 +7022,8 @@ function imprimirComprovanteFolga(folgaId) {
             ${folga.dataItems ? folga.dataItems.map(di => `<div>${fmtDate(di.data)} (${di.peso === 1 ? 'Integral' : 'Meio Período'})</div>`).join('') : fmtDate(folga.data)}
           </div></div>
           <div class="data-row"><span class="label">Total de Dias:</span><span class="value">${folga.qtd.toString().replace('.',',')} DIA(S)</span></div>
-          <div class="data-row"><span class="label">Observações:</span><span class="value">${folga.obs || '-'}</span></div>
+          ${rowSubstituto}
+          <div class="data-row"><span class="label">Observações:</span><span class="value">${parsed.obs || '-'}</span></div>
         </div>
 
         ${folga.negativo ? `
@@ -7400,7 +7600,12 @@ function renderSolicitacoes() {
         ` : `
           <p style="font-size:0.8rem">📅 <strong>Início:</strong> ${fmtDate(s.inicio)} | <strong>Retorno/Fim:</strong> ${fmtDate(s.fim)}</p>
         `}
-        ${s.obs ? `<p style="font-size:0.75rem; color:var(--muted); margin-top:6px; background: white; padding: 6px; border-radius: 4px; border: 1px dashed var(--border)">"${s.obs}"</p>` : ''}
+        ${(() => {
+          if (!s.obs) return '';
+          const parsed = parseFolgaObs(s.obs);
+          const tagCob = parsed.coberturaNome ? `<br style="margin-bottom:4px"><span class="tag tag-purple" style="display:inline-block;margin-top:4px">👥 Substituto (Cobertura): ${esc(parsed.coberturaNome)}</span>` : '';
+          return `<p style="font-size:0.75rem; color:var(--muted); margin-top:6px; background: white; padding: 6px; border-radius: 4px; border: 1px dashed var(--border)">"${esc(parsed.obs || '-')}"${tagCob}</p>`;
+        })()}
         
         <div style="display:flex; gap:8px; margin-top:12px; border-top:1px solid var(--border); padding-top:10px; align-items: center">
           ${canApprove ? `
@@ -7453,7 +7658,63 @@ function prepararEdicaoSolicitacao(id) {
   window.scrollTo({ top: document.getElementById('card-nova-solicitacao').offsetTop - 20, behavior: 'smooth' });
 }
 
+let currentResolvingSolId = null;
+
+function abrirModalCobertura(id) {
+  const lista = DB.solicitacoes();
+  const sol = lista.find(s => s.id === id);
+  if (!sol) return;
+
+  const srvs = DB.servidores();
+  const servidor = srvs.find(s => s.id === sol.srvId);
+  const servidorNome = servidor ? servidor.nome : 'Servidor';
+
+  currentResolvingSolId = id;
+
+  const mcNome = document.getElementById('mc-servidor-nome');
+  if (mcNome) mcNome.textContent = servidorNome;
+
+  const cobSel = document.getElementById('mc-cobertura-select');
+  if (cobSel) {
+    const outrosServidores = getServidoresAcessiveis().filter(s => s.id !== sol.srvId);
+    cobSel.innerHTML = '<option value="">— Sem substituto (nenhuma cobertura) —</option>' +
+      outrosServidores.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+  }
+
+  abrirModal('modal-cobertura');
+}
+
+async function confirmarCoberturaEAutorizar() {
+  if (!currentResolvingSolId) return;
+
+  const cobSel = document.getElementById('mc-cobertura-select');
+  let cobId = null;
+  let cobNome = null;
+
+  if (cobSel && cobSel.value) {
+    cobId = cobSel.value;
+    const srv = DB.servidores().find(s => s.id === cobId);
+    if (srv) {
+      cobNome = srv.nome;
+    }
+  }
+
+  fecharModal('modal-cobertura');
+  const solId = currentResolvingSolId;
+  currentResolvingSolId = null;
+
+  await executarResolucaoSolicitacao(solId, 'autorizado', cobId, cobNome);
+}
+
 async function resolverSolicitacao(id, novoStatus) {
+  if (novoStatus === 'autorizado') {
+    abrirModalCobertura(id);
+  } else {
+    await executarResolucaoSolicitacao(id, novoStatus, null, null);
+  }
+}
+
+async function executarResolucaoSolicitacao(id, novoStatus, coberturaId, coberturaNome) {
   const lista = DB.solicitacoes();
   const idx = lista.findIndex(s => s.id === id);
   if (idx < 0) return;
@@ -7470,6 +7731,12 @@ async function resolverSolicitacao(id, novoStatus) {
         await DB.saveServidores(srvs);
      }
 
+     let prefix = '';
+     if (coberturaNome && coberturaId) {
+       prefix = `[Cobertura: ${coberturaNome} (ID: ${coberturaId})] `;
+       sol.obs = prefix + (sol.obs || '');
+     }
+
      if (sol.tipo.includes('ferias')) {
         const progs = DB.programacoes();
         if (sol.periodos && sol.periodos.length > 0) {
@@ -7478,7 +7745,7 @@ async function resolverSolicitacao(id, novoStatus) {
               id: uid(), srvId: sol.srvId, solId: sol.id,
               tipo: sol.tipo === 'ferias_anual' ? 'anual' : 'premio',
               inicio: p.inicio, fim: p.fim, retorno: p.fim,
-              obs: `Autorizado via Solicitação (${pIdx+1}/${sol.periodos.length}). ${sol.obs || ''}`,
+              obs: prefix + `Autorizado via Solicitação (${pIdx+1}/${sol.periodos.length}). ${sol.obs || ''}`,
               criadoEm: new Date().toISOString()
             });
           });
@@ -7487,7 +7754,7 @@ async function resolverSolicitacao(id, novoStatus) {
             id: uid(), srvId: sol.srvId, solId: sol.id,
             tipo: sol.tipo === 'ferias_anual' ? 'anual' : 'premio',
             inicio: sol.inicio, fim: sol.fim, retorno: sol.fim,
-            obs: `Autorizado via Solicitação. ${sol.obs || ''}`,
+            obs: prefix + `Autorizado via Solicitação. ${sol.obs || ''}`,
             criadoEm: new Date().toISOString()
           });
         }
@@ -7499,7 +7766,7 @@ async function resolverSolicitacao(id, novoStatus) {
            data: sol.inicio, 
            dataItems: sol.dataItems || [{ data: sol.inicio, peso: 1 }],
            qtd: sol.qtd || 1,
-           obs: `Folga autorizada via Solicitação. ${sol.obs || ''}`,
+           obs: prefix + `Folga autorizada via Solicitação. ${sol.obs || ''}`,
            criadoEm: new Date().toISOString()
         });
         await DB.saveFolgas(folgas);
@@ -7633,8 +7900,10 @@ function carregarFolgasDisp() {
   const sel = document.getElementById('fg-ref-deb');
   if (!sel) return;
   const negBox = document.getElementById('fg-neg-box');
+  const cobSel = document.getElementById('fg-cobertura-deb');
   if (!srvId) {
     sel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
+    if (cobSel) cobSel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
     if (negBox) negBox.style.display = 'none';
     return;
   }
@@ -7642,6 +7911,12 @@ function carregarFolgasDisp() {
   const saldo = saldoFolgas(srvId);
   sel.innerHTML = '<option value="">— Folga não vinculada a crédito específico —</option>' +
     creditos.map(c => `<option value="${c.id}">${fmtDate(c.data)} · ${c.qtd}d · ${c.motivo.substring(0,50)}${c.motivo.length>50?'...':''}</option>`).join('');
+
+  if (cobSel) {
+    const outrosServidores = getServidoresAcessiveis().filter(s => s.id !== srvId);
+    cobSel.innerHTML = '<option value="">— Sem substituto (nenhuma cobertura) —</option>' +
+      outrosServidores.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+  }
 
   if (negBox) negBox.style.display = saldo <= 0 ? 'block' : 'none';
 }
@@ -7690,10 +7965,19 @@ async function registrarUsufrutoFolga() {
   const dataString = dataItems.map(di => di.data).join(', ');
   const qtd = qtdTotal;
 
+  const cobSel = document.getElementById('fg-cobertura-deb');
+  let finalObs = obs;
+  if (cobSel && cobSel.value) {
+    const srvCob = DB.servidores().find(s => s.id === cobSel.value);
+    if (srvCob) {
+      finalObs = `[Cobertura: ${srvCob.nome} (ID: ${srvCob.id})] ${obs}`;
+    }
+  }
+
   const saldo = saldoFolgas(srvId);
   const negativo = saldo - qtd < 0;
   const folgas = DB.folgas();
-  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId || null, obs, criadoEm: new Date().toISOString() };
+  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId || null, obs: finalObs, criadoEm: new Date().toISOString() };
 
   if (saldo <= 0 || negativo) {
     const descPag = document.getElementById('fg-pag-desc').value.trim();
@@ -7730,6 +8014,8 @@ function limparFormUsufruto() {
   document.getElementById('fg-pag-desc').value = '';
   document.getElementById('fg-neg-box').style.display = 'none';
   document.getElementById('fg-ref-deb').innerHTML = '<option value="">Selecionar folga do banco...</option>';
+  const cobSel = document.getElementById('fg-cobertura-deb');
+  if (cobSel) cobSel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
 }
 
 function renderHistoricoFolgas() {
@@ -7761,7 +8047,9 @@ function renderHistoricoFolgas() {
     if (f.tipo === 'credito') {
       datasDesc = `📅 ${fmtDate(f.data)} &nbsp;|&nbsp; 📝 Motivo: <em>${f.motivo}</em>`;
     } else {
-      datasDesc = `📅 ${f.dataItems ? f.dataItems.map(di => `${fmtDate(di.data)} (${di.peso === 1 ? 'Int' : `Meio - ${di.turno}`})`).join(', ') : fmtDate(f.data)} &nbsp;|&nbsp; 📝 Obs: <em>${f.obs || '-'}</em>`;
+      const parsed = parseFolgaObs(f.obs);
+      const tagCob = parsed.coberturaNome ? ` <span class="tag tag-purple">👥 Substituto (Cobertura): ${esc(parsed.coberturaNome)}</span>` : '';
+      datasDesc = `📅 ${f.dataItems ? f.dataItems.map(di => `${fmtDate(di.data)} (${di.peso === 1 ? 'Int' : `Meio - ${di.turno}`})`).join(', ') : fmtDate(f.data)} &nbsp;|&nbsp; 📝 Obs: <em>${esc(parsed.obs || '-')}</em>${tagCob}`;
     }
 
     return `<div class="folga-hist-item ${cls}">
