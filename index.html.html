@@ -1564,6 +1564,11 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     </div>
 
     <div class="sidebar-footer">
+      <div id="sync-status-bar" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin-bottom:6px;border-radius:var(--r-sm);font-size:.7rem;font-weight:600">
+        <span id="sync-status-icon" style="font-size:.8rem">☁️</span>
+        <span id="sync-status-text" style="flex:1">Sincronizado</span>
+        <button id="sync-force-btn" class="btn btn-ghost btn-sm" onclick="forcarSyncCompleto()" style="padding:2px 8px;font-size:.65rem;display:none" title="Forçar envio de todos os dados locais para a nuvem">🔄 Sincronizar</button>
+      </div>
       <div class="sidebar-user">
         <i class="fa-solid fa-circle-user"></i>
         <span id="display-user-name">Usuário</span>
@@ -1575,7 +1580,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <div style="display:flex;align-items:center;gap:6px">
           <div class="status-dot">v2.1</div>
           <div id="realtime-badge" title="Sincronização em tempo real ativa" style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);opacity:0;transition:opacity 0.4s;flex-shrink:0;"></div>
-          <div id="sync-pending-badge" title="Dados pendentes de sincronização" style="display:none;cursor:pointer;width:8px;height:8px;border-radius:50%;background:var(--warning);box-shadow:0 0 6px var(--warning);flex-shrink:0;" onclick="forcarSync()"></div>
+          <div id="sync-pending-badge" title="Dados pendentes de sincronização" style="display:none;cursor:pointer;width:8px;height:8px;border-radius:50%;background:var(--warning);box-shadow:0 0 6px var(--warning);flex-shrink:0;" onclick="forcarSyncCompleto()"></div>
         </div>
       </div>
     </div>
@@ -3114,6 +3119,25 @@ function atualizarBadgeSync() {
       badge.style.display = 'none';
     }
   }
+  const syncBar = document.getElementById('sync-status-bar');
+  const syncIcon = document.getElementById('sync-status-icon');
+  const syncText = document.getElementById('sync-status-text');
+  const syncBtn = document.getElementById('sync-force-btn');
+  if (syncBar && syncIcon && syncText) {
+    if (_syncQueue.length > 0 || _quotaBloqueado) {
+      syncBar.style.background = 'rgba(245,158,11,0.12)';
+      syncBar.style.border = '1px solid rgba(245,158,11,0.25)';
+      syncIcon.textContent = '⚠️';
+      syncText.textContent = `${_syncQueue.length} item(ns) pendente(s)`;
+      if (syncBtn) syncBtn.style.display = 'inline-flex';
+    } else {
+      syncBar.style.background = 'transparent';
+      syncBar.style.border = 'none';
+      syncIcon.textContent = '✅';
+      syncText.textContent = 'Sincronizado';
+      if (syncBtn) syncBtn.style.display = 'none';
+    }
+  }
 }
 
 async function forcarSync() {
@@ -3121,10 +3145,86 @@ async function forcarSync() {
     toastMsg("Nada para sincronizar!", "info");
     return;
   }
-  toastMsg("🔄 Forçando sincronização...", "info");
+  toastMsg("🔄 Sincronizando dados pendentes...", "info");
   _quotaBloqueado = false;
   await processSyncQueue();
   atualizarBadgeSync();
+}
+
+async function forcarSyncCompleto() {
+  const btn = document.getElementById('sync-force-btn');
+  const icon = document.getElementById('sync-status-icon');
+  const text = document.getElementById('sync-status-text');
+  if (btn) btn.disabled = true;
+  if (icon) icon.textContent = '⏳';
+  if (text) text.textContent = 'Sincronizando...';
+  toastMsg('🔄 Sincronizando todos os dados com a nuvem...', 'info');
+
+  _quotaBloqueado = false;
+
+  // Processa fila de sincronização primeiro
+  if (_syncQueue.length > 0) await processSyncQueue();
+
+  // Sobe todos os dados locais para a nuvem (caso a syncQueue tenha falhado antes)
+  const syncAll = async (tabela, dados) => {
+    if (!dados || dados.length === 0) return true;
+    try {
+      const { error } = await supabaseClient.from(tabela).upsert(dados);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue(tabela, dados);
+          return false;
+        }
+        console.error(`Erro ao sync ${tabela}:`, error);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue(tabela, dados);
+        return false;
+      }
+      console.error(`Erro ao sync ${tabela}:`, e);
+      return false;
+    }
+  };
+
+  const tabelas = [
+    { nome: 'servidores', dados: JSON.parse(localStorage.getItem('srv_servidores') || '[]') },
+    { nome: 'programacoes', dados: JSON.parse(localStorage.getItem('srv_programacoes') || '[]') },
+    { nome: 'folgas', dados: JSON.parse(localStorage.getItem('srv_folgas') || '[]') },
+    { nome: 'solicitacoes', dados: JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]') },
+    { nome: 'gestores', dados: JSON.parse(localStorage.getItem('srv_gestores') || '[]') },
+  ];
+
+  for (const t of tabelas) {
+    if (t.dados.length > 0) {
+      const ok = await syncAll(t.nome, t.dados);
+      if (text) text.textContent = `Sincronizando ${t.nome}...`;
+      if (!ok && text) text.textContent = `⏳ ${t.nome} na fila (quota)`;
+    }
+  }
+
+  // Sincronizar configurações (incluindo imagens)
+  const configLocal = JSON.parse(localStorage.getItem('srv_config') || '{}');
+  const configArray = Object.entries(configLocal)
+    .map(([key, value]) => ({
+      chave: key,
+      valor: typeof value === 'string' ? value : JSON.stringify(value)
+    }));
+  if (configArray.length > 0) {
+    try {
+      await supabaseClient.from('configuracoes').upsert(configArray);
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('configuracoes', configLocal);
+    }
+  }
+
+  atualizarBadgeSync();
+  if (btn) btn.disabled = false;
+  if (icon) icon.textContent = '✅';
+  if (text) text.textContent = 'Sincronizado';
+  toastMsg('✅ Sincronização concluída!', 'success');
 }
 
 setInterval(atualizarBadgeSync, 5000);
@@ -3641,7 +3741,14 @@ async function syncComSupabase(silencioso = false) {
 
   // Re-aplica exclusões que não puderam ser feitas na nuvem (quota, offline)
   await aplicarExclusoesPendentes();
+
+  // Tenta processar a fila de sincronização (dados que não subiram por quota)
+  if (_syncQueue.length > 0) {
+    console.log(`🔄 Processando ${_syncQueue.length} itens da fila de sync...`);
+    await processSyncQueue();
+  }
     
+  atualizarBadgeSync();
   return true;
 }
 
