@@ -613,6 +613,21 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 }
 .tag-blue   { background:rgba(77,123,255,0.14); color:#8ab0ff; border:1px solid rgba(77,123,255,0.2); }
 .tag-purple { background:rgba(133,87,245,0.14); color:#c0a0ff; border:1px solid rgba(133,87,245,0.2); }
+
+/* Comprovante online */
+.receipt-container { border: 2px solid #000; padding: 30px; max-width: 800px; margin: 0 auto; position: relative; }
+.header-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; border-bottom: 2px solid #000; }
+.header-table td { padding: 15px; vertical-align: middle; }
+.title-box { text-align: center; }
+.data-section { margin: 30px 0; }
+.data-row { display: flex; margin-bottom: 15px; border-bottom: 1px dashed #ccc; padding-bottom: 5px; }
+.label { font-weight: 700; width: 140px; text-transform: uppercase; font-size: 10px; color: #444; }
+.value { font-weight: 600; font-size: 14px; }
+.declaration { background: #f9f9f9; border: 1.5px solid #000; padding: 20px; margin: 35px 0; font-style: italic; font-size: 12px; text-align: center; }
+.sig-area { margin-top: 80px; display: flex; justify-content: space-around; gap: 50px; }
+.sig-box { text-align: center; flex: 1; }
+.sig-line { border-top: 1.5px solid #000; margin-bottom: 10px; }
+.sig-label { font-weight: 700; text-transform: uppercase; font-size: 10px; }
 .tag-green  { background:rgba(15,212,136,0.1);  color:#52e8b0; border:1px solid rgba(15,212,136,0.18); }
 .tag-warn   { background:rgba(245,183,49,0.1);  color:#ffd270; border:1px solid rgba(245,183,49,0.18); }
 .tag-red    { background:rgba(255,77,106,0.1);  color:#ff8090; border:1px solid rgba(255,77,106,0.18); }
@@ -1367,6 +1382,11 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   cursor: pointer;
   position: relative;
   transition: opacity 0.15s, transform 0.15s;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 1px;
+  overflow: hidden;
 }
 .ma-cell:hover {
   opacity: 0.85;
@@ -1378,6 +1398,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   outline-offset: -1px;
   z-index: 1;
 }
+.ma-cell-half { flex: 1; border-radius: 2px; min-height: 2px; }
 .ma-legend-item {
   display: flex;
   align-items: center;
@@ -1555,6 +1576,12 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <span class="tab-label">Mapa de Ausências</span>
       </button>
 
+      <button class="tab-btn" onclick="showTab('coberturas')" id="tab-coberturas" style="margin-bottom:4px">
+        <i class="fa-solid fa-handshake"></i>
+        <span class="tab-label">Coberturas</span>
+        <span class="badge" id="badge-coberturas" style="background:var(--accent);display:none">0</span>
+      </button>
+
       <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px;">
         <button class="tab-btn tab-sair-btn" onclick="sairSistema()" id="tab-sair" style="width:100%; background: rgba(255, 77, 106, 0.08); border: 1px solid rgba(255, 77, 106, 0.2);">
           <i class="fa-solid fa-right-from-bracket" style="color:var(--danger)"></i>
@@ -1713,6 +1740,51 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   <div id="fg-historico"><div class="empty"><div class="icon">🏖️</div><p>Nenhuma movimentação registrada.</p></div></div>
 </div>
 
+<!-- ===================== MODAL EDITAR FOLGA ===================== -->
+<div class="modal-bg" id="modal-editar-folga">
+  <div class="modal">
+    <h3 id="ef-titulo">✏️ Editar Lançamento</h3>
+    <input type="hidden" id="ef-id">
+    <input type="hidden" id="ef-tipo">
+    <div class="field" style="margin-bottom:12px">
+      <label>Servidor</label>
+      <input id="ef-srv" type="text" disabled style="background:var(--surface);opacity:.7">
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Tipo</label>
+      <input id="ef-tipo-label" type="text" disabled style="background:var(--surface);opacity:.7">
+    </div>
+    <!-- Campo data (crédito) -->
+    <div class="field" id="ef-data-group" style="margin-bottom:12px">
+      <label>Data</label>
+      <input id="ef-data" type="date">
+    </div>
+    <!-- Campo datas (débito — read-only) -->
+    <div class="field" id="ef-datas-group" style="margin-bottom:12px;display:none">
+      <label>Datas do Usufruto</label>
+      <input id="ef-datas" type="text" disabled style="background:var(--surface);opacity:.7">
+    </div>
+    <div class="field" style="margin-bottom:12px">
+      <label>Quantidade (dias)</label>
+      <input id="ef-qtd" type="number" min="0.5" step="0.5">
+    </div>
+    <!-- Campo motivo (crédito) -->
+    <div class="field" id="ef-motivo-group" style="margin-bottom:12px">
+      <label>Motivo</label>
+      <textarea id="ef-motivo" style="min-height:70px"></textarea>
+    </div>
+    <!-- Campo observação (débito) -->
+    <div class="field" id="ef-obs-group" style="margin-bottom:12px;display:none">
+      <label>Observação</label>
+      <textarea id="ef-obs" style="min-height:70px"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModal('modal-editar-folga')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoFolga()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= ABA ALERTAS ======================= -->
 <div class="tab-panel active" id="panel-alertas">
   <div class="section-title">📊 Dashboard de Gestão</div>
@@ -1761,6 +1833,11 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   <div class="section-title" style="color:var(--success)"><span class="icon">🌴</span> Servidores em Gozo Atualmente (HOJE)</div>
   <div id="lista-em-gozo-hoje" style="margin-bottom:30px">
     <div class="empty"><div class="icon">🌴</div><p>Nenhum servidor em gozo de férias hoje.</p></div>
+  </div>
+
+  <div class="section-title" style="color:var(--warning)"><span class="icon">🏖️</span> Servidores em Gozo de Folga HOJE</div>
+  <div id="lista-folgas-em-gozo-hoje" style="margin-bottom:30px">
+    <div class="empty"><div class="icon">🏖️</div><p>Nenhum servidor em gozo de folga hoje.</p></div>
   </div>
 
   <div class="section-title">⚠️ Detalhamento de Alertas (Anuais)</div>
@@ -2200,13 +2277,17 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 
   <!-- Legenda -->
   <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);align-items:center">
-    <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Nº de Ausentes:</span>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:var(--card)"></div> 0</div>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(15,212,136,0.25)"></div> 1-2</div>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(245,183,49,0.35)"></div> 3-5</div>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(245,158,11,0.5)"></div> 6-8</div>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(255,77,106,0.5)"></div> 9-12</div>
-    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(220,38,38,0.7)"></div> 13+</div>
+    <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Legenda:</span>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(77,123,255,0.5)"></div> 🔵 Férias</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(15,212,136,0.5)"></div> 🟢 Folgas</div>
+    <span style="width:1px;height:20px;background:var(--border);display:inline-block"></span>
+    <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Intensidade:</span>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:var(--card);border:1px solid var(--border)"></div> 0</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(100,100,100,0.12)"></div> 1-2</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(100,100,100,0.3)"></div> 3-5</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(100,100,100,0.5)"></div> 6-8</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(100,100,100,0.7)"></div> 9-12</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(100,100,100,0.88)"></div> 13+</div>
     <span style="margin-left:auto;font-size:.75rem;color:var(--muted)" id="ma-total-info">Carregando...</span>
   </div>
 
@@ -2432,6 +2513,21 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     </div>
   </div>
 
+  <div class="card" style="margin-bottom:20px">
+    <h3><span class="icon">🏖️</span> Limites de Folga</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Defina as regras de limite para registro de usufruto de folgas. Deixe 0 para desabilitar.</p>
+    <div class="form-row cols-2" style="gap:10px">
+      <div class="field">
+        <label>Máximo de dias consecutivos</label>
+        <input id="cfg-max-consec" type="number" min="0" max="30" step="1" value="5">
+      </div>
+      <div class="field">
+        <label>Máximo de dias por mês</label>
+        <input id="cfg-max-mes" type="number" min="0" max="31" step="1" value="5">
+      </div>
+    </div>
+  </div>
+
   <div class="grid-2">
     <div class="card">
       <h3><span class="icon">📜</span> Decreto Municipal</h3>
@@ -2605,6 +2701,42 @@ Coordenação de RH
       </div>
     </div>
   </div>
+
+<!-- ======================= ABA COBERTURAS ======================= -->
+<div class="tab-panel" id="panel-coberturas">
+  <div class="section-title">🤝 Coberturas de Ausências</div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+      <p style="font-size:.82rem;color:var(--muted)">Registro de servidores que cobriram ausências (folgas e férias) de outros servidores.</p>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button class="btn btn-primary btn-sm" onclick="exportarRelatorioCoberturas()">📄 Exportar Relatório</button>
+      </div>
+    </div>
+
+    <div class="form-row cols-3" style="margin-bottom:16px">
+      <div class="field">
+        <label>Mês / Ano</label>
+        <input id="cb-mes" type="month" style="max-width:200px" onchange="renderCoberturas()">
+      </div>
+      <div class="field">
+        <label>Setor (filtro)</label>
+        <select id="cb-setor" onchange="renderCoberturas()">
+          <option value="">Todos os Setores</option>
+        </select>
+      </div>
+      <div class="field" style="display:flex;align-items:flex-end">
+        <button class="btn btn-ghost" onclick="document.getElementById('cb-mes').value='';renderCoberturas()">✕ Limpar filtros</button>
+      </div>
+    </div>
+
+    <div id="cb-stats" style="display:flex;gap:20px;margin-bottom:16px;flex-wrap:wrap"></div>
+
+    <div id="cb-lista">
+      <div class="empty"><div class="icon">🤝</div><p>Selecione um mês para visualizar as coberturas.</p></div>
+    </div>
+  </div>
+</div>
 
 </div> <!-- close content-area -->
 </div> <!-- close app-container -->
@@ -3804,6 +3936,24 @@ function aplicarConfiguracoesSalvas() {
 
 // ===================== SEGURANÇA E NAVEGAÇÃO =====================
 async function verificarSessao() {
+  // Se for link de comprovante, renderiza direto sem login
+  const compParams = new URLSearchParams(window.location.search);
+  const compToken = compParams.get('comp');
+  if (compToken) {
+    const cfg = JSON.parse(localStorage.getItem('srv_config') || '{}');
+    const folgaId = cfg.comprovantes ? cfg.comprovantes[compToken] : null;
+    if (folgaId) {
+      document.querySelector('.app-container').style.display = 'none';
+      document.getElementById('login-screen').style.display = 'none';
+      renderComprovanteOnline(folgaId);
+      return;
+    }
+    document.querySelector('.app-container').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    document.body.innerHTML = '<div style="text-align:center;padding:60px;font-family:sans-serif"><h2>Link inválido ou expirado</h2><p>Este comprovante não está mais disponível.</p><p style="font-size:14px;color:#888;margin-top:20px">Peça ao administrador para gerar um novo link.</p></div>';
+    return;
+  }
+
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
   const appContainer = document.querySelector('.app-container');
   const loginScreen = document.getElementById('login-screen');
@@ -4225,7 +4375,7 @@ const DB = {
 
   config: () => {
     if (Object.keys(_remoteData.config).length) return _remoteData.config;
-    return JSON.parse(localStorage.getItem('srv_config') || '{"decreto":"","tema":"#5b7fff","estiloBase":"midnight","coordenadorAPS":"","setores":[],"subtituloSidebar":"Gestão de RH","tituloSidebar":"Férias / Folgas","nomeOrganizacao":"Coordenação da Atenção Primária à Saúde","tamanhoFonteOrg":14, "tamanhoLogoHeader":38}');
+    return JSON.parse(localStorage.getItem('srv_config') || '{"decreto":"","tema":"#5b7fff","estiloBase":"midnight","coordenadorAPS":"","setores":[],"subtituloSidebar":"Gestão de RH","tituloSidebar":"Férias / Folgas","nomeOrganizacao":"Coordenação da Atenção Primária à Saúde","tamanhoFonteOrg":14, "tamanhoLogoHeader":38,"maxFolgasConsecutivas":5,"maxFolgasMes":5}');
   },
   saveConfig: async (d) => {
     _remoteData.config = d;
@@ -4437,21 +4587,29 @@ const DB = {
       registroId,
       criadoEm: new Date().toISOString()
     };
+    // Salva localmente (sempre funciona)
+    const locais = JSON.parse(localStorage.getItem('srv_logs') || '[]');
+    locais.unshift(log);
+    if (locais.length > 500) locais.length = 500; // mantém só os 500 mais recentes
+    localStorage.setItem('srv_logs', JSON.stringify(locais));
+    // Tenta salvar no Supabase (se falhar, já está no localStorage)
     try {
       await supabaseClient.from('logs').insert(log);
     } catch (e) {
-      console.error("Erro ao salvar log:", e);
+      if (!isQuotaError(e)) console.error("Erro ao salvar log no Supabase:", e);
     }
     return log;
   },
 
   getLogs: async (limit = 100) => {
-    const { data, error } = await supabaseClient.from('logs').select('*').order('criadoEm', { ascending: false }).limit(limit);
-    if (error) {
-      console.error("Erro ao buscar logs:", error);
-      return [];
-    }
-    return data;
+    // Primeiro tenta do Supabase
+    try {
+      const { data, error } = await supabaseClient.from('logs').select('*').order('criadoEm', { ascending: false }).limit(limit);
+      if (!error && data && data.length > 0) return data;
+    } catch (e) { /* fallback silencioso */ }
+    // Fallback: logs locais
+    const locais = JSON.parse(localStorage.getItem('srv_logs') || '[]');
+    return locais.slice(0, limit);
   }
 };
 
@@ -4495,7 +4653,7 @@ function showTab(tab) {
   }
   if (tab === 'solicitacoes') renderSolicitacoes();
   if (tab === 'auditoria') renderAuditoria();
-  if (tab === 'config') carregarConfig();
+  if (tab === 'coberturas') renderCoberturas();
   
   currentPage = 1;
 }
@@ -5927,10 +6085,22 @@ function renderAlertas() {
 
   document.getElementById('stat-count-anual').textContent = anuais.length;
   document.getElementById('stat-count-premium').textContent = premium.length;
-  document.getElementById('stat-count-hoje').textContent = emGozoHoje.length;
+  // Servidores em gozo de folga HOJE
+  const folgasEmGozoHoje = getFolgasAcessiveis().filter(f => {
+    if (f.tipo !== 'debito') return false;
+    if (f.dataItems) return f.dataItems.some(di => di.data === hojeIso);
+    if (f.data) return f.data.split(',').map(x => x.trim()).includes(hojeIso);
+    return false;
+  }).map(f => {
+    const srv = servidores.find(s => s.id === f.srvId);
+    return srv ? { ...f, srv } : null;
+  }).filter(Boolean);
+
+  document.getElementById('stat-count-hoje').textContent = emGozoHoje.length + folgasEmGozoHoje.length;
   document.getElementById('stat-total').textContent = servidores.length;
 
   renderListaGozoHoje(emGozoHoje);
+  renderListaFolgasEmGozoHoje(folgasEmGozoHoje);
   renderListaAlertas('lista-alertas-anual', anuais, 'anual');
   renderListaAlertas('lista-alertas-premium', premium, 'premium');
   document.getElementById('badge-alertas').textContent = anuais.length + premium.length;
@@ -5959,6 +6129,235 @@ function renderListaGozoHoje(lista) {
       </div>
     </div>`;
   }).join('');
+}
+
+function renderListaFolgasEmGozoHoje(lista) {
+  const el = document.getElementById('lista-folgas-em-gozo-hoje');
+  if (!el) return;
+  if (!lista.length) {
+    el.innerHTML = `<div class="empty"><div class="icon">🏖️</div><p>Nenhum servidor em gozo de folga hoje.</p></div>`;
+    return;
+  }
+  el.innerHTML = lista.map(item => {
+    const datas = item.dataItems
+      ? item.dataItems.map(di => `${fmtDate(di.data)}${di.peso === 1 ? '' : ` (${di.turno})`}`).join(', ')
+      : item.data || '';
+    return `<div class="alert-card gozo" style="border-left: 4px solid var(--warning)">
+      <div class="alert-icon" style="background:var(--warning)22; color:var(--warning)">🏖️</div>
+      <div class="alert-info">
+        <h4>${item.srv.nome} <span style="font-weight:400;color:var(--muted);font-size:.85rem">(Mat. ${item.srv.matricula})</span></h4>
+        <p>📍 ${item.srv.setor || 'Setor não informado'} — ${item.srv.cargo || ''}</p>
+        <p>📅 Datas: <strong>${datas}</strong></p>
+        <p style="color:var(--muted);font-size:.82rem">${esc(item.obs || '-')}</p>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function atualizarSelectSetorCobertura() {
+  const sel = document.getElementById('cb-setor');
+  if (!sel) return;
+  const setores = getTodosSetores();
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Todos os Setores</option>' + setores.map(s => `<option value="${s}">${s}</option>`).join('');
+  if (setores.includes(atual)) sel.value = atual;
+}
+
+function renderCoberturas() {
+  if (typeof atualizarSelectsSetores === 'function') atualizarSelectsSetores();
+  const mesInput = document.getElementById('cb-mes');
+  const setorFiltro = document.getElementById('cb-setor')?.value || '';
+  const listaEl = document.getElementById('cb-lista');
+  const statsEl = document.getElementById('cb-stats');
+  if (!listaEl) return;
+
+  // Se não selecionou mês, mostra todas as coberturas dos últimos 3 meses
+  let mesAlvo = mesInput ? mesInput.value : '';
+  if (!mesAlvo) {
+    const d = new Date();
+    mesAlvo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (mesInput) mesInput.value = mesAlvo;
+  }
+
+  // Pega todos os débitos de folga + programações de férias que têm cobertura
+  const servidores = DB.servidores();
+  const folgas = getFolgasAcessiveis().filter(f => f.tipo === 'debito');
+  const progs = getProgramacoesAcessiveis().filter(p => !p.concluido);
+
+  const coberturas = [];
+
+  // Folgas com cobertura
+  folgas.forEach(f => {
+    const parsed = parseFolgaObs(f.obs);
+    if (!parsed.coberturaNome) return;
+    const srvAusente = servidores.find(s => s.id === f.srvId);
+    if (!srvAusente) return;
+    if (setorFiltro && srvAusente.setor !== setorFiltro) return;
+    const datas = f.dataItems ? f.dataItems.map(d => d.data) : [f.data];
+    // Filtra pelo mês selecionado
+    const datasNoMes = datas.filter(d => d && d.startsWith(mesAlvo));
+    if (datasNoMes.length === 0) return;
+    coberturas.push({
+      tipo: 'folga',
+      srvAusente,
+      substitutoNome: parsed.coberturaNome,
+      substitutoId: parsed.coberturaId,
+      datas: datasNoMes,
+      qtd: datasNoMes.length,
+      obs: parsed.obs,
+      id: f.id
+    });
+  });
+
+  // Programações de férias com cobertura (mesmo formato: [Cobertura: Nome (ID: xxx)] na obs)
+  progs.forEach(p => {
+    const parsed = parseFolgaObs(p.obs || '');
+    if (!parsed.coberturaNome) return;
+    const srvAusente = servidores.find(s => s.id === p.srvId);
+    if (!srvAusente) return;
+    if (setorFiltro && srvAusente.setor !== setorFiltro) return;
+    // Filtra se o período da programação cai no mês selecionado
+    const dias = gerarDiasNoMes(p.inicio, p.fim, mesAlvo);
+    if (dias === 0) return;
+    coberturas.push({
+      tipo: 'ferias',
+      srvAusente,
+      substitutoNome: parsed.coberturaNome,
+      substitutoId: parsed.coberturaId,
+      periodo: `${fmtDate(p.inicio)} a ${fmtDate(p.fim)}`,
+      qtd: dias,
+      obs: parsed.obs,
+      id: p.id
+    });
+  });
+
+  // Ordena por data (mais recente primeiro)
+  coberturas.sort((a, b) => (b.datas ? b.datas[0] : '') < (a.datas ? a.datas[0] : '') ? 1 : -1);
+
+  // Stats
+  const totalCoberturas = coberturas.length;
+  const servidoresUnicos = new Set(coberturas.map(c => c.substitutoNome)).size;
+  statsEl.innerHTML = `
+    <div class="stat" style="padding:10px 16px"><div class="val" style="font-size:1.2rem">${totalCoberturas}</div><div class="lbl">Coberturas no mês</div></div>
+    <div class="stat" style="padding:10px 16px"><div class="val" style="font-size:1.2rem">${servidoresUnicos}</div><div class="lbl">Substitutos distintos</div></div>
+    <div class="stat" style="padding:10px 16px"><div class="val" style="font-size:1.2rem">${coberturas.filter(c => c.tipo === 'folga').length}</div><div class="lbl">Folgas</div></div>
+    <div class="stat" style="padding:10px 16px"><div class="val" style="font-size:1.2rem">${coberturas.filter(c => c.tipo === 'ferias').length}</div><div class="lbl">Férias</div></div>
+  `;
+
+  if (!coberturas.length) {
+    listaEl.innerHTML = '<div class="empty"><div class="icon">🤝</div><p>Nenhuma cobertura registrada neste mês.</p></div>';
+    atualizarBadgeCoberturas(0);
+    return;
+  }
+
+  listaEl.innerHTML = coberturas.map(c => {
+    const icone = c.tipo === 'folga' ? '🏖️' : '🌴';
+    const tipoLabel = c.tipo === 'folga' ? 'Folga' : 'Férias';
+    const periodo = c.tipo === 'folga' ? c.datas.map(d => fmtDate(d)).join(', ') : c.periodo;
+    const substituto = servidores.find(s => s.id === c.substitutoId);
+    const subNome = substituto ? `${substituto.nome} (Mat. ${substituto.matricula})` : c.substitutoNome;
+    return `<div class="alert-card" style="border-left: 4px solid var(--accent)">
+      <div class="alert-icon" style="background:var(--accent)22; color:var(--accent)">🤝</div>
+      <div class="alert-info">
+        <h4>${icone} ${c.srvAusente.nome} <span style="font-weight:400;color:var(--muted);font-size:.85rem">(Mat. ${c.srvAusente.matricula})</span></h4>
+        <p>📍 ${c.srvAusente.setor || '-'} — ${tipoLabel}</p>
+        <p>📅 <strong>${periodo}</strong> · ${c.qtd} dia(s)</p>
+        <p style="color:var(--success)">👤 Coberto por: <strong>${subNome}</strong></p>
+        ${c.obs ? `<p style="color:var(--muted);font-size:.8rem">📝 ${esc(c.obs)}</p>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  atualizarBadgeCoberturas(coberturas.length);
+}
+
+function gerarDiasNoMes(inicio, fim, mesAlvo) {
+  if (!inicio || !fim) return 0;
+  const dInicio = new Date(inicio + 'T00:00:00');
+  const dFim = new Date(fim + 'T00:00:00');
+  const [ano, mes] = mesAlvo.split('-').map(Number);
+  let count = 0;
+  const d = new Date(dInicio);
+  while (d <= dFim) {
+    if (d.getFullYear() === ano && d.getMonth() + 1 === mes) count++;
+    d.setDate(d.getDate() + 1);
+  }
+  return count;
+}
+
+function atualizarBadgeCoberturas(qtd) {
+  const badge = document.getElementById('badge-coberturas');
+  if (!badge) return;
+  badge.style.display = qtd > 0 ? 'inline-block' : 'none';
+  badge.textContent = qtd;
+}
+
+function exportarRelatorioCoberturas() {
+  const mesInput = document.getElementById('cb-mes');
+  let mesAlvo = mesInput ? mesInput.value : '';
+  if (!mesAlvo) {
+    const d = new Date();
+    mesAlvo = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+
+  const servidores = DB.servidores();
+  const folgas = getFolgasAcessiveis().filter(f => f.tipo === 'debito');
+  const progs = getProgramacoesAcessiveis().filter(p => !p.concluido);
+  const linhas = [];
+
+  folgas.forEach(f => {
+    const parsed = parseFolgaObs(f.obs);
+    if (!parsed.coberturaNome) return;
+    const srv = servidores.find(s => s.id === f.srvId);
+    if (!srv) return;
+    const datas = f.dataItems ? f.dataItems.map(d => d.data) : [f.data];
+    const datasNoMes = datas.filter(d => d && d.startsWith(mesAlvo));
+    if (datasNoMes.length === 0) return;
+    linhas.push({ ausente: srv.nome, setor: srv.setor || '-', tipo: 'Folga', substituto: parsed.coberturaNome, periodo: datasNoMes.map(d => fmtDate(d)).join(', '), qtd: datasNoMes.length });
+  });
+
+  progs.forEach(p => {
+    const parsed = parseFolgaObs(p.obs || '');
+    if (!parsed.coberturaNome) return;
+    const srv = servidores.find(s => s.id === p.srvId);
+    if (!srv) return;
+    const dias = gerarDiasNoMes(p.inicio, p.fim, mesAlvo);
+    if (dias === 0) return;
+    linhas.push({ ausente: srv.nome, setor: srv.setor || '-', tipo: 'Férias', substituto: parsed.coberturaNome, periodo: `${fmtDate(p.inicio)} a ${fmtDate(p.fim)}`, qtd: dias });
+  });
+
+  if (!linhas.length) return toastMsg('Nenhuma cobertura para exportar no período.', 'info');
+
+  const [ano, mes] = mesAlvo.split('-');
+  const nomesMes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const imgPrint = getImg('print');
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head><meta charset="UTF-8"><title>Relatório de Coberturas - ${nomesMes[parseInt(mes)-1]} ${ano}</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+      body { font-family: 'Inter', sans-serif; padding: 40px; font-size: 12px; }
+      h1 { font-size: 20px; margin-bottom: 5px; }
+      h2 { font-size: 14px; font-weight: 400; color: #555; margin-bottom: 30px; }
+      table { width: 100%; border-collapse: collapse; }
+      th { background: #f0f0f0; text-align: left; padding: 10px 8px; font-size: 10px; text-transform: uppercase; border-bottom: 2px solid #000; }
+      td { padding: 8px; border-bottom: 1px solid #ddd; }
+      .total { margin-top: 20px; font-weight: 700; font-size: 14px; }
+      .footer { margin-top: 40px; text-align: center; font-size: 9px; color: #888; border-top: 1px solid #ddd; padding-top: 10px; }
+      @media print { @page { size: A4 landscape; margin: 1cm; } body { padding: 0; } }
+    </style></head>
+    <body onload="window.print()">
+      ${imgPrint ? `<div style="text-align:center;margin-bottom:20px"><img src="${imgPrint}" style="max-height:60px"></div>` : ''}
+      <h1>🤝 Relatório de Coberturas</h1>
+      <h2>${nomesMes[parseInt(mes)-1]} de ${ano} · Total: ${linhas.length} cobertura(s)</h2>
+      <table><thead><tr><th>Servidor Ausente</th><th>Setor</th><th>Tipo</th><th>Substituto</th><th>Período</th><th>Dias</th></tr></thead>
+      <tbody>${linhas.map(l => `<tr><td>${l.ausente}</td><td>${l.setor}</td><td>${l.tipo}</td><td>${l.substituto}</td><td>${l.periodo}</td><td>${l.qtd}</td></tr>`).join('')}</tbody></table>
+      <div class="total">Total de coberturas no período: ${linhas.length}</div>
+      <div class="footer">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+    </body></html>
+  `);
+  win.document.close();
 }
 
 function renderListaAlertas(containerId, lista, tipo) {
@@ -6383,6 +6782,11 @@ function carregarConfig() {
   renderListaSetores();
   atualizarSelectsSetores();
 
+  const maxConsec = document.getElementById('cfg-max-consec');
+  if (maxConsec) maxConsec.value = cfg.maxFolgasConsecutivas ?? 5;
+  const maxMes = document.getElementById('cfg-max-mes');
+  if (maxMes) maxMes.value = cfg.maxFolgasMes ?? 5;
+
   const txtAut = document.getElementById('cfg-texto-autorizacao');
   if (txtAut) txtAut.value = cfg.textoAutorizacao || '';
   atualizarPreview();
@@ -6410,6 +6814,11 @@ async function salvarConfig() {
   cfg.nomeOrganizacao = document.getElementById('cfg-org-name').value.trim() || 'Coordenação da Atenção Primária à Saúde';
   cfg.tamanhoFonteOrg = parseInt(document.getElementById('cfg-org-font-size').value) || 14;
   cfg.tamanhoLogoHeader = parseInt(document.getElementById('cfg-logo-size').value) || 38;
+
+  const maxConsec = document.getElementById('cfg-max-consec');
+  if (maxConsec) cfg.maxFolgasConsecutivas = parseInt(maxConsec.value) || 0;
+  const maxMes = document.getElementById('cfg-max-mes');
+  if (maxMes) cfg.maxFolgasMes = parseInt(maxMes.value) || 0;
 
   await DB.saveConfig(cfg);
   
@@ -6493,7 +6902,7 @@ function atualizarSelectsSetores() {
     }
   }
   
-  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb'];
+  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor'];
   
   selectIds.forEach(id => {
     const el = document.getElementById(id);
@@ -7464,7 +7873,8 @@ function imprimirComprovanteFolga(folgaId) {
         .sig-area { margin-top: 80px; display: flex; justify-content: space-around; gap: 50px; }
         .sig-box { text-align: center; flex: 1; }
         .sig-line { border-top: 1.5px solid #000; margin-bottom: 10px; }
-        .sig-label { font-weight: 700; text-transform: uppercase; font-size: 10px; }
+.sig-label { font-weight: 700; text-transform: uppercase; font-size: 10px; }
+@media print { .comp-bar { display: none !important; } }
         @media print { @page { size: A4 portrait; margin: 1cm; } body { padding: 0; } .receipt-container { border: 2.5px solid #000; } }
       </style>
     </head>
@@ -7522,6 +7932,97 @@ function imprimirComprovanteFolga(folgaId) {
   `;
   win.document.write(fullHTML);
   win.document.close();
+}
+
+function gerarLinkComprovante(folgaId) {
+  const folga = DB.folgas().find(f => f.id === folgaId);
+  if (!folga || folga.tipo !== 'debito') return toastMsg('Comprovante disponível apenas para usufrutos.', 'error');
+  
+  const token = folga.id.slice(0, 6) + '-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2, 4);
+  
+  const cfg = DB.config();
+  if (!cfg.comprovantes) cfg.comprovantes = {};
+  cfg.comprovantes[token] = folgaId;
+  DB.saveConfig(cfg);
+  
+  const url = window.location.href.split('?')[0].split('#')[0] + '?comp=' + token;
+  
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      toastMsg('🔗 Link copiado para a área de transferência!');
+    }).catch(() => { fallbackCopy(url); });
+  } else {
+    fallbackCopy(url);
+  }
+}
+
+function fallbackCopy(text) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.position = 'fixed'; ta.style.left = '-9999px';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); toastMsg('🔗 Link copiado!'); }
+  catch (e) { toastMsg('📋 Link: ' + text, 'info'); }
+  document.body.removeChild(ta);
+}
+
+function renderComprovanteOnline(folgaId) {
+  const folga = DB.folgas().find(f => f.id === folgaId);
+  if (!folga) return document.body.innerHTML = '<div style="text-align:center;padding:60px;font-family:sans-serif"><h2>Comprovante não encontrado</h2><p>O registro pode ter sido excluído.</p></div>';
+  const srv = DB.servidores().find(s => s.id === folga.srvId);
+  if (!srv) return document.body.innerHTML = '<div style="text-align:center;padding:60px;font-family:sans-serif"><h2>Servidor não encontrado</h2></div>';
+
+  const parsed = parseFolgaObs(folga.obs);
+  const rowSubstituto = parsed.coberturaNome ? `<div class="data-row"><span class="label">Substituto (Cobertura):</span><span class="value" style="color: #6366f1;">👥 ${parsed.coberturaNome}</span></div>` : '';
+  const imgPrint = getImg('print');
+
+  document.body.innerHTML = `
+    <div style="font-family: 'Inter', sans-serif; max-width: 800px; margin: 20px auto; padding: 0 16px;">
+      <div class="comp-bar" style="text-align:center;margin-bottom:20px">
+        <button onclick="window.print()" style="padding:10px 24px;background:#0fd488;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer;margin-right:10px">🖨️ Imprimir</button>
+        <button onclick="window.close()" style="padding:10px 24px;background:#526080;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✕ Fechar</button>
+      </div>
+      <div class="receipt-container">
+        <table class="header-table">
+          <tr>
+            <td style="width: 25%; text-align: center; height: 100px;">
+              ${imgPrint ? `<img src="${imgPrint}" style="max-height: 95px; max-width: 100%; object-fit: contain;">` : '<div style="font-weight: 800; font-size: 20px;">APS</div>'}
+            </td>
+            <td class="title-box">
+              <div style="font-size: 10px; font-weight: 700; color: #444; letter-spacing: 1px;">COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE</div>
+              <div style="font-size: 18px; font-weight: 800; margin-top: 8px; text-decoration: underline;">COMPROVANTE DE USUFRUTO DE FOLGA</div>
+            </td>
+            <td style="width: 20%; text-align: right; font-size: 9px; font-weight: 600;">CERTIFICADO Nº<br>${folga.id.substring(0,8).toUpperCase()}</td>
+          </tr>
+        </table>
+        <div class="data-section">
+          <div class="data-row"><span class="label">Servidor(a):</span><span class="value">${srv.nome}</span></div>
+          <div class="data-row"><span class="label">Matrícula:</span><span class="value">${srv.matricula}</span></div>
+          <div class="data-row"><span class="label">Setor Atual:</span><span class="value">${srv.setor || 'NÃO INFORMADO'}</span></div>
+          <div class="data-row"><span class="label">Período de Usufruto:</span><div class="value">
+            ${folga.dataItems ? folga.dataItems.map(di => `<div>${fmtDate(di.data)} (${di.peso === 1 ? 'Integral' : 'Meio Período'})</div>`).join('') : fmtDate(folga.data)}
+          </div></div>
+          <div class="data-row"><span class="label">Total de Dias:</span><span class="value">${folga.qtd.toString().replace('.',',')} DIA(S)</span></div>
+          ${rowSubstituto}
+          <div class="data-row"><span class="label">Observações:</span><span class="value">${parsed.obs || '-'}</span></div>
+        </div>
+        ${folga.negativo ? `<div style="border: 1.5px solid #d32f2f; background: #fff8f8; color: #d32f2f; padding: 12px; border-radius: 4px; margin: 20px 0; font-size: 10px; font-weight: 700; text-align: center; text-transform: uppercase;">
+          ⚠️ AVISO: REGISTRO REALIZADO COM SALDO DE FOLGAS NEGATIVO.<br>
+          <span style="font-size: 9px; font-weight: 600;">COMPENSAÇÃO PACTUADA: ${folga.descPagamento || 'A DEFINIR'}</span>
+        </div>` : ''}
+        <div class="declaration">
+          "Pelo presente termo, fica formalizado o usufruto de folga compensatória do servidor acima identificado, <br>
+          estando devidamente autorizado pela coordenação imediata, conforme registros em sistema."
+        </div>
+        <div class="sig-area">
+          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div style="font-size: 9px;">Assinatura do Servidor</div></div>
+          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Coordenador (a) APS</div><div style="font-size: 9px;">Carimbo e Assinatura</div></div>
+        </div>
+        <div style="text-align: center; margin-top: 50px; font-size: 9px; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
+          Documento emitido eletronicamente em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
+        </div>
+      </div>
+    </div>
+  `;
 }
 
 let fpGozo = null;
@@ -8562,6 +9063,46 @@ async function registrarUsufrutoFolga() {
   }
   // ===============================================================
 
+  // ==== VALIDAÇÃO DE LIMITES CONFIGURÁVEIS ====
+  const cfg = DB.config();
+  const maxConsec = cfg.maxFolgasConsecutivas || 0;
+  const maxMes = cfg.maxFolgasMes || 0;
+  const datasOrdenadas = dataItems.map(d => d.data).sort();
+
+  if (maxConsec > 0) {
+    let streak = 1;
+    let maxStreak = 1;
+    for (let i = 1; i < datasOrdenadas.length; i++) {
+      const prev = new Date(datasOrdenadas[i-1] + 'T00:00:00');
+      const curr = new Date(datasOrdenadas[i] + 'T00:00:00');
+      const diff = (curr - prev) / 86400000;
+      if (diff === 1) { streak++; maxStreak = Math.max(maxStreak, streak); }
+      else { streak = 1; }
+    }
+    if (maxStreak > maxConsec) {
+      const msg = `⚠️ LIMITE DE DIAS CONSECUTIVOS EXCEDIDO\n\n` +
+                  `Máximo permitido: ${maxConsec} dias consecutivos.\n` +
+                  `Você selecionou ${maxStreak} dias seguidos.\n\nDeseja registrar mesmo assim?`;
+      if (!confirm(msg)) return;
+    }
+  }
+
+  if (maxMes > 0) {
+    const mesAno = datasOrdenadas[0].substring(0, 7);
+    const folgasNoMes = DB.folgas().filter(f =>
+      f.srvId === srvId && f.tipo === 'debito' && f.dataItems &&
+      f.dataItems.some(di => di.data.startsWith(mesAno))
+    );
+    const totalNoMes = folgasNoMes.reduce((acc, f) => acc + f.qtd, 0) + qtd;
+    if (totalNoMes > maxMes) {
+      const msg = `⚠️ LIMITE MENSAL DE FOLGAS EXCEDIDO\n\n` +
+                  `Máximo permitido: ${maxMes} dias no mês ${mesAno}.\n` +
+                  `Com este registro, o total será de ${totalNoMes} dias.\n\nDeseja registrar mesmo assim?`;
+      if (!confirm(msg)) return;
+    }
+  }
+  // ===============================================================
+
   const cobSel = document.getElementById('fg-cobertura-deb');
   let finalObs = obs;
   if (cobSel && cobSel.value) {
@@ -8659,6 +9200,8 @@ function renderHistoricoFolgas() {
         <div style="display:flex;align-items:center;gap:10px">
           <span style="font-weight:700;font-size:1rem;color:${cor}">${sinalQtd}</span>
           ${f.tipo === 'debito' ? `<button class="btn btn-primary btn-sm" onclick="imprimirComprovanteFolga('${f.id}')" title="Imprimir Comprovante">🖨️</button>` : ''}
+          ${f.tipo === 'debito' ? `<button class="btn btn-ghost btn-sm" onclick="gerarLinkComprovante('${f.id}')" title="Compartilhar Link">🔗</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="abrirModalEditarFolga('${f.id}')" title="Editar">✏️</button>
           <button class="btn btn-danger btn-sm" onclick="excluirFolga('${f.id}')" title="Excluir">🗑️</button>
         </div>
       </div>
@@ -8687,6 +9230,77 @@ async function excluirFolga(id) {
   renderDashboard();
   toastMsg('Lançamento excluído permanentemente.');
   DB.saveLog('Exclusão Folga', `Excluiu lançamento de folga (ID: ${id})`, 'folgas', id);
+}
+
+function abrirModalEditarFolga(id) {
+  const f = DB.folgas().find(x => x.id === id);
+  if (!f) return toastMsg('Registro não encontrado!', 'error');
+  const srv = DB.servidores().find(s => s.id === f.srvId);
+  document.getElementById('ef-id').value = f.id;
+  document.getElementById('ef-tipo').value = f.tipo;
+  document.getElementById('ef-srv').value = srv ? `${srv.nome} (Mat. ${srv.matricula})` : f.srvId;
+  document.getElementById('ef-tipo-label').value = f.tipo === 'credito' ? 'Crédito (Banco)' : 'Débito (Usufruto)';
+  document.getElementById('ef-qtd').value = f.qtd;
+
+  const isCred = f.tipo === 'credito';
+  document.getElementById('ef-data-group').style.display = isCred ? '' : 'none';
+  document.getElementById('ef-datas-group').style.display = isCred ? 'none' : '';
+  document.getElementById('ef-motivo-group').style.display = isCred ? '' : 'none';
+  document.getElementById('ef-obs-group').style.display = isCred ? 'none' : '';
+  document.getElementById('ef-titulo').textContent = isCred ? '✏️ Editar Crédito' : '✏️ Editar Usufruto';
+
+  if (isCred) {
+    document.getElementById('ef-data').value = f.data || '';
+    document.getElementById('ef-motivo').value = f.motivo || '';
+  } else {
+    const datas = f.dataItems
+      ? f.dataItems.map(di => `${fmtDate(di.data)} (${di.peso === 1 ? 'Integral' : `${di.turno}`})`).join(', ')
+      : f.data || '';
+    document.getElementById('ef-datas').value = datas;
+    const parsed = parseFolgaObs(f.obs);
+    document.getElementById('ef-obs').value = parsed.obs || '';
+  }
+
+  document.getElementById('modal-editar-folga').classList.add('open');
+}
+
+async function salvarEdicaoFolga() {
+  const id = document.getElementById('ef-id').value;
+  if (!id) return;
+  const folgas = DB.folgas();
+  const idx = folgas.findIndex(x => x.id === id);
+  if (idx === -1) return toastMsg('Registro não encontrado!', 'error');
+
+  const f = folgas[idx];
+  const isCred = f.tipo === 'credito';
+  const qtd = parseFloat(document.getElementById('ef-qtd').value);
+  if (!qtd || qtd <= 0) return toastMsg('Quantidade inválida!', 'error');
+
+  if (isCred) {
+    const data = document.getElementById('ef-data').value;
+    const motivo = document.getElementById('ef-motivo').value.trim();
+    if (!data) return toastMsg('Informe a data!', 'error');
+    if (!motivo) return toastMsg('Informe o motivo!', 'error');
+    f.data = data;
+    f.qtd = qtd;
+    f.motivo = motivo;
+  } else {
+    const obs = document.getElementById('ef-obs').value.trim();
+    f.qtd = qtd;
+    const parsed = parseFolgaObs(f.obs);
+    f.obs = parsed.coberturaNome
+      ? `[Cobertura: ${parsed.coberturaNome} (ID: ${parsed.coberturaId})] ${obs}`
+      : obs;
+  }
+
+  folgas[idx] = f;
+  await DB.saveFolgas(folgas, [f]);
+  fecharModal('modal-editar-folga');
+  renderHistoricoFolgas();
+  atualizarSaldoDisplay();
+  atualizarBadgeFolgas();
+  toastMsg('Lançamento atualizado!');
+  DB.saveLog('Edição Folga', `Editou lançamento de folga (ID: ${id})`, 'folgas', id);
 }
 
 function atualizarBadgeFolgas() {
@@ -9351,13 +9965,15 @@ function renderMapaAusencias() {
     let html = '<div class="ma-sem-agrupamento">';
     dias.forEach(dia => {
       const diaISO = dia.toISOString().split('T')[0];
-      const count = contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo);
-      const cor = corHeatmap(count);
-      const ehHoje = dia.getTime() === hoje.getTime();
       const nomes = listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo);
       const ck = `ma_${diaISO}|`;
       _maCache.set(ck, nomes);
-      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" style="background:${cor}" data-count="${count}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" title="${fmtDate(diaISO)}: ${count} ausente(s)"></div>`;
+      const { ferias, folga, total } = contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo);
+      const ehHoje = dia.getTime() === hoje.getTime();
+      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" data-count="${total}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" title="${fmtDate(diaISO)}: ${total} ausente(s)">
+        <div class="ma-cell-half" style="background:${corHeatmapTipo(ferias, 'ferias')}"></div>
+        <div class="ma-cell-half" style="background:${corHeatmapTipo(folga, 'folga')}"></div>
+      </div>`;
     });
     html += '</div>';
     container.innerHTML = html;
@@ -9386,13 +10002,15 @@ function renderMapaAusencias() {
     html += `<div class="ma-row-label">${esc(setor)}</div>`;
     dias.forEach(dia => {
       const diaISO = dia.toISOString().split('T')[0];
-      const count = contarAusencias(dia, diaISO, servidores, programacoes, folgas, setor, filtroTipo);
-      const cor = corHeatmap(count);
-      const ehHoje = dia.getTime() === hoje.getTime();
       const nomes = listarAusentes(dia, diaISO, servidores, programacoes, folgas, setor, filtroTipo);
       const ck = `ma_${diaISO}|${setor}`;
       _maCache.set(ck, nomes);
-      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" style="background:${cor}" data-count="${count}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" data-setor="${esc(setor)}"></div>`;
+      const { ferias, folga, total } = contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, setor, filtroTipo);
+      const ehHoje = dia.getTime() === hoje.getTime();
+      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" data-count="${total}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" data-setor="${esc(setor)}">
+        <div class="ma-cell-half" style="background:${corHeatmapTipo(ferias, 'ferias')}"></div>
+        <div class="ma-cell-half" style="background:${corHeatmapTipo(folga, 'folga')}"></div>
+      </div>`;
     });
     html += '</div>';
   });
@@ -9501,6 +10119,50 @@ function listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSet
   return nomes;
 }
 
+function contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  const servidoresSetor = filtroSetor ? servidores.filter(s => s.setor === filtroSetor) : servidores;
+  let ferias = 0, folga = 0;
+
+  if (filtroTipo !== 'folga') {
+    programacoes.forEach(p => {
+      const srv = servidores.find(s => s.id === p.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (p.concluido) return;
+      const pInicio = p.inicio || '';
+      const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
+      if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) ferias++;
+    });
+  }
+
+  if (filtroTipo !== 'ferias') {
+    folgas.forEach(f => {
+      if (f.tipo !== 'debito') return;
+      const srv = servidores.find(s => s.id === f.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (f.dataItems && Array.isArray(f.dataItems)) {
+        if (f.dataItems.some(di => di.data === diaISO)) folga++;
+      } else if (f.data) {
+        const datas = f.data.split(',').map(d => d.trim());
+        if (datas.includes(diaISO)) folga++;
+      }
+    });
+  }
+
+  return { ferias, folga, total: ferias + folga };
+}
+
+function corHeatmapTipo(count, tipo) {
+  if (count === 0) return 'transparent';
+  const cores = tipo === 'ferias'
+    ? ['rgba(77,123,255,0.12)','rgba(77,123,255,0.3)','rgba(77,123,255,0.5)','rgba(77,123,255,0.7)','rgba(77,123,255,0.88)']
+    : ['rgba(15,212,136,0.12)','rgba(15,212,136,0.3)','rgba(15,212,136,0.5)','rgba(15,212,136,0.7)','rgba(15,212,136,0.88)'];
+  if (count <= 2) return cores[0];
+  if (count <= 5) return cores[1];
+  if (count <= 8) return cores[2];
+  if (count <= 12) return cores[3];
+  return cores[4];
+}
+
 function corHeatmap(count) {
   if (count === 0) return 'var(--card)';
   if (count <= 2) return 'rgba(15,212,136,0.25)';
@@ -9525,6 +10187,15 @@ function anexarTooltipMapa() {
       let html = `<strong style="color:var(--primary)">${data}</strong>`;
       if (setor) html += ` · <span style="color:var(--text-mid)">${esc(setor)}</span>`;
       html += `<br><span style="font-size:0.9rem;font-weight:800">${count} ausente(s)</span>`;
+      // Breakdown por tipo
+      let feriasCount = 0, folgaCount = 0;
+      nomes.forEach(n => { if (n.tipo === 'Folga') folgaCount++; else feriasCount++; });
+      if (feriasCount > 0 || folgaCount > 0) {
+        html += `<div style="margin-top:4px;font-size:.75rem;display:flex;gap:12px">
+          ${feriasCount > 0 ? `<span>🔵 ${feriasCount} férias</span>` : ''}
+          ${folgaCount > 0 ? `<span>🟢 ${folgaCount} folgas</span>` : ''}
+        </div>`;
+      }
       if (nomes.length > 0) {
         html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;max-height:180px;overflow-y:auto">';
         nomes.forEach(n => {
