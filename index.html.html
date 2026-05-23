@@ -4257,11 +4257,12 @@ const DB = {
   },
 
   folgas: () => _remoteData.folgas.length ? _remoteData.folgas : JSON.parse(localStorage.getItem('srv_folgas') || '[]'),
-  saveFolgas: async (d) => {
+  saveFolgas: async (d, apenasNovos) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
+    const paraSubir = apenasNovos || d;
     try {
-      const { error } = await supabaseClient.from('folgas').upsert(d);
+      const { error } = await supabaseClient.from('folgas').upsert(paraSubir);
       if (error) {
         if (isQuotaError(error)) {
           saveToSyncQueue('folgas', d);
@@ -8298,18 +8299,19 @@ async function executarResolucaoSolicitacao(id, novoStatus, coberturaId, cobertu
           });
         }
         await DB.saveProgramacoes(progs);
-     } else {
-        const folgas = DB.folgas();
-        folgas.push({
-           id: uid(), srvId: sol.srvId, solId: sol.id, tipo: 'gozo', 
-           data: sol.inicio, 
-           dataItems: sol.dataItems || [{ data: sol.inicio, peso: 1 }],
-           qtd: sol.qtd || 1,
-           obs: prefix + `Folga autorizada via Solicitação. ${sol.obs || ''}`,
-           criadoEm: new Date().toISOString()
-        });
-        await DB.saveFolgas(folgas);
-     }
+      } else {
+         const folgas = DB.folgas();
+         const novaFolga = {
+            id: uid(), srvId: sol.srvId, solId: sol.id, tipo: 'gozo', 
+            data: sol.inicio, 
+            dataItems: sol.dataItems || [{ data: sol.inicio, peso: 1 }],
+            qtd: sol.qtd || 1,
+            obs: prefix + `Folga autorizada via Solicitação. ${sol.obs || ''}`,
+            criadoEm: new Date().toISOString()
+         };
+         folgas.push(novaFolga);
+         await DB.saveFolgas(folgas, [novaFolga]);
+      }
      atualizarBadge();
   }
 
@@ -8496,8 +8498,9 @@ async function adicionarFolga() {
   if (!motivo) return toastMsg('O motivo é obrigatório!', 'error');
 
   const folgas = DB.folgas();
-  folgas.push({ id: uid(), srvId, tipo: 'credito', data, qtd: qtdReal, motivo, criadoEm: new Date().toISOString() });
-  await DB.saveFolgas(folgas);
+  const novoCredito = { id: uid(), srvId, tipo: 'credito', data, qtd: qtdReal, motivo, criadoEm: new Date().toISOString() };
+  folgas.push(novoCredito);
+  await DB.saveFolgas(folgas, [novoCredito]);
 
   document.getElementById('fg-data-cred').value = '';
   document.getElementById('fg-qtd-cred').value = 1;
@@ -8570,7 +8573,7 @@ async function registrarUsufrutoFolga() {
   }
 
   folgas.push(novaFolga);
-  await DB.saveFolgas(folgas);
+  await DB.saveFolgas(folgas, [novaFolga]);
   limparFormUsufruto();
   renderHistoricoFolgas();
   atualizarBadgeFolgas();
