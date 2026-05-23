@@ -2942,8 +2942,8 @@ function isQuotaError(error) {
   return msg.includes('exceed_egress') || msg.includes('service for this project is restricted') || msg.includes('quota');
 }
 
-function saveToSyncQueue(tabela, dados, action = 'upsert') {
-  const queueItem = { tabela, dados, action, timestamp: Date.now() };
+function saveToSyncQueue(tabela, dados) {
+  const queueItem = { tabela, dados, timestamp: Date.now() };
   _syncQueue.push(queueItem);
   localStorage.setItem('srv_sync_queue', JSON.stringify(_syncQueue));
   console.log(`📦 Adicionado à fila de sync: ${tabela} (${_syncQueue.length} itens pendentes)`);
@@ -2982,12 +2982,6 @@ async function processSyncQueue() {
         if (error) {
           if (isQuotaError(error)) throw error;
           console.error(`Erro ao sync config:`, error);
-        }
-      } else if (item.action === 'delete') {
-        const { error } = await supabaseClient.from(tabela).delete().eq('id', dados);
-        if (error) {
-          if (isQuotaError(error)) throw error;
-          console.error(`Erro ao sync delete ${tabela}:`, error);
         }
       } else {
         const { error } = await supabaseClient.from(tabela).upsert(dados);
@@ -3690,8 +3684,11 @@ async function syncComSupabase(silencioso = false) {
       migrarDadosLocaisParaNuvem('folgas', pendentes);
     }
     const unificados = [...data, ...pendentes];
-    _remoteData.folgas = unificados;
-    localStorage.setItem('srv_folgas', JSON.stringify(unificados));
+    // Excluir registros com exclusão pendente (deletados localmente mas sem quota no Supabase)
+    const idsExcluir = new Set(_pendingDeletions.filter(p => p.tabela === 'folgas').map(p => p.id));
+    const unificadosFiltrados = idsExcluir.size > 0 ? unificados.filter(x => !idsExcluir.has(x.id)) : unificados;
+    _remoteData.folgas = unificadosFiltrados;
+    localStorage.setItem('srv_folgas', JSON.stringify(unificadosFiltrados));
   });
 
   await syncTabela('solicitacoes', '*', (data) => {
@@ -4291,7 +4288,7 @@ const DB = {
     const { error } = await supabaseClient.from('folgas').delete().eq('id', id);
     if (error) {
       if (isQuotaError(error)) {
-        saveToSyncQueue('folgas', id, 'delete');
+        registrarPendenteExclusao('folgas', id);
       } else {
         toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
       }
