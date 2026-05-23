@@ -1309,6 +1309,99 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 .skeleton-rect { height: 150px; width: 100%; }
 
 }
+
+/* ================================================================
+   MAPA DE AUSÊNCIAS — HEATMAP
+=============================================================== */
+.ma-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  overflow-x: auto;
+}
+.ma-header-row {
+  display: flex;
+  align-items: flex-end;
+  margin-bottom: 4px;
+  padding-left: 140px;
+}
+.ma-header-cell {
+  flex: 1;
+  min-width: 32px;
+  text-align: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--muted);
+  padding: 3px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.ma-header-cell.weekend { color: var(--danger); opacity: 0.5; }
+.ma-row {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  min-height: 34px;
+  transition: background 0.15s;
+}
+.ma-row:last-child { border-bottom: none; }
+.ma-row:hover { background: var(--surface); }
+.ma-row-label {
+  width: 140px;
+  min-width: 140px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-mid);
+  padding: 5px 10px 5px 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex-shrink: 0;
+}
+.ma-cell {
+  flex: 1;
+  min-width: 32px;
+  height: 30px;
+  margin: 1px;
+  border-radius: 3px;
+  cursor: pointer;
+  position: relative;
+  transition: opacity 0.15s, transform 0.15s;
+}
+.ma-cell:hover {
+  opacity: 0.85;
+  transform: scale(1.15);
+  z-index: 2;
+}
+.ma-cell.hoje {
+  outline: 2px solid var(--primary);
+  outline-offset: -1px;
+  z-index: 1;
+}
+.ma-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+.ma-legend-cell {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  border: 1px solid var(--border);
+}
+.ma-sem-agrupamento {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(20px, 1fr));
+  gap: 3px;
+}
+.ma-sem-agrupamento .ma-cell {
+  min-width: auto;
+  height: 20px;
+}
+}
 </style>
 </head>
 <body onload="verificarSessao()">
@@ -1456,6 +1549,10 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-cake-candles"></i>
         <span class="tab-label">Aniversariantes</span>
         <span class="badge" id="badge-bday" style="background:linear-gradient(90deg,var(--warning),#ec4899)">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('mapaausencias')" id="tab-mapaausencias">
+        <i class="fa-solid fa-fire"></i>
+        <span class="tab-label">Mapa de Ausências</span>
       </button>
 
       <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px;">
@@ -1936,6 +2033,36 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     </div>
   </div>
 
+  <!-- RELATÓRIO MENSAL PDF -->
+  <div class="card" style="margin-bottom:24px">
+    <h3><span class="icon">📄</span> Relatório Mensal de Ausências</h3>
+    <p style="font-size:.82rem;color:var(--muted);margin-bottom:12px">Gera um relatório PDF consolidado com férias e folgas do mês, agrupado por setor.</p>
+    <div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap">
+      <div class="field" style="margin:0;min-width:160px">
+        <label>Mês</label>
+        <select id="rel-mes-pdf">
+          <option value="0">Janeiro</option>
+          <option value="1">Fevereiro</option>
+          <option value="2">Março</option>
+          <option value="3">Abril</option>
+          <option value="4">Maio</option>
+          <option value="5">Junho</option>
+          <option value="6">Julho</option>
+          <option value="7">Agosto</option>
+          <option value="8">Setembro</option>
+          <option value="9">Outubro</option>
+          <option value="10">Novembro</option>
+          <option value="11">Dezembro</option>
+        </select>
+      </div>
+      <div class="field" style="margin:0;min-width:140px">
+        <label>Ano</label>
+        <select id="rel-ano-pdf"></select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="exportarRelatorioMensalPDF()">📄 Exportar Relatório Mensal</button>
+    </div>
+  </div>
+
   <!-- SALDO POR SERVIDOR -->
   <div class="card" style="margin-bottom:24px">
     <h3><span class="icon">👤</span> Saldo de Férias e Folgas por Servidor</h3>
@@ -2032,6 +2159,61 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   </div>
 
   <div id="bday-lista" class="bday-grid"><div class="empty"><div class="icon">🎂</div><p>Nenhum aniversariante cadastrado.</p></div></div>
+</div>
+
+<!-- ======================= ABA MAPA DE AUSÊNCIAS ======================= -->
+<div class="tab-panel" id="panel-mapaausencias">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:16px">
+    <div class="section-title" style="margin:0">🔥 Mapa de Ausências</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-ghost btn-sm" onclick="navegarMapaAusencias(-1)" title="Mês Anterior">
+        <i class="fa-solid fa-chevron-left"></i>
+      </button>
+      <span id="ma-titulo-mes" style="font-size:0.92rem;font-weight:800;color:var(--text);min-width:140px;text-align:center;display:inline-block"></span>
+      <button class="btn btn-ghost btn-sm" onclick="navegarMapaAusencias(1)" title="Próximo Mês">
+        <i class="fa-solid fa-chevron-right"></i>
+      </button>
+      <button class="btn btn-ghost btn-sm" onclick="irParaHojeMapaAusencias()" style="margin-left:4px">Hoje</button>
+    </div>
+  </div>
+
+  <!-- Filtros -->
+  <div class="search-bar" style="margin-bottom:16px">
+    <select id="ma-filtro-setor" onchange="renderMapaAusencias()">
+      <option value="">Todos os Setores</option>
+    </select>
+    <select id="ma-filtro-tipo" onchange="renderMapaAusencias()">
+      <option value="">Férias & Folgas</option>
+      <option value="ferias">🌴 Só Férias</option>
+      <option value="folga">🏖️ Só Folgas</option>
+    </select>
+    <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);font-weight:600">
+      <input type="checkbox" id="ma-agrupar-setor" checked onchange="renderMapaAusencias()">
+      Agrupar por Setor
+    </label>
+  </div>
+
+  <!-- Legenda -->
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:14px;padding:10px 14px;background:var(--surface);border-radius:var(--r-sm);border:1px solid var(--border);align-items:center">
+    <span style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">Nº de Ausentes:</span>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:var(--card)"></div> 0</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(15,212,136,0.25)"></div> 1-2</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(245,183,49,0.35)"></div> 3-5</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(245,158,11,0.5)"></div> 6-8</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(255,77,106,0.5)"></div> 9-12</div>
+    <div class="ma-legend-item"><div class="ma-legend-cell" style="background:rgba(220,38,38,0.7)"></div> 13+</div>
+    <span style="margin-left:auto;font-size:.75rem;color:var(--muted)" id="ma-total-info">Carregando...</span>
+  </div>
+
+  <!-- Container do Grid -->
+  <div class="card" style="padding:0;overflow:auto">
+    <div id="ma-grid-container" style="min-width:400px;padding:16px">
+      <div class="empty" style="padding:40px"><div class="icon">🔥</div><p>Processando dados de ausências...</p></div>
+    </div>
+  </div>
+
+  <!-- Tooltip -->
+  <div id="ma-tooltip" style="display:none;position:fixed;background:var(--card2);backdrop-filter:blur(12px);border:1px solid var(--border-hi);border-radius:var(--r-sm);padding:10px 13px;font-size:.78rem;color:var(--text);z-index:9999;pointer-events:none;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.4);line-height:1.5"></div>
 </div>
 
 <!-- ======================= ABA SOLICITAÇÕES ======================= -->
@@ -2442,6 +2624,10 @@ Coordenação de RH
       <i class="fa-solid fa-umbrella-beach"></i>
       <span>Folgas</span>
     </button>
+    <button class="bnav-btn" onclick="showTab('mapaausencias')" id="bnav-mapaausencias">
+      <i class="fa-solid fa-fire"></i>
+      <span>Ausências</span>
+    </button>
     <button class="bnav-btn" onclick="toggleSidebar()" id="bnav-mais">
       <i class="fa-solid fa-bars"></i>
       <span>Menu</span>
@@ -2503,10 +2689,11 @@ Coordenação de RH
 <div class="modal-bg" id="modal-cobertura">
   <div class="modal">
     <h3>👥 Definir Cobertura de Ausência</h3>
-    <p style="font-size:.84rem;color:var(--muted);margin-bottom:16px;line-height:1.5">
+    <p style="font-size:.84rem;color:var(--muted);margin-bottom:6px;line-height:1.5">
       Você está autorizando a ausência de <strong id="mc-servidor-nome" style="color:var(--text)">[Servidor]</strong>.<br>
       Quem ficará responsável por cobrir as atividades deste servidor durante o período?
     </p>
+    <div id="mc-info-extra" style="margin-bottom:14px;min-height:20px"></div>
     <div class="field" style="margin-bottom:12px">
       <label>Substituto (Cobertura)</label>
       <select id="mc-cobertura-select">
@@ -2706,6 +2893,20 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ===================== MODAL DETALHES AUSÊNCIA (HEATMAP) ===================== -->
+<div class="modal-bg" id="modal-ausencia-detalhes">
+  <div class="modal" style="max-width:600px">
+    <div id="ausencia-detalhes-conteudo">
+      <h3 id="ausencia-modal-titulo">📋 Ausentes no Dia</h3>
+      <div id="ausencia-modal-sub" style="font-size:.82rem;color:var(--muted);margin-bottom:16px"></div>
+      <div id="ausencia-modal-lista" style="max-height:400px;overflow-y:auto"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModal('modal-ausencia-detalhes')">Fechar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ===================== CONSTANTES DE ESTILO =====================
@@ -2840,6 +3041,68 @@ function iniciarSyncTimer() {
 
 loadSyncQueue();
 iniciarSyncTimer();
+
+// ==== FILA DE EXCLUSÕES PENDENTES ====
+// Garante que exclusões feitas offline/quota-excedida persistam ao recarregar
+let _pendingDeletions = JSON.parse(localStorage.getItem('srv_pending_deletions') || '[]');
+
+function registrarPendenteExclusao(tabela, id) {
+  if (_pendingDeletions.some(p => p.tabela === tabela && p.id === id)) return;
+  _pendingDeletions.push({ tabela, id, timestamp: Date.now() });
+  localStorage.setItem('srv_pending_deletions', JSON.stringify(_pendingDeletions));
+  console.log(`📦 Exclusão pendente registrada: ${tabela} (${id})`);
+}
+
+async function aplicarExclusoesPendentes() {
+  if (_pendingDeletions.length === 0) return;
+  console.log(`🔄 Aplicando ${_pendingDeletions.length} exclusões pendentes...`);
+  const aindaPendentes = [];
+  for (const p of _pendingDeletions) {
+    try {
+      // Remove do in-memory + localStorage se ainda estiver lá
+      const mapKey = p.tabela;
+      if (mapKey === 'servidores') {
+        const arr = _remoteData.servidores.filter(x => x.id !== p.id);
+        _remoteData.servidores = arr;
+        localStorage.setItem('srv_servidores', JSON.stringify(arr));
+      } else if (mapKey === 'programacoes') {
+        const arr = _remoteData.programacoes.filter(x => x.id !== p.id);
+        _remoteData.programacoes = arr;
+        localStorage.setItem('srv_programacoes', JSON.stringify(arr));
+      } else if (mapKey === 'folgas') {
+        const arr = _remoteData.folgas.filter(x => x.id !== p.id);
+        _remoteData.folgas = arr;
+        localStorage.setItem('srv_folgas', JSON.stringify(arr));
+      } else if (mapKey === 'solicitacoes') {
+        const arr = _remoteData.solicitacoes.filter(x => x.id !== p.id);
+        _remoteData.solicitacoes = arr;
+        localStorage.setItem('srv_solicitacoes', JSON.stringify(arr));
+      }
+      // Tenta deletar do Supabase novamente
+      const { error } = await supabaseClient.from(p.tabela).delete().eq('id', p.id);
+      if (error) {
+        if (isQuotaError(error)) {
+          aindaPendentes.push(p);
+        } else {
+          console.warn(`Erro ao re-deletar ${p.tabela}(${p.id}):`, error.message);
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        aindaPendentes.push(p);
+      } else {
+        console.warn(`Erro ao aplicar exclusão pendente ${p.tabela}(${p.id}):`, e);
+      }
+    }
+  }
+  _pendingDeletions = aindaPendentes;
+  localStorage.setItem('srv_pending_deletions', JSON.stringify(_pendingDeletions));
+  if (aindaPendentes.length > 0) {
+    console.log(`⏳ ${aindaPendentes.length} exclusão(ões) ainda pendente(s) — quota excedida.`);
+  } else {
+    console.log('✅ Todas as exclusões pendentes foram aplicadas.');
+  }
+}
 
 function atualizarBadgeSync() {
   const badge = document.getElementById('sync-pending-badge');
@@ -3375,6 +3638,9 @@ async function syncComSupabase(silencioso = false) {
 
   // Migrar fotos Base64 para Storage automaticamente
   migrarFotosLegado();
+
+  // Re-aplica exclusões que não puderam ser feitas na nuvem (quota, offline)
+  await aplicarExclusoesPendentes();
     
   return true;
 }
@@ -3450,7 +3716,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-solicitacoes'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-mapaausencias', 'tab-solicitacoes'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
@@ -4100,6 +4366,7 @@ function showTab(tab) {
   if (tab === 'calendario') iniciarCalendario();
   if (tab === 'relatorio') renderRelatorio(), popularSelectRelatorio();
   if (tab === 'aniversariantes') renderAniversariantes();
+  if (tab === 'mapaausencias') iniciarMapaAusencias();
   if (tab === 'folgas') {
     renderFolgas();
     if (!fpGozo) initFlatpickrFolga();
@@ -4155,6 +4422,80 @@ function getFolgasAcessiveis() {
   const srvsIds = getServidoresAcessiveis().map(s => s.id);
   return DB.folgas().filter(f => srvsIds.includes(f.srvId));
 }
+
+function temAusenciaNoPeriodo(srvId, inicio, fim) {
+  const progs = DB.programacoes().filter(p => p.srvId === srvId && !p.concluido);
+  for (const p of progs) {
+    if (p.inicio <= fim && p.fim >= inicio) return true;
+  }
+  const folgas = DB.folgas().filter(f => f.srvId === srvId && f.tipo === 'debito');
+  for (const f of folgas) {
+    if (f.dataItems && Array.isArray(f.dataItems)) {
+      for (const di of f.dataItems) {
+        if (di.data >= inicio && di.data <= fim) return true;
+      }
+    } else if (f.data) {
+      if (f.data.includes(',')) {
+        const dates = f.data.split(',').map(d => d.trim());
+        for (const d of dates) {
+          if (d >= inicio && d <= fim) return true;
+        }
+      } else if (f.data >= inicio && f.data <= fim) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// ===================== DETECTOR DE CONFLITOS =====================
+function verificarConflitosSetorFuncao(srvId, periodos) {
+  const srv = DB.servidores().find(s => s.id === srvId);
+  if (!srv || !srv.setor) return [];
+  const setor = srv.setor.trim().toLowerCase();
+  const funcao = (srv.cargo || '').trim().toLowerCase();
+  if (!setor) return [];
+
+  const outrosServidores = DB.servidores().filter(s => {
+    if (s.id === srvId) return false;
+    if ((s.setor || '').trim().toLowerCase() !== setor) return false;
+    if (funcao && (s.cargo || '').trim().toLowerCase() !== funcao) return false;
+    return true;
+  });
+  if (outrosServidores.length === 0) return [];
+
+  const outrosIds = outrosServidores.map(s => s.id);
+  const conflitos = [];
+
+  // Verificar programações (férias)
+  const progs = DB.programacoes().filter(p => outrosIds.includes(p.srvId) && !p.concluido);
+  progs.forEach(p => {
+    const srvP = outrosServidores.find(s => s.id === p.srvId);
+    periodos.forEach(per => {
+      if (per.inicio <= p.fim && per.fim >= p.inicio) {
+        conflitos.push(`${srvP.nome} (${srvP.cargo || '-'}) — Férias: ${fmtDate(p.inicio)} a ${fmtDate(p.fim)}`);
+      }
+    });
+  });
+
+  // Verificar folgas (débito)
+  const folgasLista = DB.folgas().filter(f => outrosIds.includes(f.srvId) && f.tipo === 'debito');
+  folgasLista.forEach(f => {
+    const srvP = outrosServidores.find(s => s.id === f.srvId);
+    const datasFolga = f.dataItems && Array.isArray(f.dataItems)
+      ? f.dataItems.map(di => di.data)
+      : f.data ? f.data.split(',').map(d => d.trim()) : [];
+    periodos.forEach(per => {
+      const sobrepoe = datasFolga.some(d => d >= per.inicio && d <= per.fim);
+      if (sobrepoe) {
+        conflitos.push(`${srvP.nome} (${srvP.cargo || '-'}) — Folga: ${datasFolga.map(fmtDate).join(', ')}`);
+      }
+    });
+  });
+
+  return [...new Set(conflitos)];
+}
+// ================================================================
 
 // ===================== UTILS =====================
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
@@ -4894,11 +5235,26 @@ async function excluirServidor(id) {
     await supabaseClient.storage.from('FOTOS').remove([filePath]);
   }
 
-  await DB.deleteServidor(id);
-  // Deletar dependentes no Supabase
-  await supabaseClient.from('programacoes').delete().eq('srvId', id);
-  await supabaseClient.from('folgas').delete().eq('srvId', id);
-  await supabaseClient.from('solicitacoes').delete().eq('srvId', id);
+  const delOk = {};
+  const { error: errSrv } = await supabaseClient.from('servidores').delete().eq('id', id);
+  delOk.servidores = !errSrv || !isQuotaError(errSrv);
+  if (!delOk.servidores) registrarPendenteExclusao('servidores', id);
+  if (errSrv && !isQuotaError(errSrv)) console.error('Erro ao deletar servidor:', errSrv);
+
+  const { error: errProg } = await supabaseClient.from('programacoes').delete().eq('srvId', id);
+  if (errProg && isQuotaError(errProg)) {
+    for (const p of DB.programacoes().filter(x => x.srvId === id)) registrarPendenteExclusao('programacoes', p.id);
+  }
+
+  const { error: errFol } = await supabaseClient.from('folgas').delete().eq('srvId', id);
+  if (errFol && isQuotaError(errFol)) {
+    for (const f of DB.folgas().filter(x => x.srvId === id)) registrarPendenteExclusao('folgas', f.id);
+  }
+
+  const { error: errSol } = await supabaseClient.from('solicitacoes').delete().eq('srvId', id);
+  if (errSol && isQuotaError(errSol)) {
+    for (const s of DB.solicitacoes().filter(x => x.srvId === id)) registrarPendenteExclusao('solicitacoes', s.id);
+  }
 
   // 2. Apaga localmente
   const servidoresNovos = DB.servidores().filter(s => s.id !== id);
@@ -4923,7 +5279,10 @@ async function excluirServidor(id) {
   renderAniversariantes();
   renderDashboard();
   atualizarBadge();
-  toastMsg('Servidor e registros vinculados excluídos permanentemente!');
+  const msgPendente = _pendingDeletions.length > 0
+    ? ' (alguns registros serão sincronizados com a nuvem quando a conexão for restaurada)'
+    : '';
+  toastMsg(`Servidor e registros vinculados excluídos permanentemente!${msgPendente}`);
   DB.saveLog('Exclusão', `Excluiu o servidor (ID: ${id}) e todos os seus registros vinculados.`, 'servidores', id);
 }
 
@@ -5026,32 +5385,17 @@ async function salvarProgramacao() {
     });
   }
 
-  // ==== DETECTOR DE CONFLITOS ====
-  const srvTarget = DB.servidores().find(s => s.id === srvId);
-  if (srvTarget && srvTarget.setor) {
-    const conflitos = [];
-    const outrasProgs = DB.programacoes().filter(p => p.srvId !== srvId);
-    
-    outrasProgs.forEach(p => {
-      const srvP = DB.servidores().find(s => s.id === p.srvId);
-      if (srvP && srvP.setor === srvTarget.setor) {
-        novasProg.forEach(np => {
-          if (np.inicio <= p.fim && np.fim >= p.inicio) {
-            conflitos.push(`${srvP.nome} (${fmtDate(p.inicio)} a ${fmtDate(p.fim)})`);
-          }
-        });
-      }
-    });
-
-    if (conflitos.length > 0) {
-      const msg = `⚠️ ALERTA DE CONFLITO DE FÉRIAS - SETOR: ${srvTarget.setor}\n\n` +
-                  `Foi detectada sobreposição de datas com os seguintes servidores do mesmo setor:\n` +
-                  `- ${[...new Set(conflitos)].join('\n- ')}\n\n` +
-                  `Deseja salvar esta programação mesmo assim?`;
-      if (!confirm(msg)) return;
-    }
+  // ==== DETECTOR DE CONFLITOS (MESMA FUNÇÃO + SETOR) ====
+  const conflitos = verificarConflitosSetorFuncao(srvId, novasProg.map(np => ({ inicio: np.inicio, fim: np.fim })));
+  if (conflitos.length > 0) {
+    const srvTarget = DB.servidores().find(s => s.id === srvId);
+    const msg = `⚠️ ALERTA DE CONFLITO — ${srvTarget?.setor || ''} / ${srvTarget?.cargo || 'sem função'}\n\n` +
+                `Servidores da mesma função e setor já ausentes no período:\n\n` +
+                conflitos.map(c => `• ${c}`).join('\n') +
+                `\n\nDeseja salvar esta programação mesmo assim?`;
+    if (!confirm(msg)) return;
   }
-  // ===============================
+  // ===============================================================
 
   let lista = DB.programacoes();
   lista.push(...novasProg);
@@ -5259,29 +5603,17 @@ async function salvarEdicaoProg() {
   
   const novaFim = document.getElementById('ep-fim').value;
 
-  // ==== DETECTOR DE CONFLITOS ====
-  const srvTarget = DB.servidores().find(s => s.id === srvId);
-  if (srvTarget && srvTarget.setor) {
-      const outrasProgs = DB.programacoes().filter(p => p.srvId !== srvId && p.id !== id);
-      const conflitos = [];
-
-      outrasProgs.forEach(p => {
-        const srvP = DB.servidores().find(s => s.id === p.srvId);
-        if (srvP && srvP.setor === srvTarget.setor) {
-          if (inicio <= p.fim && novaFim >= p.inicio) {
-            conflitos.push(`${srvP.nome} (${fmtDate(p.inicio)} a ${fmtDate(p.fim)})`);
-          }
-        }
-      });
-      if (conflitos.length > 0) {
-        const msg = `⚠️ ALERTA DE CONFLITO DE FÉRIAS - SETOR: ${srvTarget.setor}\n\n` +
-                    `Foi detectada sobreposição de datas com os seguintes servidores do mesmo setor:\n` +
-                    `- ${[...new Set(conflitos)].join('\n- ')}\n\n` +
-                    `Deseja salvar esta edição mesmo assim?`;
-        if (!confirm(msg)) return;
-      }
+  // ==== DETECTOR DE CONFLITOS (MESMA FUNÇÃO + SETOR) ====
+  const conflitos = verificarConflitosSetorFuncao(srvId, [{ inicio, fim: novaFim }]);
+  if (conflitos.length > 0) {
+    const srvTarget = DB.servidores().find(s => s.id === srvId);
+    const msg = `⚠️ ALERTA DE CONFLITO — ${srvTarget?.setor || ''} / ${srvTarget?.cargo || 'sem função'}\n\n` +
+                `Servidores da mesma função e setor já ausentes no período:\n\n` +
+                conflitos.map(c => `• ${c}`).join('\n') +
+                `\n\nDeseja salvar esta edição mesmo assim?`;
+    if (!confirm(msg)) return;
   }
-  // ===============================
+  // ===============================================================
 
   let lista = DB.programacoes();
   const idx = lista.findIndex(p => p.id === id);
@@ -5768,6 +6100,19 @@ function popularSelectRelatorio() {
   if (sessao.role === 'servidor' && filtrados.length > 0) {
     if (!sel.value) sel.value = filtrados[0].id;
     renderSaldoServidor();
+  }
+
+  // Popular seletor de ano do relatório mensal
+  const anoSel = document.getElementById('rel-ano-pdf');
+  if (anoSel && !anoSel.options.length) {
+    const anoAtual = new Date().getFullYear();
+    for (let a = anoAtual - 2; a <= anoAtual + 1; a++) {
+      const opt = document.createElement('option');
+      opt.value = a;
+      opt.textContent = a;
+      if (a === anoAtual) opt.selected = true;
+      anoSel.appendChild(opt);
+    }
   }
 }
 
@@ -7521,6 +7866,20 @@ async function criarSolicitacao() {
     dados.parcelamento = solTipoPeriodo === 1 ? 'Integral' : (solTipoPeriodo === 2 ? '15/15' : '10/10/10');
   }
 
+  // ==== DETECTOR DE CONFLITOS (SOLICITAÇÃO) ====
+  const periodosCheck = tipo === 'folga'
+    ? (dados.dataItems || []).map(di => ({ inicio: di.data, fim: di.data }))
+    : (dados.periodos || []);
+  const conflitos = verificarConflitosSetorFuncao(sessao.id, periodosCheck);
+  if (conflitos.length > 0) {
+    const msg = `⚠️ ALERTA DE CONFLITO\n\n` +
+                `Servidores da mesma função e setor já ausentes neste período:\n\n` +
+                conflitos.map(c => `• ${c}`).join('\n') +
+                `\n\nDeseja enviar a solicitação mesmo assim?`;
+    if (!confirm(msg)) return;
+  }
+  // ===============================================================
+
   // Salvar solicitação
   try {
     const result = await DB.saveSolicitacao(dados);
@@ -7668,17 +8027,81 @@ function abrirModalCobertura(id) {
   const srvs = DB.servidores();
   const servidor = srvs.find(s => s.id === sol.srvId);
   const servidorNome = servidor ? servidor.nome : 'Servidor';
+  const setorOrigem = servidor ? (servidor.setor || '').trim().toLowerCase() : '';
+
+  const inicio = sol.inicio;
+  const fim = sol.fim;
 
   currentResolvingSolId = id;
 
   const mcNome = document.getElementById('mc-servidor-nome');
   if (mcNome) mcNome.textContent = servidorNome;
 
+  const mcInfo = document.getElementById('mc-info-extra');
+  if (mcInfo) {
+    mcInfo.innerHTML = setorOrigem
+      ? `<span style="display:inline-flex;gap:6px;align-items:center;flex-wrap:wrap"><span class="tag" style="background:var(--accent);color:#fff;padding:2px 10px;border-radius:12px;font-size:.75rem">Setor: ${servidor.setor}</span><span style="font-size:.78rem;color:var(--muted)">Período: ${fmtDate(inicio)} a ${fmtDate(fim)}</span></span>`
+      : `<span style="font-size:.78rem;color:var(--muted)">Período: ${fmtDate(inicio)} a ${fmtDate(fim)}</span>`;
+  }
+
   const cobSel = document.getElementById('mc-cobertura-select');
   if (cobSel) {
     const outrosServidores = getServidoresAcessiveis().filter(s => s.id !== sol.srvId);
-    cobSel.innerHTML = '<option value="">— Sem substituto (nenhuma cobertura) —</option>' +
-      outrosServidores.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+
+    const mesmoSetorDisponivel = [];
+    const mesmoSetorAusente = [];
+    const outrosSetores = [];
+
+    outrosServidores.forEach(s => {
+      const setorSrv = (s.setor || '').trim().toLowerCase();
+      const mesmoSetor = setorOrigem && setorSrv === setorOrigem;
+      if (mesmoSetor) {
+        if (inicio && fim && temAusenciaNoPeriodo(s.id, inicio, fim)) {
+          mesmoSetorAusente.push(s);
+        } else {
+          mesmoSetorDisponivel.push(s);
+        }
+      } else {
+        outrosSetores.push(s);
+      }
+    });
+
+    const sortFn = (a, b) => a.nome.localeCompare(b.nome);
+    mesmoSetorDisponivel.sort(sortFn);
+    mesmoSetorAusente.sort(sortFn);
+    outrosSetores.sort(sortFn);
+
+    let html = '<option value="">— Sem substituto (nenhuma cobertura) —</option>';
+
+    if (mesmoSetorDisponivel.length > 0) {
+      html += '<optgroup label="✅ Mesmo setor — Disponível">';
+      html += mesmoSetorDisponivel.map(s =>
+        `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`
+      ).join('');
+      html += '</optgroup>';
+    }
+
+    if (mesmoSetorAusente.length > 0) {
+      html += '<optgroup label="⚠️ Mesmo setor — Também ausente no período">';
+      html += mesmoSetorAusente.map(s =>
+        `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`
+      ).join('');
+      html += '</optgroup>';
+    }
+
+    if (outrosSetores.length > 0) {
+      html += '<optgroup label="📌 Outros setores">';
+      html += outrosSetores.map(s =>
+        `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`
+      ).join('');
+      html += '</optgroup>';
+    }
+
+    cobSel.innerHTML = html;
+
+    if (mesmoSetorDisponivel.length > 0) {
+      cobSel.value = mesmoSetorDisponivel[0].id;
+    }
   }
 
   abrirModal('modal-cobertura');
@@ -7914,8 +8337,33 @@ function carregarFolgasDisp() {
 
   if (cobSel) {
     const outrosServidores = getServidoresAcessiveis().filter(s => s.id !== srvId);
-    cobSel.innerHTML = '<option value="">— Sem substituto (nenhuma cobertura) —</option>' +
-      outrosServidores.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+    const srvOrigem = DB.servidores().find(s => s.id === srvId);
+    const setorOrigem = srvOrigem ? (srvOrigem.setor || '').trim().toLowerCase() : '';
+    const mesmoSetor = [];
+    const outrosSetores = [];
+    outrosServidores.forEach(s => {
+      if (setorOrigem && (s.setor || '').trim().toLowerCase() === setorOrigem) {
+        mesmoSetor.push(s);
+      } else {
+        outrosSetores.push(s);
+      }
+    });
+    const sortFn = (a, b) => a.nome.localeCompare(b.nome);
+    mesmoSetor.sort(sortFn);
+    outrosSetores.sort(sortFn);
+    let html = '<option value="">— Sem substituto (nenhuma cobertura) —</option>';
+    if (mesmoSetor.length > 0) {
+      html += '<optgroup label="✅ Mesmo setor">';
+      html += mesmoSetor.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+      html += '</optgroup>';
+    }
+    if (outrosSetores.length > 0) {
+      html += '<optgroup label="📌 Outros setores">';
+      html += outrosSetores.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+      html += '</optgroup>';
+    }
+    cobSel.innerHTML = html;
+    if (mesmoSetor.length > 0) cobSel.value = mesmoSetor[0].id;
   }
 
   if (negBox) negBox.style.display = saldo <= 0 ? 'block' : 'none';
@@ -7964,6 +8412,17 @@ async function registrarUsufrutoFolga() {
 
   const dataString = dataItems.map(di => di.data).join(', ');
   const qtd = qtdTotal;
+
+  // ==== DETECTOR DE CONFLITOS (USUFRUTO FOLGA) ====
+  const conflitos = verificarConflitosSetorFuncao(srvId, dataItems.map(di => ({ inicio: di.data, fim: di.data })));
+  if (conflitos.length > 0) {
+    const msg = `⚠️ ALERTA DE CONFLITO\n\n` +
+                `Servidores da mesma função e setor já ausentes neste período:\n\n` +
+                conflitos.map(c => `• ${c}`).join('\n') +
+                `\n\nDeseja registrar o usufruto mesmo assim?`;
+    if (!confirm(msg)) return;
+  }
+  // ===============================================================
 
   const cobSel = document.getElementById('fg-cobertura-deb');
   let finalObs = obs;
@@ -8692,6 +9151,569 @@ function exportarCSV(tipo) {
   a.click();
   URL.revokeObjectURL(url);
   toastMsg(`✅ ${nomeArquivo} exportado com sucesso!`, 'success');
+}
+
+// ===================== MAPA DE AUSÊNCIAS (HEATMAP) =====================
+let maAno = new Date().getFullYear();
+let maMes = new Date().getMonth();
+let _maCache = new Map();
+
+function iniciarMapaAusencias() {
+  const sel = document.getElementById('ma-filtro-setor');
+  if (!sel) return;
+  const setores = getTodosSetores();
+  sel.innerHTML = '<option value="">Todos os Setores</option>' +
+    setores.map(s => `<option value="${s}">${s}</option>`).join('');
+  renderMapaAusencias();
+}
+
+function navegarMapaAusencias(dir) {
+  maMes += dir;
+  if (maMes > 11) { maMes = 0; maAno++; }
+  if (maMes < 0)  { maMes = 11; maAno--; }
+  renderMapaAusencias();
+}
+
+function irParaHojeMapaAusencias() {
+  const hoje = new Date();
+  maAno = hoje.getFullYear();
+  maMes = hoje.getMonth();
+  renderMapaAusencias();
+}
+
+function renderMapaAusencias() {
+  const container = document.getElementById('ma-grid-container');
+  const titulo = document.getElementById('ma-titulo-mes');
+  if (!container || !titulo) return;
+
+  titulo.textContent = `${MESES_PT[maMes]} de ${maAno}`;
+
+  const filtroSetor = document.getElementById('ma-filtro-setor')?.value || '';
+  const filtroTipo = document.getElementById('ma-filtro-tipo')?.value || '';
+  const agruparSetor = document.getElementById('ma-agrupar-setor')?.checked !== false;
+
+  const servidores = getServidoresAcessiveis();
+  const programacoes = getProgramacoesAcessiveis();
+  const folgas = getFolgasAcessiveis();
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  // Gerar array de dias do mês
+  const diasNoMes = new Date(maAno, maMes + 1, 0).getDate();
+  const dias = [];
+  for (let d = 1; d <= diasNoMes; d++) {
+    dias.push(new Date(maAno, maMes, d));
+  }
+
+  _maCache.clear();
+
+  // Se não agrupar — visão global única (total de ausentes por dia)
+  if (!agruparSetor) {
+    const totalServidores = servidores.filter(s => !filtroSetor || s.setor === filtroSetor).length;
+    let html = '<div class="ma-sem-agrupamento">';
+    dias.forEach(dia => {
+      const diaISO = dia.toISOString().split('T')[0];
+      const count = contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo);
+      const cor = corHeatmap(count);
+      const ehHoje = dia.getTime() === hoje.getTime();
+      const nomes = listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo);
+      const ck = `ma_${diaISO}|`;
+      _maCache.set(ck, nomes);
+      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" style="background:${cor}" data-count="${count}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" title="${fmtDate(diaISO)}: ${count} ausente(s)"></div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+    document.getElementById('ma-total-info').textContent = `Total: ${totalServidores} servidor(es) · ${diasNoMes} dia(s)`;
+    anexarTooltipMapa();
+    return;
+  }
+
+  // Agrupado por setor
+  const setores = [...new Set(servidores.map(s => s.setor).filter(Boolean))].sort();
+  const setoresFiltrados = filtroSetor ? setores.filter(s => s === filtroSetor) : setores;
+
+  // Cabeçalho dos dias
+  let html = '<div class="ma-grid">';
+  html += '<div class="ma-header-row">';
+  html += '<div class="ma-row-label" style="font-size:0.65rem;color:var(--muted)">Setor</div>';
+  dias.forEach(dia => {
+    const diaSem = dia.getDay();
+    html += `<div class="ma-header-cell${diaSem === 0 || diaSem === 6 ? ' weekend' : ''}">${dia.getDate()}</div>`;
+  });
+  html += '</div>';
+
+  // Linhas por setor
+  setoresFiltrados.forEach(setor => {
+    html += '<div class="ma-row">';
+    html += `<div class="ma-row-label">${esc(setor)}</div>`;
+    dias.forEach(dia => {
+      const diaISO = dia.toISOString().split('T')[0];
+      const count = contarAusencias(dia, diaISO, servidores, programacoes, folgas, setor, filtroTipo);
+      const cor = corHeatmap(count);
+      const ehHoje = dia.getTime() === hoje.getTime();
+      const nomes = listarAusentes(dia, diaISO, servidores, programacoes, folgas, setor, filtroTipo);
+      const ck = `ma_${diaISO}|${setor}`;
+      _maCache.set(ck, nomes);
+      html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" style="background:${cor}" data-count="${count}" data-ck="${ck}" data-data="${fmtDate(diaISO)}" data-setor="${esc(setor)}"></div>`;
+    });
+    html += '</div>';
+  });
+
+  // Linha de total por dia
+  html += '<div class="ma-row" style="border-top:2px solid var(--border-hi);background:var(--surface)">';
+  html += '<div class="ma-row-label" style="font-weight:800;color:var(--text)">Total</div>';
+  let totalGeral = 0;
+  dias.forEach(dia => {
+    const diaISO = dia.toISOString().split('T')[0];
+    let totalDia = 0;
+    setoresFiltrados.forEach(setor => {
+      totalDia += contarAusencias(dia, diaISO, servidores, programacoes, folgas, setor, filtroTipo);
+    });
+    totalGeral += totalDia;
+    const cor = corHeatmap(totalDia);
+    const ehHoje = dia.getTime() === hoje.getTime();
+    const ck = `ma_${diaISO}|__total__`;
+    _maCache.set(ck, []);
+    html += `<div class="ma-cell${ehHoje ? ' hoje' : ''}" style="background:${cor};cursor:default" data-count="${totalDia}" data-ck="${ck}" data-data="${fmtDate(diaISO)}"></div>`;
+  });
+  html += '</div>';
+
+  html += '</div>';
+  container.innerHTML = html;
+
+  document.getElementById('ma-total-info').textContent =
+    `Total: ${setoresFiltrados.length} setor(es) · ${servidores.length} servidor(es) · ${diasNoMes} dia(s)`;
+
+  anexarTooltipMapa();
+}
+
+function contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  let count = 0;
+
+  const servidoresSetor = filtroSetor
+    ? servidores.filter(s => s.setor === filtroSetor)
+    : servidores;
+
+  if (filtroTipo !== 'folga') {
+    // Contar férias
+    programacoes.forEach(p => {
+      const srv = servidores.find(s => s.id === p.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (p.concluido) return;
+      const pInicio = p.inicio || '';
+      const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
+      if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) {
+        count++;
+      }
+    });
+  }
+
+  if (filtroTipo !== 'ferias') {
+    // Contar folgas (usufruto/débito)
+    folgas.forEach(f => {
+      if (f.tipo !== 'debito') return;
+      const srv = servidores.find(s => s.id === f.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (f.dataItems && Array.isArray(f.dataItems)) {
+        if (f.dataItems.some(di => di.data === diaISO)) count++;
+      } else if (f.data) {
+        const datas = f.data.split(',').map(d => d.trim());
+        if (datas.includes(diaISO)) count++;
+      }
+    });
+  }
+
+  return count;
+}
+
+function listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  const nomes = [];
+
+  const servidoresSetor = filtroSetor
+    ? servidores.filter(s => s.setor === filtroSetor)
+    : servidores;
+
+  if (filtroTipo !== 'folga') {
+    programacoes.forEach(p => {
+      const srv = servidores.find(s => s.id === p.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (p.concluido) return;
+      const pInicio = p.inicio || '';
+      const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
+      if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) {
+        nomes.push({ nome: srv.nome, tipo: p.tipo === 'anual' ? 'Férias' : 'Prêmio', setor: srv.setor });
+      }
+    });
+  }
+
+  if (filtroTipo !== 'ferias') {
+    folgas.forEach(f => {
+      if (f.tipo !== 'debito') return;
+      const srv = servidores.find(s => s.id === f.srvId);
+      if (!srv || !servidoresSetor.includes(srv)) return;
+      if (f.dataItems && Array.isArray(f.dataItems)) {
+        if (f.dataItems.some(di => di.data === diaISO)) nomes.push({ nome: srv.nome, tipo: 'Folga', setor: srv.setor });
+      } else if (f.data) {
+        const datas = f.data.split(',').map(d => d.trim());
+        if (datas.includes(diaISO)) nomes.push({ nome: srv.nome, tipo: 'Folga', setor: srv.setor });
+      }
+    });
+  }
+
+  return nomes;
+}
+
+function corHeatmap(count) {
+  if (count === 0) return 'var(--card)';
+  if (count <= 2) return 'rgba(15,212,136,0.25)';
+  if (count <= 5) return 'rgba(245,183,49,0.35)';
+  if (count <= 8) return 'rgba(245,158,11,0.5)';
+  if (count <= 12) return 'rgba(255,77,106,0.5)';
+  return 'rgba(220,38,38,0.7)';
+}
+
+function anexarTooltipMapa() {
+  const tooltip = document.getElementById('ma-tooltip');
+  if (!tooltip) return;
+
+  document.querySelectorAll('#ma-grid-container .ma-cell').forEach(cell => {
+    cell.addEventListener('mouseenter', (e) => {
+      const count = parseInt(cell.dataset.count || '0');
+      const data = cell.dataset.data || '';
+      const ck = cell.dataset.ck || '';
+      const setor = cell.dataset.setor || '';
+      const nomes = _maCache.get(ck) || [];
+
+      let html = `<strong style="color:var(--primary)">${data}</strong>`;
+      if (setor) html += ` · <span style="color:var(--text-mid)">${esc(setor)}</span>`;
+      html += `<br><span style="font-size:0.9rem;font-weight:800">${count} ausente(s)</span>`;
+      if (nomes.length > 0) {
+        html += '<div style="margin-top:6px;border-top:1px solid var(--border);padding-top:6px;max-height:180px;overflow-y:auto">';
+        nomes.forEach(n => {
+          html += `<div style="display:flex;justify-content:space-between;gap:8px;font-size:.75rem;padding:2px 0">
+            <span>${esc(n.nome)}</span>
+            <span style="color:var(--muted);font-weight:600">${n.tipo}</span>
+          </div>`;
+        });
+        html += '</div>';
+      }
+      html += '<div style="margin-top:8px;font-size:.7rem;color:var(--primary);border-top:1px solid var(--border);padding-top:6px">👆 Clique para ver detalhes</div>';
+
+      tooltip.innerHTML = html;
+      tooltip.style.display = 'block';
+
+      const rect = cell.getBoundingClientRect();
+      let left = rect.left + window.scrollX;
+      let top = rect.bottom + window.scrollY + 6;
+      if (top + tooltip.offsetHeight > window.innerHeight + window.scrollY) {
+        top = rect.top + window.scrollY - tooltip.offsetHeight - 6;
+      }
+      if (left + tooltip.offsetWidth > window.innerWidth + window.scrollX) {
+        left = window.innerWidth + window.scrollX - tooltip.offsetWidth - 10;
+      }
+      tooltip.style.left = left + 'px';
+      tooltip.style.top = top + 'px';
+    });
+
+    cell.addEventListener('mouseleave', () => {
+      tooltip.style.display = 'none';
+    });
+
+    cell.addEventListener('click', () => {
+      abrirModalAusencias(cell);
+    });
+  });
+}
+
+function exportarRelatorioMensalPDF() {
+  const mes = parseInt(document.getElementById('rel-mes-pdf')?.value);
+  const ano = parseInt(document.getElementById('rel-ano-pdf')?.value);
+  if (isNaN(mes) || isNaN(ano)) return toastMsg('Selecione o mês e ano!', 'error');
+
+  const servidores = getServidoresAcessiveis();
+  const programacoes = getProgramacoesAcessiveis().filter(p => !p.concluido);
+  const folgas = getFolgasAcessiveis().filter(f => f.tipo === 'debito');
+  const hoje = new Date();
+
+  const mesesNomes = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesNome = mesesNomes[mes];
+
+  // Construir lista de dias úteis do mês (para métricas)
+  const diasNoMes = new Date(ano, mes + 1, 0).getDate();
+
+  // Para cada servidor, coletar ausências no mês
+  const ausencias = [];
+  servidores.forEach(srv => {
+    const ausenciasSrv = [];
+
+    // Programações que cobrem este mês
+    programacoes.filter(p => p.srvId === srv.id).forEach(p => {
+      const pInicio = new Date(p.inicio + 'T12:00:00');
+      const pFim = new Date((p.retorno || p.fim) + 'T12:00:00');
+      const mesInicio = new Date(ano, mes, 1);
+      const mesFim = new Date(ano, mes + 1, 0);
+      if (pInicio <= mesFim && pFim >= mesInicio) {
+        const inicioRel = pInicio < mesInicio ? mesInicio : pInicio;
+        const fimRel = pFim > mesFim ? mesFim : pFim;
+        const dias = Math.round((fimRel - inicioRel) / 86400000) + 1;
+        const tipoLabel = p.tipo === 'anual' ? 'Férias Anuais' : 'Férias Prêmio';
+        const periodo = `${fmtDate(p.inicio)} a ${fmtDate(p.retorno || p.fim)}`;
+        ausenciasSrv.push({ tipo: tipoLabel, periodo, dias, dataInicio: p.inicio });
+      }
+    });
+
+    // Folgas no mês
+    folgas.filter(f => f.srvId === srv.id).forEach(f => {
+      const datas = f.dataItems && Array.isArray(f.dataItems)
+        ? f.dataItems.map(di => di.data)
+        : f.data ? f.data.split(',').map(d => d.trim()) : [];
+      const diasNoMesFolga = datas.filter(d => {
+        const dt = new Date(d + 'T12:00:00');
+        return dt.getMonth() === mes && dt.getFullYear() === ano;
+      });
+      if (diasNoMesFolga.length > 0) {
+        ausenciasSrv.push({
+          tipo: 'Folga',
+          periodo: diasNoMesFolga.map(d => fmtDate(d)).join(', '),
+          dias: diasNoMesFolga.length,
+          dataInicio: diasNoMesFolga[0]
+        });
+      }
+    });
+
+    if (ausenciasSrv.length > 0) {
+      ausenciasSrv.sort((a, b) => a.dataInicio.localeCompare(b.dataInicio));
+      ausencias.push({ servidor: srv, ausencias: ausenciasSrv, totalDias: ausenciasSrv.reduce((s, a) => s + a.dias, 0) });
+    }
+  });
+
+  // Agrupar por setor
+  const setores = {};
+  ausencias.forEach(a => {
+    const setor = a.servidor.setor || 'Não Informado';
+    if (!setores[setor]) setores[setor] = [];
+    setores[setor].push(a);
+  });
+
+  // Total de servidores por setor
+  const servidoresPorSetor = {};
+  servidores.forEach(s => {
+    const setor = s.setor || 'Não Informado';
+    servidoresPorSetor[setor] = (servidoresPorSetor[setor] || 0) + 1;
+  });
+
+  const setoresOrdenados = Object.keys(setores).sort();
+
+  const win = window.open('', '_blank');
+  const imgPrint = getImg('print');
+
+  const headCSS = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: 'Inter', sans-serif; color: #111; margin: 30px 36px;
+        line-height: 1.45; font-size: 10px;
+        -webkit-print-color-adjust: exact; print-color-adjust: exact;
+      }
+      .doc-header { border: 2px solid #000; width: 100%; margin-bottom: 20px; border-collapse: collapse; }
+      .doc-header td { border: 1.5px solid #000; padding: 10px 14px; vertical-align: middle; }
+      .doc-header .cell-logo { width: 22%; text-align: center; }
+      .doc-header .cell-title { width: 56%; text-align: center; }
+      .doc-header .cell-meta { width: 22%; font-size: 8px; line-height: 1.6; background: #f7f7f7; }
+      .doc-header h2 { margin: 4px 0 2px; font-size: 13px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.5px; }
+      .doc-header .subtitle { font-size: 8.5px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+      .doc-header .org-name { font-size: 8px; margin-bottom: 4px; font-weight: 700; color: #333; text-transform: uppercase; letter-spacing: 1px; }
+      .doc-header strong { font-size: 8px; }
+      .section-title-print {
+        font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+        color: #555; border-bottom: 1.5px solid #000; padding-bottom: 4px; margin: 16px 0 8px;
+      }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+      thead { display: table-header-group; }
+      tr { page-break-inside: avoid; }
+      th {
+        background-color: #1a1a2e; color: #fff; padding: 7px 9px;
+        text-align: left; font-size: 8px; text-transform: uppercase;
+        font-weight: 700; letter-spacing: 0.06em;
+      }
+      td { border: 1px solid #ccc; padding: 6px 9px; font-size: 9.5px; vertical-align: middle; }
+      tbody tr:nth-child(even) td { background: #f7f8fc; }
+      .text-center { text-align: center; }
+      .bold { font-weight: 700; }
+      .text-sm { font-size: 8.5px; }
+      .badge-ferias { background: #dbeafe; color: #1e40af; border: 1px solid #93c5fd; padding: 1px 5px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+      .badge-premio { background: #ede9fe; color: #4c1d95; border: 1px solid #c4b5fd; padding: 1px 5px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+      .badge-folga  { background: #fef3c7; color: #92400e; border: 1px solid #fcd34d; padding: 1px 5px; border-radius: 3px; font-size: 7.5px; font-weight: 700; }
+      .summary-grid { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+      .summary-card {
+        flex: 1; min-width: 140px; border: 1.5px solid #333; border-radius: 4px; padding: 14px;
+        text-align: center; background: #fafafa;
+      }
+      .summary-card .num { font-size: 24px; font-weight: 800; color: #1a1a2e; }
+      .summary-card .label { font-size: 8px; text-transform: uppercase; color: #666; font-weight: 700; margin-top: 4px; }
+      .summary-card.warn { border-color: #f59e0b; background: #fffbeb; }
+      .summary-card.danger { border-color: #ef4444; background: #fef2f2; }
+      .group-block { margin-bottom: 20px; page-break-inside: avoid; border: 1.5px solid #333; border-radius: 4px; overflow: hidden; }
+      .group-header {
+        background: #1a1a2e; color: #fff; font-weight: 700;
+        font-size: 10px; padding: 8px 12px;
+        display: flex; justify-content: space-between; align-items: center;
+      }
+      .group-header .sub-info { font-size: 9px; font-weight: 500; color: #94a3b8; }
+      .footer-print {
+        position: fixed; bottom: 0; left: 0; right: 0;
+        border-top: 1.5px solid #000; padding: 6px 36px;
+        font-size: 8px; font-weight: 600; color: #333;
+        display: flex; justify-content: space-between; align-items: center;
+        background: #fff; text-transform: uppercase; letter-spacing: 0.04em;
+      }
+      @media print { @page { size: A4 landscape; margin: 10mm; } body { margin: 0; } }
+    </style>
+  `;
+
+  // Summary cards
+  const totalServidores = servidores.length;
+  const totalAusentes = ausencias.length;
+  const totalFolgas = ausencias.filter(a => a.ausencias.some(x => x.tipo === 'Folga')).length;
+  const totalFerias = ausencias.filter(a => a.ausencias.some(x => x.tipo.includes('Férias'))).length;
+  const pctAusentes = totalServidores > 0 ? Math.round(totalAusentes / totalServidores * 100) : 0;
+
+  const summaryHTML = `
+    <div class="summary-grid">
+      <div class="summary-card">
+        <div class="num">${totalServidores}</div>
+        <div class="label">Servidores</div>
+      </div>
+      <div class="summary-card ${pctAusentes > 30 ? 'danger' : pctAusentes > 15 ? 'warn' : ''}">
+        <div class="num">${totalAusentes}</div>
+        <div class="label">Ausentes no mês (${pctAusentes}%)</div>
+      </div>
+      <div class="summary-card">
+        <div class="num">${totalFerias}</div>
+        <div class="label">Em férias</div>
+      </div>
+      <div class="summary-card">
+        <div class="num">${totalFolgas}</div>
+        <div class="label">Folgas no mês</div>
+      </div>
+      <div class="summary-card">
+        <div class="num">${diasNoMes}</div>
+        <div class="label">Dias no mês</div>
+      </div>
+    </div>
+  `;
+
+  // Tabela por setor
+  let htmlTabela = '';
+  setoresOrdenados.forEach(setor => {
+    const items = setores[setor].sort((a, b) => a.servidor.nome.localeCompare(b.servidor.nome));
+    const totalSetor = servidoresPorSetor[setor] || 0;
+    const ausentesSetor = items.length;
+    const pctSetor = totalSetor > 0 ? Math.round(ausentesSetor / totalSetor * 100) : 0;
+
+    htmlTabela += `
+      <div class="group-block">
+        <div class="group-header">
+          <span>📁 ${setor}</span>
+          <span class="sub-info">${ausentesSetor} de ${totalSetor} servidores ausentes (${pctSetor}%)</span>
+        </div>
+        <table style="margin:0">
+          <thead>
+            <tr>
+              <th style="width:40px">#</th>
+              <th>Servidor</th>
+              <th style="width:65px">Matrícula</th>
+              <th style="width:90px">Tipo</th>
+              <th>Período / Datas</th>
+              <th style="width:45px;text-align:center">Dias</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${items.map((item, idx) => {
+              const srv = item.servidor;
+              return item.ausencias.map((a, aIdx) => {
+                const tipoBadge = a.tipo === 'Férias Anuais' ? '<span class="badge-ferias">Férias Anuais</span>'
+                  : a.tipo === 'Férias Prêmio' ? '<span class="badge-premio">Férias Prêmio</span>'
+                  : '<span class="badge-folga">Folga</span>';
+                const rowNome = aIdx === 0 ? `<td class="bold" rowspan="${item.ausencias.length}">${srv.nome}</td><td class="text-center text-mono" rowspan="${item.ausencias.length}">${srv.matricula}</td>` : '';
+                const rowNum = aIdx === 0 ? `<td class="text-center bold" rowspan="${item.ausencias.length}">${idx + 1}</td>` : '';
+                return `<tr>${rowNum}${rowNome}<td class="text-center">${tipoBadge}</td><td>${a.periodo}</td><td class="text-center bold">${a.dias}</td></tr>`;
+              }).join('');
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  });
+
+  if (!htmlTabela) {
+    htmlTabela = '<div style="text-align:center;padding:40px;border:1.5px solid #333;border-radius:4px;font-size:11px;color:#666"><strong>Nenhuma ausência registrada neste mês.</strong></div>';
+  }
+
+  win.document.write(`<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Relatório Mensal — ${mesNome} ${ano}</title>${headCSS}</head><body onload="window.print()">
+    <table class="doc-header">
+      <tr>
+        <td class="cell-logo">
+          ${imgPrint ? `<img src="${imgPrint}" style="max-height:80px;max-width:100%;object-fit:contain;display:block;margin:0 auto;">` : '<div style="font-weight:800;font-size:16px;color:#1a1a2e;">RH</div>'}
+        </td>
+        <td class="cell-title">
+          <div class="org-name">${DB.config().nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde'}</div>
+          <h2>Relatório Mensal de Ausências</h2>
+          <div class="subtitle">${mesNome} ${ano} — Controle de Escalas, Férias e Banco de Folgas</div>
+        </td>
+        <td class="cell-meta">
+          <strong>DOCUMENTO:</strong> REL-MENSAL-${String(mes+1).padStart(2,'0')}${ano}<br>
+          <strong>EMISSÃO:</strong> ${hoje.toLocaleDateString('pt-BR')} ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}<br>
+          <strong>SISTEMA:</strong> V.2.0-PRO
+        </td>
+      </tr>
+    </table>
+    ${summaryHTML}
+    <div class="section-title-print">📋 Ausências por Setor</div>
+    ${htmlTabela}
+    <div class="footer-print">
+      <span>© ${hoje.getFullYear()} — ${DB.config().nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde'}</span>
+      <span>Emitido em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
+    </div>
+  </body></html>`);
+  win.document.close();
+}
+
+function abrirModalAusencias(cell) {
+  const modal = document.getElementById('modal-ausencia-detalhes');
+  const titulo = document.getElementById('ausencia-modal-titulo');
+  const sub = document.getElementById('ausencia-modal-sub');
+  const lista = document.getElementById('ausencia-modal-lista');
+  if (!modal || !lista) return;
+
+  const data = cell.dataset.data || '';
+  const setor = cell.dataset.setor || '';
+  const count = parseInt(cell.dataset.count || '0');
+  const ck = cell.dataset.ck || '';
+  const nomes = _maCache.get(ck) || [];
+
+  titulo.textContent = `📋 Ausentes — ${data}`;
+  sub.innerHTML = setor
+    ? `<span style="font-weight:700;color:var(--text)">${esc(setor)}</span> · <strong>${count}</strong> ausente(s)`
+    : `<strong>${count}</strong> ausente(s) no total`;
+
+  if (nomes.length === 0) {
+    lista.innerHTML = '<div class="empty" style="padding:30px"><div class="icon">✅</div><p>Nenhum ausente neste dia.</p></div>';
+  } else {
+    let html = '<div style="display:flex;flex-direction:column;gap:4px">';
+    nomes.forEach(n => {
+      const tipoClass = n.tipo === 'Férias' ? 'tag-blue' : n.tipo === 'Prêmio' ? 'tag-purple' : 'tag-warn';
+      html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--card);border-radius:var(--r-sm);border:1px solid var(--border)">
+        <span style="font-weight:600;font-size:.84rem;color:var(--text)">${esc(n.nome)}</span>
+        <span class="tag ${tipoClass}">${n.tipo}</span>
+      </div>`;
+    });
+    html += '</div>';
+    lista.innerHTML = html;
+  }
+
+  modal.classList.add('open');
 }
 </script>
 
