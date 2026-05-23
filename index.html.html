@@ -6182,13 +6182,17 @@ function popularSelectFerias(setor) {
 }
 function popularSelectFolgasCred(setor) {
   const sel = document.getElementById('fg-srv-cred'); if (!sel) return;
+  const prev = sel.value;
   const lista = getServidoresAcessiveis().filter(s => !setor || s.setor === setor);
   sel.innerHTML = '<option value="">Selecione...</option>' + lista.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+  if (prev && lista.some(s => s.id === prev)) sel.value = prev;
 }
 function popularSelectFolgasDeb(setor) {
   const sel = document.getElementById('fg-srv-deb'); if (!sel) return;
+  const prev = sel.value;
   const lista = getServidoresAcessiveis().filter(s => !setor || s.setor === setor);
   sel.innerHTML = '<option value="">Selecione...</option>' + lista.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
+  if (prev && lista.some(s => s.id === prev)) sel.value = prev;
 }
 
 function popularSelectRelatorio() {
@@ -8418,10 +8422,20 @@ function renderFolgas() {
 function popularSelectsFolgas() {
   const srvs = getServidoresAcessiveis();
   const opts = '<option value="">Selecione...</option>' + srvs.map(s => `<option value="${s.id}">${s.nome} (${s.matricula})</option>`).join('');
-  ['fg-srv-cred','fg-srv-deb'].forEach(id => { const el = document.getElementById(id); if(el) el.innerHTML = opts; });
+  ['fg-srv-cred','fg-srv-deb'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const prev = el.value;
+    el.innerHTML = opts;
+    if (prev && srvs.some(s => s.id === prev)) el.value = prev;
+  });
 
   const histEl = document.getElementById('fg-hist-srv');
-  if (histEl) histEl.innerHTML = '<option value="">Todos os Servidores</option>' + srvs.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+  if (histEl) {
+    const prev = histEl.value;
+    histEl.innerHTML = '<option value="">Todos os Servidores</option>' + srvs.map(s => `<option value="${s.id}">${s.nome}</option>`).join('');
+    if (prev && srvs.some(s => s.id === prev)) histEl.value = prev;
+  }
 }
 
 function atualizarSaldoDisplay() {
