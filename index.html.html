@@ -3276,7 +3276,16 @@ function renderAposSync(tabelaAlterada) {
   if (typeof renderListaSetores === 'function') renderListaSetores();
   if (typeof atualizarSelectsSetores === 'function') atualizarSelectsSetores();
   if (typeof popularSelects === 'function') popularSelects();
-  if (typeof popularSelectsFolgas === 'function') popularSelectsFolgas();
+  // Preserva seleção atual dos dropdowns de folga ao re-sincronizar
+  if (typeof popularSelectsFolgas === 'function') {
+    const selDeb = document.getElementById('fg-srv-deb');
+    const selCred = document.getElementById('fg-srv-cred');
+    const valDeb = selDeb ? selDeb.value : '';
+    const valCred = selCred ? selCred.value : '';
+    popularSelectsFolgas();
+    if (selDeb && valDeb) selDeb.value = valDeb;
+    if (selCred && valCred) selCred.value = valCred;
+  }
 
   // Sempre atualizar badges e dashboard relevantes
   if (isAdminOuGestor) {
