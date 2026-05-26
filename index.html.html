@@ -1797,6 +1797,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     <!-- ADICIONAR HORAS AO BANCO -->
     <div class="card">
       <h3><span class="icon">+</span> Adicionar Horas ao Banco</h3>
+      <div style="font-size:.75rem;color:var(--danger);font-weight:600;margin-bottom:12px;padding:8px 10px;background:var(--danger-dim);border-radius:var(--r-sm)">* Horas já acrescidas de 50% (horas extras)</div>
       <div class="form-row cols-2" style="margin-bottom:12px">
         <div class="field">
           <label>Filtrar por Setor</label>
@@ -9926,6 +9927,7 @@ function imprimirRelatorioBancoHoras() {
             <div style="font-size: 9px; margin-bottom: 3px; font-weight: 600; color: #444;">${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</div>
             <h2 style="margin:0; font-size:14px;">RELATÓRIO DE BANCO DE HORAS</h2>
             <p style="margin:3px 0 0; font-size:9px;">Controle de Horas Sem Pagas</p>
+            <p style="margin:3px 0 0; font-size:8px; font-weight:700; color:#c00;">* Horas já acrescidas de 50% (horas extras)</p>
           </td>
           <td style="width: 22%; font-size: 8.5px; line-height: 1.5; background: #fafafa;">
             <strong>EMISSÃO:</strong> ${hoje.toLocaleDateString('pt-BR')} ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}<br>
