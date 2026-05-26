@@ -1793,7 +1793,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 <div class="tab-panel" id="panel-bancohoras">
   <div class="section-title">⏱️ Banco de Horas (Sem Pagas)</div>
 
-  <div class="grid-2" style="margin-bottom:24px">
+  <div class="grid-3" style="margin-bottom:24px">
     <!-- ADICIONAR HORAS AO BANCO -->
     <div class="card">
       <h3><span class="icon">+</span> Adicionar Horas ao Banco</h3>
@@ -1856,6 +1856,48 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
       <button class="btn btn-success" onclick="adicionarBancoHoras()">+ Adicionar ao Banco de Horas</button>
     </div>
 
+    <!-- AJUSTE MANUAL -->
+    <div class="card" style="border-color:var(--warning-dim)">
+      <h3><span class="icon">⚖️</span> Ajuste Manual (Crédito/Débito)</h3>
+      <p style="font-size:.8rem;color:var(--muted);margin-bottom:12px">Para corrigir saldo sem registrar horas geradas/pagas. Ex: ajuste de erro de lançamento anterior.</p>
+      <div class="form-row cols-2" style="margin-bottom:12px">
+        <div class="field">
+          <label>Filtrar por Setor</label>
+          <select id="bh-ajuste-setor" onchange="popularSelectBancoHorasAjuste(this.value)">
+            <option value="">Todos os Setores</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Servidor *</label>
+          <select id="bh-ajuste-srv">
+            <option value="">Selecione...</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row cols-2" style="margin-bottom:12px">
+        <div class="field">
+          <label>Tipo de Ajuste *</label>
+          <select id="bh-ajuste-tipo">
+            <option value="credito">Crédito (adicionar saldo)</option>
+            <option value="debito">Débito (remover saldo)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Quantidade de Horas *</label>
+          <input id="bh-ajuste-horas" type="number" min="0.5" step="0.5" value="1" placeholder="Ex: 2">
+        </div>
+      </div>
+      <div class="field" style="margin-bottom:12px">
+        <label>Autorizado Por</label>
+        <input id="bh-ajuste-autorizado" type="text" placeholder="Nome de quem autorizou o ajuste">
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Motivo do Ajuste *</label>
+        <textarea id="bh-ajuste-motivo" placeholder="Ex: Erro de digitação no lançamento de Jan/2025..." style="min-height:60px"></textarea>
+      </div>
+      <button class="btn btn-warning" onclick="adicionarAjusteBancoHoras()">⚖️ Registrar Ajuste Manual</button>
+    </div>
+
     <!-- SALDO DO SERVIDOR -->
     <div class="card">
       <h3><span class="icon">📊</span> Saldo Banco de Horas</h3>
@@ -1905,7 +1947,8 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     <div class="field" style="margin:0;min-width:100px;flex:1">
       <input id="bh-hist-ano" type="number" placeholder="Ano" onchange="renderHistoricoBancoHoras()">
     </div>
-    <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorioBancoHoras()" style="align-self:flex-end">🖨️ Imprimir Relatório</button>
+    <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorioBancoHoras()" style="align-self:flex-end" title="Relatório individual do servidor selecionado">🖨️ Relatório Individual</button>
+    <button class="btn btn-primary btn-sm" onclick="imprimirRelatorioBancoHorasGeral()" style="align-self:flex-end">📋 Relatório Geral</button>
   </div>
   <div id="bh-historico"><div class="empty"><div class="icon">⏱️</div><p>Nenhum registro de banco de horas.</p></div></div>
 
@@ -7153,7 +7196,7 @@ function atualizarSelectsSetores() {
     }
   }
   
-  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor'];
+  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor', 'bh-ajuste-setor'];
   
   selectIds.forEach(id => {
     const el = document.getElementById(id);
@@ -7175,6 +7218,7 @@ function atualizarSelectsSetores() {
   popularSelectFolgasDeb(document.getElementById('fg-filtro-setor-deb')?.value);
   popularSelectBancoHoras(document.getElementById('bh-filtro-setor')?.value);
   popularSelectBancoHorasSaldo(document.getElementById('bh-saldo-setor')?.value);
+  popularSelectBancoHorasAjuste(document.getElementById('bh-ajuste-setor')?.value);
   popularSelectRelatorio();
 }
 
@@ -9570,6 +9614,7 @@ function renderBancoHoras() {
   if (bhAno && !bhAno.value) bhAno.value = hoje.getFullYear();
   popularSelectBancoHoras('');
   popularSelectBancoHorasSaldo('');
+  popularSelectBancoHorasAjuste('');
   renderHistoricoBancoHoras();
 }
 
@@ -9587,6 +9632,55 @@ function popularSelectBancoHorasSaldo(setor) {
   const servidores = getServidoresAcessiveis().filter(s => !setor || s.setor === setor);
   sel.innerHTML = '<option value="">Selecione...</option>' +
     servidores.map(s => `<option value="${s.id}">${s.nome} (${s.matricula})${s.setor ? ' - ' + s.setor : ''}</option>`).join('');
+}
+
+function popularSelectBancoHorasAjuste(setor) {
+  const sel = document.getElementById('bh-ajuste-srv');
+  if (!sel) return;
+  const servidores = getServidoresAcessiveis().filter(s => !setor || s.setor === setor);
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    servidores.map(s => `<option value="${s.id}">${s.nome} (${s.matricula})${s.setor ? ' - ' + s.setor : ''}</option>`).join('');
+}
+
+async function adicionarAjusteBancoHoras() {
+  const srvId = document.getElementById('bh-ajuste-srv').value;
+  const tipo = document.getElementById('bh-ajuste-tipo').value;
+  const horas = parseFloat(document.getElementById('bh-ajuste-horas').value) || 0;
+  const autorizadoPor = document.getElementById('bh-ajuste-autorizado').value.trim();
+  const motivo = document.getElementById('bh-ajuste-motivo').value.trim();
+  const hoje = new Date();
+  const mes = hoje.getMonth();
+  const ano = hoje.getFullYear();
+
+  if (!srvId) return toastMsg('Selecione um servidor!', 'error');
+  if (horas <= 0) return toastMsg('Informe uma quantidade de horas válida!', 'error');
+  if (!motivo) return toastMsg('Informe o motivo do ajuste!', 'error');
+
+  const novo = {
+    id: gerarIdUnico(),
+    srvId,
+    mes,
+    ano,
+    horasGeradas: tipo === 'credito' ? horas : 0,
+    horasPagas: tipo === 'debito' ? horas : 0,
+    autorizadoPor,
+    obs: `[Ajuste Manual - ${tipo === 'credito' ? 'Crédito' : 'Débito'}] ${motivo}`,
+    tipoLancamento: 'ajuste',
+    criadoEm: new Date().toISOString()
+  };
+
+  const lista = DB.bancoHoras();
+  lista.push(novo);
+  await DB.saveBancoHoras(lista, [novo]);
+
+  document.getElementById('bh-ajuste-horas').value = '1';
+  document.getElementById('bh-ajuste-autorizado').value = '';
+  document.getElementById('bh-ajuste-motivo').value = '';
+
+  renderHistoricoBancoHoras();
+  renderSaldoBancoHoras();
+  toastMsg(`Ajuste manual de ${tipo === 'credito' ? 'crédito' : 'débito'} registrado com sucesso!`);
+  DB.saveLog('Ajuste Banco de Horas', `Ajuste manual ${tipo} de ${horas}h para servidor ${srvId}`, 'banco_horas', novo.id);
 }
 
 function gerarIdUnico() {
@@ -9618,6 +9712,7 @@ async function adicionarBancoHoras() {
     horasPagas,
     autorizadoPor,
     obs,
+    tipoLancamento: 'normal',
     criadoEm: new Date().toISOString()
   };
 
@@ -9747,6 +9842,7 @@ function renderHistoricoBancoHoras() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div>
           <strong>⏱️ ${meses[r.mes] || '?'}/${r.ano}</strong>
+          ${r.tipoLancamento === 'ajuste' ? '<span style="margin-left:6px;font-size:10px;background:var(--warning);color:#000;padding:2px 6px;border-radius:4px;font-weight:700">AJUSTE MANUAL</span>' : ''}
           <span style="margin-left:10px;font-size:.8rem;color:var(--muted)">${esc(srv?.nome || '-')}</span>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
@@ -9971,6 +10067,130 @@ function imprimirRelatorioBancoHoras() {
             <div style="font-size:14px;color:#444;font-weight:700;letter-spacing:4px;margin-top:6px">_____ / _____ / _________</div>
           </div>
         </div>
+      </div>
+      <div class="footer-print">
+        <span>© ${hoje.getFullYear()} - ${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</span>
+        <span>Página 1 de 1</span>
+      </div>
+    </body>
+    </html>
+  `;
+  win.document.write(fullHTML);
+  win.document.close();
+}
+
+function imprimirRelatorioBancoHorasGeral() {
+  const win = window.open('', '_blank');
+  const hoje = new Date();
+  const imgPrint = getImg('print');
+  const servidores = getServidoresAcessiveis().filter(s => s.id && DB.bancoHoras().some(b => b.srvId === s.id));
+
+  if (!servidores.length) {
+    return toastMsg('Nenhum servidor com registros de banco de horas encontrado!', 'error');
+  }
+
+  const headCSS = `
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+      * { box-sizing: border-box; }
+      body { font-family: 'Inter', sans-serif; color: #111; margin: 40px; line-height: 1.4; font-size: 11px; }
+      .doc-header { border: 1.5px solid #000; width: 100%; margin-bottom: 25px; table-layout: fixed; border-collapse: collapse; }
+      .doc-header td { border: 1.5px solid #000; padding: 12px; vertical-align: middle; }
+      .doc-header h2 { margin: 0; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+      .doc-header p { margin: 3px 0 0; font-size: 9px; font-weight: 600; color: #444; text-transform: uppercase; }
+      table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+      th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+      th { background-color: #f0f0f0; font-weight: 700; font-size: 9.5px; text-transform: uppercase; }
+      .sig-area { margin-top: 60px; display: flex; justify-content: space-around; gap: 40px; page-break-inside: avoid; }
+      .sig-box { flex: 1; text-align: center; }
+      .sig-line { border-top: 1.2px solid #000; margin-bottom: 8px; margin-top: 45px; }
+      .sig-label { font-weight: 700; font-size: 10px; text-transform: uppercase; }
+      .sig-sub { font-size: 9px; color: #444; font-weight: 600; }
+      .footer-print { position: fixed; bottom: 30px; left: 40px; right: 40px; border-top: 1.5px solid #000; padding-top: 10px; font-size: 9.5px; font-weight: 600; color: #000; display: flex; justify-content: space-between; text-transform: uppercase; }
+      @media print { @page { size: A4 landscape; margin: 1cm; } body { margin: 0; } }
+    </style>
+  `;
+
+  let linhas = '';
+  servidores.sort((a, b) => (a.setor || '').localeCompare(b.setor || '') || a.nome.localeCompare(b.nome));
+
+  servidores.forEach(srv => {
+    const registros = DB.bancoHoras().filter(r => r.srvId === srv.id);
+    let totalGeradas = 0, totalPagas = 0, saldo = 0;
+    registros.forEach(r => {
+      totalGeradas += r.horasGeradas || 0;
+      totalPagas += r.horasPagas || 0;
+    });
+    saldo = totalGeradas - totalPagas;
+    linhas += `<tr>
+      <td>${srv.nome}</td>
+      <td>${srv.matricula}</td>
+      <td>${srv.setor || '-'}</td>
+      <td style="text-align:center">${totalGeradas.toFixed(1)}h</td>
+      <td style="text-align:center">${totalPagas.toFixed(1)}h</td>
+      <td style="text-align:center;font-weight:700;color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${saldo >= 0 ? '+' : ''}${saldo.toFixed(1)}h</td>
+    </tr>`;
+  });
+
+  const totalGeral = servidores.reduce((acc, s) => {
+    const registros = DB.bancoHoras().filter(r => r.srvId === s.id);
+    return acc + registros.reduce((a, r) => a + (r.horasGeradas || 0) - (r.horasPagas || 0), 0);
+  }, 0);
+
+  const htmlTabela = `
+    <table>
+      <thead><tr>
+        <th>Servidor</th>
+        <th>Matrícula</th>
+        <th>Setor</th>
+        <th>Total Horas Geradas</th>
+        <th>Total Horas Pagas</th>
+        <th>Saldo Remanescente</th>
+      </tr></thead>
+      <tbody>
+        ${linhas}
+        <tr style="font-weight:800;background:#f0fdf4">
+          <td colspan="3" style="text-align:right;text-transform:uppercase;font-size:9px">Saldo Geral</td>
+          <td colspan="3" style="text-align:center;font-weight:800">${totalGeral >= 0 ? '+' : ''}${totalGeral.toFixed(1)}h</td>
+        </tr>
+      </tbody>
+    </table>
+  `;
+
+  const fullHTML = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head><meta charset="UTF-8"><title>Relatório Geral Banco de Horas</title>${headCSS}</head>
+    <body onload="window.print()">
+      <table class="doc-header">
+        <tr>
+          <td style="width: 20%; text-align: center; height: 100px;">
+            ${imgPrint ? `<img src="${imgPrint}" style="max-height: 90px; max-width: 100%; object-fit: contain; display: block; margin: 0 auto;">` : '<div style="font-weight: 800; font-size: 18px;">RECURSOS HUMANOS</div>'}
+          </td>
+          <td style="width: 60%; text-align: center;">
+            <div style="font-size: 9px; margin-bottom: 3px; font-weight: 600; color: #444;">${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</div>
+            <h2 style="margin:0; font-size:14px;">RELATÓRIO GERAL DE BANCO DE HORAS</h2>
+            <p style="margin:3px 0 0; font-size:9px;">Consolidado de Horas Sem Pagas</p>
+            <p style="margin:3px 0 0; font-size:8px; font-weight:700; color:#c00;">* Horas já acrescidas de 50% (horas extras)</p>
+          </td>
+          <td style="width: 20%; font-size: 8.5px; line-height: 1.5; background: #fafafa;">
+            <strong>EMISSÃO:</strong> ${hoje.toLocaleDateString('pt-BR')} ${hoje.toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'})}<br>
+            <strong>QTD SERVIDORES:</strong> ${servidores.length}
+          </td>
+        </tr>
+      </table>
+      ${htmlTabela}
+      <div style="font-size: 9px; border: 1px solid #000; padding: 12px; margin-top: 20px; line-height: 1.6;">
+        <strong>DECLARAÇÃO:</strong> Declaro que as informações acima são extratos fiéis dos registros constantes no sistema de gestão de banco de horas.
+      </div>
+      <div class="sig-area">
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Responsável pelo Controle</div><div class="sig-sub">Coordenador(a) da APS</div></div>
+        <div class="sig-box">
+          <div class="sig-line"></div>
+          <div class="sig-label">Entregue ao RH em</div>
+          <div class="sig-sub" style="font-size:14px;font-weight:700;letter-spacing:4px;margin-top:6px">_____ / _____ / _________</div>
+        </div>
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Coordenador(a) do RH</div><div class="sig-sub">Carimbo e Assinatura</div></div>
       </div>
       <div class="footer-print">
         <span>© ${hoje.getFullYear()} - ${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</span>
