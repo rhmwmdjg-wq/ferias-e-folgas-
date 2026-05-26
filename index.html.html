@@ -9848,12 +9848,13 @@ function imprimirRelatorioBancoHoras() {
     const saldoRem = totalDisp - (r.horasPagas || 0);
     linhasTabela += `<tr>
       <td style="text-align:center">${meses[r.mes] || '?'}/${r.ano}</td>
-      <td style="text-align:center">${saldoAnterior.toFixed(1)}</td>
-      <td style="text-align:center">${(r.horasGeradas || 0).toFixed(1)}</td>
-      <td style="text-align:center;font-weight:700">${totalDisp.toFixed(1)}</td>
-      <td style="text-align:center;color:${(r.horasPagas || 0) > 0 ? '#16a34a' : '#666'}">${(r.horasPagas || 0).toFixed(1)}</td>
-      <td style="text-align:center;font-weight:700;color:${saldoRem >= 0 ? '#16a34a' : '#dc2626'}">${saldoRem.toFixed(1)}</td>
+      <td style="text-align:center">${saldoAnterior.toFixed(1)}h</td>
+      <td style="text-align:center">${(r.horasGeradas || 0).toFixed(1)}h</td>
+      <td style="text-align:center;font-weight:700">${totalDisp.toFixed(1)}h</td>
+      <td style="text-align:center;color:${(r.horasPagas || 0) > 0 ? '#16a34a' : '#666'}">${(r.horasPagas || 0).toFixed(1)}h</td>
+      <td style="text-align:center;font-weight:700;color:${saldoRem >= 0 ? '#16a34a' : '#dc2626'}">${saldoRem.toFixed(1)}h</td>
       <td style="font-size:9px">${r.autorizadoPor || '-'}</td>
+      <td style="font-size:9px">${r.obs || '-'}</td>
     </tr>`;
     saldoAnterior = saldoRem;
   });
@@ -9898,13 +9899,14 @@ function imprimirRelatorioBancoHoras() {
         <th>Horas Pagas</th>
         <th>Saldo Remanescente</th>
         <th>Autorizado Por</th>
+        <th>Observações</th>
       </tr></thead>
       <tbody>
         ${linhasTabela}
         <tr style="font-weight:800;background:#f0fdf4">
           <td colspan="2" style="text-align:right;text-transform:uppercase;font-size:9px">Saldo Final</td>
           <td style="text-align:center;font-weight:800">${saldoFinal >= 0 ? '+' : ''}${saldoFinal.toFixed(1)}h</td>
-          <td colspan="4"></td>
+          <td colspan="5"></td>
         </tr>
       </tbody>
     </table>
@@ -9938,6 +9940,9 @@ function imprimirRelatorioBancoHoras() {
       ${htmlTabela}
       <div style="font-size: 9px; border: 1px solid #000; padding: 12px; margin-top: 20px; line-height: 1.6;">
         <strong>DECLARAÇÃO:</strong> Declaro que as informações acima são extratos fiéis dos registros constantes no sistema de gestão de banco de horas.
+      </div>
+      <div style="font-size: 9px; border: 1px solid #000; padding: 12px; margin-top: 12px; line-height: 1.6;">
+        <strong>TERMO DE RECEBIMENTO:</strong> Declaro para os devidos fins que <strong>RECEBI</strong> os impressos originais do Banco de Horas (horas extras sem pagas) do servidor(a) <strong>${srv.nome}</strong>, Mat. <strong>${srv.matricula}</strong>, referentes às movimentações até o presente momento, para conferência e providências cabíveis.
       </div>
       <div class="sig-area">
         <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Responsável pelo Controle</div><div class="sig-sub">Coordenador(a) da APS</div></div>
