@@ -1546,6 +1546,10 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-file-pdf"></i>
         <span class="tab-label" style="font-weight:800">Emitir Autorização</span>
       </button>
+      <button class="tab-btn" onclick="showTab('autorizacoes')" id="tab-autorizacoes">
+        <i class="fa-solid fa-clock-rotate-left"></i>
+        <span class="tab-label">Histórico de Autorizações</span>
+      </button>
       <button class="tab-btn" onclick="showTab('calendario')" id="tab-calendario">
         <i class="fa-solid fa-calendar-week"></i>
         <span class="tab-label">Calendário Visual</span>
@@ -2620,6 +2624,21 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   </div>
 </div>
 
+<!-- ======================= ABA HISTÓRICO DE AUTORIZAÇÕES ======================= -->
+<div class="tab-panel" id="panel-autorizacoes">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div class="section-title" style="margin:0">📜 Histórico de Autorizações Emitidas</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="abrirModalAutorizacao()">📄 Nova Autorização</button>
+    </div>
+  </div>
+  <div class="card" style="padding:14px">
+    <div id="lista-autorizacoes">
+      <div class="empty"><div class="icon">⏳</div><p>Carregando autorizações...</p></div>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= ABA CONFIGURAÇÕES ======================= -->
 <div class="tab-panel" id="panel-config">
   <div class="section-title">⚙️ Configurações do Sistema</div>
@@ -3341,7 +3360,8 @@ async function processSyncQueue() {
           console.error(`Erro ao sync config:`, error);
         }
       } else {
-        const { error } = await supabaseClient.from(tabela).upsert(dados);
+        const dadosLimpos = (tabela === 'folgas' && Array.isArray(dados)) ? dados.map(f => { const { refId, ...resto } = f; return resto; }) : dados;
+        const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
         if (error) {
           if (isQuotaError(error)) throw error;
           console.error(`Erro ao sync ${tabela}:`, error);
@@ -3953,7 +3973,8 @@ async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
       chunks.push(pendentes.slice(i, i + chunkSize));
     }
     for (const chunk of chunks) {
-      const { error } = await supabaseClient.from(tabela).upsert(chunk);
+      const dadosLimpos = (tabela === 'folgas') ? chunk.map(f => { const { refId, ...resto } = f; return resto; }) : chunk;
+      const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
       if (error) throw error;
     }
     console.log(`✅ ${pendentes.length} registros locais de [${tabela}] sincronizados com sucesso na nuvem!`);
@@ -3969,6 +3990,7 @@ let _remoteData = {
   bancoHoras: [],
   solicitacoes: [],
   gestores: [],
+  autorizacoes: [],
   config: {}
 };
 
@@ -4085,6 +4107,11 @@ async function syncComSupabase(silencioso = false) {
   await syncTabela('gestores', '*', (data) => {
     _remoteData.gestores = data;
     if (data.length > 0) localStorage.setItem('srv_gestores', JSON.stringify(data));
+  });
+
+  await syncTabela('autorizacoes', '*', (data) => {
+    _remoteData.autorizacoes = data;
+    if (data.length > 0) localStorage.setItem('srv_autorizacoes', JSON.stringify(data));
   });
 
   await syncTabela('configuracoes', 'chave,valor', (data) => {
@@ -4231,7 +4258,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-mapaausencias', 'tab-solicitacoes'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-ferias', 'tab-calendario', 'tab-folgas', 'tab-relatorio', 'tab-aniversariantes', 'tab-mapaausencias', 'tab-solicitacoes', 'tab-autorizacoes'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
@@ -4659,7 +4686,10 @@ const DB = {
   saveFolgas: async (d, apenasNovos) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
-    const paraSubir = apenasNovos || d;
+    const paraSubir = (apenasNovos || d).map(f => {
+      const { refId, ...resto } = f;
+      return resto;
+    });
     try {
       const { error } = await supabaseClient.from('folgas').upsert(paraSubir);
       if (error) {
@@ -4892,6 +4922,27 @@ const DB = {
     // Fallback: logs locais
     const locais = JSON.parse(localStorage.getItem('srv_logs') || '[]');
     return locais.slice(0, limit);
+  },
+
+  autorizacoes: () => _remoteData.autorizacoes.length ? _remoteData.autorizacoes : JSON.parse(localStorage.getItem('srv_autorizacoes') || '[]'),
+  saveAutorizacao: async (obj) => {
+    const idx = _remoteData.autorizacoes.findIndex(a => a.id === obj.id);
+    if (idx >= 0) _remoteData.autorizacoes[idx] = obj;
+    else _remoteData.autorizacoes.push(obj);
+    localStorage.setItem('srv_autorizacoes', JSON.stringify(_remoteData.autorizacoes));
+    try {
+      const { error } = await supabaseClient.from('autorizacoes').upsert(obj);
+      if (error && isQuotaError(error)) saveToSyncQueue('autorizacoes', obj);
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('autorizacoes', obj);
+    }
+  },
+  deleteAutorizacao: async (id) => {
+    _remoteData.autorizacoes = _remoteData.autorizacoes.filter(a => a.id !== id);
+    localStorage.setItem('srv_autorizacoes', JSON.stringify(_remoteData.autorizacoes));
+    try {
+      await supabaseClient.from('autorizacoes').delete().eq('id', id);
+    } catch (e) { /* silent */ }
   }
 };
 
@@ -4934,6 +4985,7 @@ function showTab(tab) {
     if (!fpGozo) initFlatpickrFolga();
   }
   if (tab === 'solicitacoes') renderSolicitacoes();
+  if (tab === 'autorizacoes') renderAutorizacoes();
   if (tab === 'auditoria') renderAuditoria();
   if (tab === 'coberturas') renderCoberturas();
   if (tab === 'bancohoras') {
@@ -10344,7 +10396,30 @@ function gerarAutorizacaoFerias() {
   const textoAutorizacao = cfg.textoAutorizacao || 'Autorizo a concessão de férias ao(à) servidor(a) abaixo identificado(a), conforme períodos a seguir descritos.';
 
   imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, textoAutorizacao, tipoFerias);
+
+  // Salvar no histórico de autorizações
+  const tipoParc = periodos.length === 1 ? 'Integral (30 dias)' : periodos.length === 2 ? '2 períodos de 15 dias' : '3 períodos de 10 dias';
+  DB.saveAutorizacao({
+    id: uid(),
+    srvId: srv.id,
+    srvNome: srv.nome,
+    srvMatricula: srv.matricula,
+    srvSetor: srv.setor,
+    srvCargo: srv.cargo,
+    srvAdmissao: srv.admissao,
+    tipoFerias,
+    periodos,
+    tercoMes,
+    periodoRef,
+    obs,
+    textoAutorizacao,
+    tipoParc,
+    coordenador: cfg.coordenadorAPS || '',
+    dataEmissao: new Date().toISOString()
+  });
+
   fecharModal('modal-autorizacao');
+  toastMsg('Autorização salva no histórico!');
   DB.saveLog('Documento', `Gerou Autorização de Férias para ${srv.nome} (${tipoFerias === 'premio' ? 'Prêmio' : 'Regulamentar'})`, 'servidores', srv.id);
 }
 
@@ -10528,6 +10603,66 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
 
   win.document.write(fullHTML);
   win.document.close();
+}
+
+// ===================== HISTÓRICO DE AUTORIZAÇÕES =====================
+function renderAutorizacoes() {
+  const lista = DB.autorizacoes();
+  const container = document.getElementById('lista-autorizacoes');
+  if (!container) return;
+
+  if (!lista.length) {
+    container.innerHTML = '<div class="empty" style="padding:40px 10px"><div class="icon">📜</div><p>Nenhuma autorização emitida ainda.</p><p style="font-size:.8rem;color:var(--muted)">As autorizações aparecerão aqui após serem emitidas.</p></div>';
+    return;
+  }
+
+  container.innerHTML = lista.sort((a, b) => new Date(b.dataEmissao) - new Date(a.dataEmissao)).map(aut => {
+    const dataEmissao = new Date(aut.dataEmissao);
+    const ferLabel = aut.tipoFerias === 'premio' ? 'Prêmio' : 'Regulamentar';
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;padding:14px 16px;border-radius:10px;background:var(--surface);margin-bottom:8px;border:1px solid var(--border-low)">
+        <div style="flex:1;min-width:200px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">
+            <span style="font-weight:700">${esc(aut.srvNome)}</span>
+            <span class="tag tag-blue">Mat. ${esc(aut.srvMatricula)}</span>
+            <span class="tag ${aut.tipoFerias === 'premio' ? 'tag-purple' : 'tag-green'}">${ferLabel}</span>
+          </div>
+          <div style="font-size:.82rem;color:var(--muted)">
+            📅 ${dataEmissao.toLocaleDateString('pt-BR')} às ${dataEmissao.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+            · ${esc(aut.srvSetor || '-')}
+            · ${aut.tipoParc}
+            ${aut.periodoRef ? `· Ref: ${esc(aut.periodoRef)}` : ''}
+          </div>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-primary btn-sm" onclick="reimprimirAutorizacao('${aut.id}')">🖨️ Reimprimir</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirAutorizacao('${aut.id}')">🗑️</button>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function reimprimirAutorizacao(id) {
+  const aut = DB.autorizacoes().find(a => a.id === id);
+  if (!aut) return toastMsg('Autorização não encontrada.', 'error');
+
+  const srv = {
+    id: aut.srvId,
+    nome: aut.srvNome,
+    matricula: aut.srvMatricula,
+    setor: aut.srvSetor,
+    cargo: aut.srvCargo,
+    admissao: aut.srvAdmissao
+  };
+
+  imprimirAutorizacaoFerias(srv, aut.periodos, aut.tercoMes, aut.periodoRef, aut.obs, aut.textoAutorizacao, aut.tipoFerias);
+}
+
+function excluirAutorizacao(id) {
+  if (!confirm('Tem certeza que deseja excluir esta autorização do histórico?')) return;
+  DB.deleteAutorizacao(id);
+  renderAutorizacoes();
+  toastMsg('Autorização removida do histórico.');
 }
 
 // window.onload = initApp; // Removido para usar o body onload="verificarSessao()" que já chama o initApp
