@@ -3,14 +3,14 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
-<title>Sistema de Controle Férias/Folgas</title>
+<title>Atlas Saúde</title>
 
 <!-- PWA Meta Tags -->
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#5b7fff">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Férias Gestão">
+<meta name="apple-mobile-web-app-title" content="Atlas Saúde">
 <link rel="apple-touch-icon" href="icon-512.png">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
@@ -1417,8 +1417,135 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 }
 .ma-sem-agrupamento .ma-cell {
   min-width: auto;
-  height: 20px;
+   height: 20px;
+ }
 }
+
+/* ================================================================
+   EVENTOS MODULE
+=============================================================== */
+.ev-top-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+}
+.ev-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--surface);
+  border-radius: var(--r-sm);
+  padding: 4px;
+  border: 1px solid var(--border-mid);
+}
+.ev-tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  font-family: var(--font);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all var(--transition);
+}
+.ev-tab.active { background: var(--primary); color: #fff; box-shadow: 0 2px 8px rgba(77,123,255,0.3); }
+.ev-tab:hover:not(.active) { color: var(--text); background: rgba(255,255,255,0.04); }
+
+.ev-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+@media (max-width: 900px) {
+  .ev-grid { grid-template-columns: 1fr; }
+}
+.ev-card {
+  background: var(--card);
+  backdrop-filter: blur(var(--glass-blur));
+  border: 1px solid var(--border);
+  border-radius: var(--r-lg);
+  padding: 18px;
+  transition: all var(--transition);
+}
+.ev-card h3 {
+  font-size: 0.86rem; font-weight: 700;
+  margin-bottom: 14px;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.ev-prof-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+  transition: all var(--transition);
+}
+.ev-prof-item:hover { border-color: var(--border-mid); }
+.ev-prof-info { flex: 1; min-width: 0; }
+.ev-prof-nome { font-weight: 700; font-size: 0.84rem; color: var(--text); }
+.ev-prof-cat { font-size: 0.72rem; color: var(--muted); }
+.ev-prof-remove { color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 4px; }
+.ev-prof-remove:hover { opacity: 0.7; }
+
+.ev-status-incompleto { border-left: 4px solid var(--danger) !important; }
+.ev-status-completo { border-left: 4px solid var(--success) !important; }
+
+.ev-list-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 14px 16px;
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: all var(--transition);
+  position: relative;
+  overflow: hidden;
+}
+.ev-list-item:hover { border-color: var(--border-mid); transform: translateX(3px); }
+.ev-list-item::before {
+  content: '';
+  position: absolute;
+  left: 0; top: 0; bottom: 0;
+  width: 4px;
+}
+.ev-list-item.incompleto::before { background: var(--danger); }
+.ev-list-item.completo::before { background: var(--success); }
+.ev-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.ev-list-nome { font-weight: 700; font-size: 0.92rem; color: var(--text); }
+.ev-list-meta { font-size: 0.72rem; color: var(--muted); margin-top: 2px; display: flex; gap: 12px; flex-wrap: wrap; }
+.ev-list-actions { display: flex; gap: 6px; align-items: center; }
+.ev-list-faltam { font-size: 0.7rem; color: var(--danger); font-weight: 700; margin-top: 6px; }
+
+.ev-cat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--r-sm);
+  margin-bottom: 6px;
+}
+.ev-cat-row select { flex: 1; min-width: 120px; }
+.ev-cat-row input[type=number] { width: 60px; }
+.ev-cat-remove { color: var(--danger); cursor: pointer; font-size: 0.9rem; padding: 4px; }
+
+@media (max-width: 600px) {
+  .ev-grid { grid-template-columns: 1fr; }
 }
 </style>
 </head>
@@ -1441,7 +1568,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   <div class="login-wrapper">
     <div class="login-brand">
       <div class="brand-icon" id="login-logo-container">🌴</div>
-      <div style="font-size:1.4rem;font-weight:800;letter-spacing:-0.03em;color:var(--text)">Férias & Folgas</div>
+      <div style="font-size:1.4rem;font-weight:800;letter-spacing:-0.03em;color:var(--text)">Atlas Saúde</div>
       <div id="display-org-name-login" style="font-size:0.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.1em;margin-top:4px">Coordenação APS</div>
     </div>
 
@@ -1502,7 +1629,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     <div class="sidebar-header">
       <div class="sidebar-logo" id="sidebar-logo-container">🌴</div>
       <div class="sidebar-title">
-        <h1 id="display-sidebar-title">Férias / Folgas</h1>
+        <h1 id="display-sidebar-title">Atlas Saúde</h1>
         <span id="display-sidebar-sub">Gestão de RH</span>
       </div>
       <button class="sidebar-close" onclick="closeSidebar()" aria-label="Fechar menu">
@@ -1571,6 +1698,18 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
         <i class="fa-solid fa-file-signature"></i>
         <span class="tab-label">Solicitações</span>
         <span class="badge" id="badge-solic" style="background:var(--accent);display:none">0</span>
+      </button>
+
+      <!-- ===== Eventos ===== -->
+      <div class="sidebar-section-label">Eventos</div>
+      <button class="tab-btn" onclick="showTab('eventos')" id="tab-eventos" style="margin-bottom:4px">
+        <i class="fa-solid fa-calendar-check"></i>
+        <span class="tab-label">Gerenciar Eventos</span>
+        <span class="badge" id="badge-eventos" style="background:var(--accent);display:none">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('veiculos')" id="tab-veiculos" style="margin-bottom:4px">
+        <i class="fa-solid fa-truck"></i>
+        <span class="tab-label">Veículos</span>
       </button>
 
       <!-- ===== Relatórios ===== -->
@@ -2811,7 +2950,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
       <div class="grid-2" style="gap:10px">
         <div class="field">
           <label>Título Principal</label>
-          <input type="text" id="cfg-sidebar-title" placeholder="Ex: Férias / Folgas">
+          <input type="text" id="cfg-sidebar-title" placeholder="Ex: Atlas Saúde">
         </div>
         <div class="field">
           <label>Subtítulo</label>
@@ -2991,8 +3130,197 @@ Coordenação de RH
   </div>
 </div>
 
+
+<!-- ======================= ABA VEÍCULOS ======================= -->
+<div class="tab-panel" id="panel-veiculos">
+  <div class="section-title">🚗 Veículos</div>
+  <div class="ev-grid">
+    <div class="ev-card">
+      <h3>➕ Novo Veículo</h3>
+      <input type="hidden" id="veic-id">
+      <div class="form-row cols-2">
+        <div class="field"><label>Nome *</label><input id="veic-nome" placeholder="Ex: Carro APS"></div>
+        <div class="field"><label>Placa</label><input id="veic-placa" placeholder="ABC-1234"></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="field"><label>Modelo</label><input id="veic-modelo" placeholder="Ex: Fiat Uno"></div>
+        <div class="field"><label>Cor</label><input id="veic-cor" placeholder="Branco"></div>
+      </div>
+      <div class="field" style="margin-bottom:14px">
+        <label>Observação</label>
+        <textarea id="veic-obs" placeholder="Observações..." style="min-height:50px"></textarea>
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-primary" onclick="salvarVeiculo()">💾 Salvar Veículo</button>
+        <button class="btn btn-ghost" onclick="limparFormVeiculo()">🗑️ Limpar</button>
+      </div>
+    </div>
+    <div class="ev-card">
+      <h3>📋 Veículos Cadastrados</h3>
+      <div id="lista-veiculos"><div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= ABA EVENTOS ======================= -->
+<div class="tab-panel" id="panel-eventos">
+  <div class="section-title">📅 Gerenciar Eventos</div>
+  <div class="ev-top-bar">
+    <div class="ev-tabs" id="ev-subtabs">
+      <button class="ev-tab active" onclick="toggleEvSubtab('eventos',this)">📅 Eventos</button>
+      <button class="ev-tab" onclick="toggleEvSubtab('veiculos',this)">🚗 Veículos</button>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Eventos -->
+  <div id="ev-sub-eventos">
+    <div class="ev-grid">
+      <!-- Formulário Novo Evento -->
+      <div class="ev-card">
+        <h3>✍️ <span id="ev-form-title">Novo Evento</span></h3>
+        <input type="hidden" id="ev-id">
+        <div class="form-row cols-2">
+          <div class="field"><label>Nome do Evento *</label><input id="ev-nome" placeholder="Ex: Mutirão de Vacinação"></div>
+          <div class="field"><label>Data *</label><input id="ev-data" type="date"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Horário Início *</label><input id="ev-hr-inicio" type="time"></div>
+          <div class="field"><label>Horário Término *</label><input id="ev-hr-fim" type="time"></div>
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>Local</label>
+          <input id="ev-local" placeholder="Ex: UBS Central">
+        </div>
+        <div class="field" style="margin-bottom:12px">
+          <label>Descrição</label>
+          <textarea id="ev-desc" placeholder="Descrição do evento..." style="min-height:50px"></textarea>
+        </div>
+
+        <!-- Categorias Necessárias -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">Categorias de Profissionais *</label>
+          <div id="ev-categorias-container"></div>
+          <button class="btn btn-ghost btn-sm" onclick="addCategoriaRow()" style="margin-top:6px">➕ Adicionar Categoria</button>
+        </div>
+
+        <!-- Veículo -->
+        <div class="field" style="margin-bottom:14px">
+          <label>Veículo (transporte)</label>
+          <select id="ev-veiculo"><option value="">Nenhum</option></select>
+        </div>
+
+        <!-- Profissionais Escalados -->
+        <div style="margin-bottom:14px">
+          <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">Profissionais Escalados</label>
+          <div id="ev-profissionais-lista"><div class="empty" style="padding:16px"><p>Adicione categorias acima e clique em "+" para escalar profissionais.</p></div></div>
+        </div>
+
+        <!-- Seletor de Profissional por Categoria -->
+        <div id="ev-add-prof-area" style="display:none;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:12px;margin-bottom:14px">
+          <div class="form-row cols-2">
+            <div class="field"><label>Profissional</label>
+              <select id="ev-add-srv"><option value="">Selecione...</option></select>
+            </div>
+            <div class="field"><label>Categoria</label>
+              <select id="ev-add-cat"><option value="">Selecione...</option></select>
+            </div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="field"><label>Tipo de Pagamento</label>
+              <select id="ev-add-pagto" onchange="toggleEvPagtoCampos()">
+                <option value="folga">🌴 Folga (dias)</option>
+                <option value="dinheiro">💰 Hora Extra (dinheiro)</option>
+              </select>
+            </div>
+            <div class="field">
+              <label id="ev-add-qtd-label">Dias de Folga</label>
+              <input id="ev-add-qtd" type="number" min="0.5" step="0.5" value="1">
+            </div>
+          </div>
+          <div style="display:flex;gap:8px;margin-top:8px">
+            <button class="btn btn-success btn-sm" onclick="adicionarProfissionalEvento()">✅ Adicionar</button>
+            <button class="btn btn-ghost btn-sm" onclick="cancelarAddProfissional()">Cancelar</button>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn btn-primary" onclick="salvarEvento()">💾 Salvar Evento</button>
+          <button class="btn btn-ghost" onclick="limparFormEvento()">🗑️ Limpar</button>
+          <button class="btn btn-ghost btn-sm" id="ev-btn-imprimir" style="margin-left:auto;display:none" onclick="imprimirEvento()">🖨️ Imprimir</button>
+        </div>
+      </div>
+
+      <!-- Lista de Eventos -->
+      <div class="ev-card">
+        <h3>📋 Eventos</h3>
+        <div class="search-bar">
+          <input id="ev-busca" type="text" placeholder="🔍 Buscar evento..." oninput="renderEventos()" style="flex:1">
+          <select id="ev-filtro-status" onchange="renderEventos()">
+            <option value="">Todos</option>
+            <option value="completo">✅ Completos</option>
+            <option value="incompleto">🔴 Incompletos</option>
+          </select>
+        </div>
+        <div id="lista-eventos"><div class="empty"><div class="icon">📅</div><p>Nenhum evento cadastrado.</p></div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Veículos (dentro de eventos) -->
+  <div id="ev-sub-veiculos" style="display:none">
+    <div class="ev-grid">
+      <div class="ev-card">
+        <h3>➕ Novo Veículo</h3>
+        <div class="form-row cols-2">
+          <div class="field"><label>Nome *</label><input id="ev-veic-nome" placeholder="Ex: Carro APS"></div>
+          <div class="field"><label>Placa</label><input id="ev-veic-placa" placeholder="ABC-1234"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Modelo</label><input id="ev-veic-modelo" placeholder="Ex: Fiat Uno"></div>
+          <div class="field"><label>Cor</label><input id="ev-veic-cor" placeholder="Branco"></div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label>Observação</label>
+          <textarea id="ev-veic-obs" placeholder="Observações..." style="min-height:50px"></textarea>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-primary" onclick="salvarVeiculoEv()">💾 Salvar Veículo</button>
+          <button class="btn btn-ghost" onclick="limparFormVeiculoEv()">🗑️ Limpar</button>
+        </div>
+      </div>
+      <div class="ev-card">
+        <h3>📋 Veículos</h3>
+        <div id="ev-sub-lista-veiculos"><div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
 </div> <!-- close content-area -->
-</div> <!-- close app-container -->
+
+<!-- MODAL EDITAR PROFISSIONAL EVENTO -->
+<div class="modal-bg" id="modal-editar-prof-event">
+  <div class="modal" style="max-width:400px">
+    <h3>✏️ Editar Profissional</h3>
+    <input type="hidden" id="eprof-idx">
+    <div class="form-row cols-2">
+      <div class="field"><label>Tipo de Pagamento</label>
+        <select id="eprof-pagto" onchange="toggleEvPagtoCamposEdit()">
+          <option value="folga">🌴 Folga (dias)</option>
+          <option value="dinheiro">💰 Hora Extra (dinheiro)</option>
+        </select>
+      </div>
+      <div class="field">
+        <label id="eprof-qtd-label">Dias de Folga</label>
+        <input id="eprof-qtd" type="number" min="0.5" step="0.5" value="1">
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="fecharModal('modal-editar-prof-event')">Cancelar</button>
+      <button class="btn btn-primary" onclick="salvarEdicaoProfEvento()">💾 Salvar</button>
+    </div>
+  </div>
+</div>
 
 <!-- ======================= BOTTOM NAV (Mobile) ======================= -->
 <nav class="bottom-nav" id="bottom-nav" style="display:none">
@@ -3368,6 +3696,18 @@ async function processSyncQueue() {
           if (isQuotaError(error)) throw error;
           console.error(`Erro ao sync config:`, error);
         }
+      } else if (tabela === 'eventos') {
+        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: dados });
+        if (error) {
+          if (isQuotaError(error)) throw error;
+          console.error(`Erro ao sync ${tabela}:`, error);
+        }
+      } else if (tabela === 'veiculos') {
+        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: dados });
+        if (error) {
+          if (isQuotaError(error)) throw error;
+          console.error(`Erro ao sync ${tabela}:`, error);
+        }
       } else {
         const dadosLimpos = (tabela === 'folgas' && Array.isArray(dados)) ? dados.map(f => { const { refId, ...resto } = f; return resto; }) : dados;
         const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
@@ -3627,7 +3967,7 @@ function setupRealtime() {
     _realtimeChannel = null;
   }
 
-  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes'];
+  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes', 'eventos', 'veiculos'];
 
   _realtimeChannel = supabaseClient.channel('sync-global');
 
@@ -3689,6 +4029,8 @@ function renderAposSync(tabelaAlterada) {
   if (tabelaAlterada === 'configuracoes') {
     aplicarConfiguracoesSalvas();
   }
+  if (tabelaAlterada === 'eventos') { _eventosData = DB.eventos(); }
+  if (tabelaAlterada === 'veiculos') { _veiculosData = DB.veiculos(); }
 
   // SEMPRE re-renderizar o painel ativo — independente de qual tabela mudou
   // Isso garante que skeletons nunca fiquem presos na tela
@@ -3713,6 +4055,12 @@ function renderAposSync(tabelaAlterada) {
       break;
     case 'panel-solicitacoes':
       renderSolicitacoes();
+      break;
+    case 'panel-eventos':
+      if (typeof renderEventos === 'function') { _eventosData = DB.eventos(); renderEventos(); }
+      break;
+    case 'panel-veiculos':
+      if (typeof renderVeiculos === 'function') { _veiculosData = DB.veiculos(); renderVeiculos(); }
       break;
     case 'panel-alertas':
       // Dashboard já foi re-renderizado acima
@@ -3976,15 +4324,35 @@ async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
   if (!pendentes || !Array.isArray(pendentes) || pendentes.length === 0) return;
   console.log(`📤 Enviando ${pendentes.length} registros locais de [${tabela}] para o Supabase...`);
   try {
-    const chunks = [];
-    const chunkSize = 50;
-    for (let i = 0; i < pendentes.length; i += chunkSize) {
-      chunks.push(pendentes.slice(i, i + chunkSize));
-    }
-    for (const chunk of chunks) {
-      const dadosLimpos = (tabela === 'folgas') ? chunk.map(f => { const { refId, ...resto } = f; return resto; }) : chunk;
-      const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
-      if (error) throw error;
+    if (tabela === 'eventos') {
+      for (const ev of pendentes) {
+        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: ev });
+        if (error) throw error;
+      }
+    } else if (tabela === 'veiculos') {
+      for (const v of pendentes) {
+        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: v });
+        if (error) throw error;
+      }
+    } else {
+      const chunks = [];
+      const chunkSize = 50;
+      for (let i = 0; i < pendentes.length; i += chunkSize) {
+        chunks.push(pendentes.slice(i, i + chunkSize));
+      }
+      for (const chunk of chunks) {
+        let dadosLimpos = (tabela === 'folgas') ? chunk.map(f => { const { refId, ...resto } = f; return resto; }) : chunk;
+        if (tabela === 'eventos') {
+          dadosLimpos = dadosLimpos.map(function(ev) {
+            const e = { ...ev };
+            if (e.categoriasNecessarias && typeof e.categoriasNecessarias === 'object') e.categoriasNecessarias = JSON.stringify(e.categoriasNecessarias);
+            if (e.profissionais && typeof e.profissionais === 'object') e.profissionais = JSON.stringify(e.profissionais);
+            return e;
+          });
+        }
+        const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
+        if (error) throw error;
+      }
     }
     console.log(`✅ ${pendentes.length} registros locais de [${tabela}] sincronizados com sucesso na nuvem!`);
   } catch (e) {
@@ -4000,6 +4368,8 @@ let _remoteData = {
   solicitacoes: [],
   gestores: [],
   autorizacoes: [],
+  eventos: [],
+  veiculos: [],
   config: {}
 };
 
@@ -4121,6 +4491,26 @@ async function syncComSupabase(silencioso = false) {
   await syncTabela('autorizacoes', '*', (data) => {
     _remoteData.autorizacoes = data;
     if (data.length > 0) localStorage.setItem('srv_autorizacoes', JSON.stringify(data));
+  });
+
+  await syncTabela('eventos', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_eventos') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('eventos', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.eventos = unificados;
+    localStorage.setItem('srv_eventos', JSON.stringify(unificados));
+  });
+
+  await syncTabela('veiculos', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_veiculos') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('veiculos', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.veiculos = unificados;
+    localStorage.setItem('srv_veiculos', JSON.stringify(unificados));
   });
 
   await syncTabela('configuracoes', 'chave,valor', (data) => {
@@ -4267,7 +4657,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-relatorio', 'tab-mapaausencias'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
@@ -4657,7 +5047,7 @@ const DB = {
 
   config: () => {
     if (Object.keys(_remoteData.config).length) return _remoteData.config;
-    return JSON.parse(localStorage.getItem('srv_config') || '{"decreto":"","tema":"#5b7fff","estiloBase":"midnight","coordenadorAPS":"","setores":[],"subtituloSidebar":"Gestão de RH","tituloSidebar":"Férias / Folgas","nomeOrganizacao":"Coordenação da Atenção Primária à Saúde","tamanhoFonteOrg":14, "tamanhoLogoHeader":38,"maxFolgasConsecutivas":5,"maxFolgasMes":5}');
+    return JSON.parse(localStorage.getItem('srv_config') || '{"decreto":"","tema":"#5b7fff","estiloBase":"midnight","coordenadorAPS":"","setores":[],"subtituloSidebar":"Gestão de RH","tituloSidebar":"Atlas Saúde","nomeOrganizacao":"Coordenação da Atenção Primária à Saúde","tamanhoFonteOrg":14, "tamanhoLogoHeader":38,"maxFolgasConsecutivas":5,"maxFolgasMes":5}');
   },
   saveConfig: async (d) => {
     _remoteData.config = d;
@@ -4952,62 +5342,133 @@ const DB = {
     try {
       await supabaseClient.from('autorizacoes').delete().eq('id', id);
     } catch (e) { /* silent */ }
-  }
+  },
+
+  eventos: () => _remoteData.eventos.length ? _remoteData.eventos : JSON.parse(localStorage.getItem('srv_eventos') || '[]'),
+  saveEventos: async (d) => {
+    _remoteData.eventos = d;
+    localStorage.setItem('srv_eventos', JSON.stringify(d));
+    let todosOk = true;
+    for (let i = 0; i < d.length; i++) {
+      try {
+        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: d[i] });
+        if (error) {
+          if (isQuotaError(error)) { saveToSyncQueue('eventos', d[i]); }
+          else { console.error("Erro Supabase (eventos):", error); todosOk = false; }
+        }
+      } catch (e) {
+        if (isQuotaError(e)) { saveToSyncQueue('eventos', d[i]); }
+        else { console.error("Erro ao salvar evento:", e); todosOk = false; }
+      }
+    }
+    if (!todosOk) {
+      toastMsg("Alguns eventos não puderam ser sincronizados com a nuvem. Dados salvos localmente.", "warning");
+    }
+  },
+  deleteEvento: async (id) => {
+    try {
+      await supabaseClient.rpc('deletar_evento', { p_id: id });
+    } catch (e) { /* silent */ }
+  },
+
+  veiculos: () => _remoteData.veiculos.length ? _remoteData.veiculos : JSON.parse(localStorage.getItem('srv_veiculos') || '[]'),
+  saveVeiculos: async (d) => {
+    _remoteData.veiculos = d;
+    localStorage.setItem('srv_veiculos', JSON.stringify(d));
+    let todosOk = true;
+    for (let i = 0; i < d.length; i++) {
+      try {
+        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
+        if (error && !isQuotaError(error)) {
+          console.error("Erro Supabase (veiculos):", error);
+          todosOk = false;
+        } else if (error) {
+          saveToSyncQueue('veiculos', d[i]);
+        }
+      } catch (e) {
+        if (isQuotaError(e)) {
+          saveToSyncQueue('veiculos', d[i]);
+        } else {
+          console.error("Erro ao salvar veículo:", e);
+          todosOk = false;
+        }
+      }
+    }
+    if (!todosOk) {
+      toastMsg("Alguns veículos não puderam ser sincronizados com a nuvem. Dados salvos localmente.", "warning");
+    }
+  },
+  deleteVeiculo: async (id) => {
+    try {
+      await supabaseClient.rpc('deletar_veiculo', { p_id: id });
+    } catch (e) { /* silent */ }
+  },
+
 };
 
-// Helper global para obter imagens (Prioridade: Nuvem > Local)
-const getImg = (lado) => {
-  const cfg = DB.config();
-  return cfg['img_' + lado] || localStorage.getItem('srv_img_' + lado);
-};
+// ===================== UTILITARIOS =====================
+function toastMsg(msg, type = 'info', duration = 4000) {
+  const container = document.getElementById('toast-container');
+  if (!container) return;
+  const icons = { success: 'fa-circle-check', error: 'fa-circle-xmark', warning: 'fa-triangle-exclamation', info: 'fa-circle-info' };
+  const el = document.createElement('div');
+  el.className = 'toast toast-' + type;
+  el.innerHTML = '<i class="fa-solid ' + (icons[type] || icons.info) + '"></i><div class="toast-content">' + msg + '</div><div class="toast-progress"></div>';
+  el.onclick = () => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); };
+  container.appendChild(el);
+  if (duration > 0) setTimeout(() => { el.classList.add('leaving'); setTimeout(() => el.remove(), 300); }, duration);
+  return el;
+}
 
-function uid() { return Math.random().toString(36).substr(2, 9); }
+function esc(str) {
+  if (!str) return '';
+  return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
 
-let editId = null;
-let currentPage = 1;
-const rowsPerPage = 10;
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  if (isNaN(dt.getTime())) return d;
+  return dt.toLocaleDateString('pt-BR', { timeZone: 'UTC' });
+}
 
-// ===================== TABS =====================
+function diffDays(d) {
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const dt = new Date(d + 'T00:00:00');
+  return Math.round((dt - hoje) / 86400000);
+}
+
+// ===================== NAVEGACAO DE ABAS =====================
 function showTab(tab) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('panel-' + tab).classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
-
-  // Resetar filtros de busca globais ao trocar de aba para evitar confusão
   if (document.getElementById('busca-servidor')) document.getElementById('busca-servidor').value = '';
   if (document.getElementById('filtro-setor')) document.getElementById('filtro-setor').value = '';
-
   if (tab === 'alertas') renderDashboard();
-  if (tab === 'servidores') {
-    renderTabela();
-    atualizarSelectsSetores();
-  }
+  if (tab === 'servidores') { renderTabela(); atualizarSelectsSetores(); }
   if (tab === 'gestores') renderGestores(), popularSetoresGestor();
   if (tab === 'ferias') renderProgramacoes(), popularSelectServidor();
   if (tab === 'calendario') iniciarCalendario();
   if (tab === 'relatorio') renderRelatorio(), popularSelectRelatorio();
   if (tab === 'aniversariantes') renderAniversariantes();
   if (tab === 'mapaausencias') iniciarMapaAusencias();
-  if (tab === 'folgas') {
-    renderFolgas();
-    if (!fpGozo) initFlatpickrFolga();
-  }
+  if (tab === 'folgas') { renderFolgas(); if (!fpGozo) initFlatpickrFolga(); }
   if (tab === 'solicitacoes') renderSolicitacoes();
   if (tab === 'autorizacoes') renderAutorizacoes();
   if (tab === 'auditoria') renderAuditoria();
   if (tab === 'coberturas') renderCoberturas();
-  if (tab === 'bancohoras') {
-    renderBancoHoras();
-  }
-  
+  if (tab === 'bancohoras') renderBancoHoras();
+  if (tab === 'eventos') { renderEventos(); popularSelectVeiculos('ev-veiculo'); }
+  if (tab === 'veiculos') renderVeiculos();
   currentPage = 1;
 }
 
 // ===================== SAIR =====================
 function sairSistema() {
   if (confirm('Deseja realmente sair do sistema?')) {
-    teardownRealtime(); // Encerrar conexão Realtime antes de sair
+    teardownRealtime();
     sessionStorage.removeItem('ferias_sessao');
     verificarSessao();
   }
@@ -5019,1373 +5480,435 @@ function getServidoresAcessiveis() {
   if (!sessaoStr) return [];
   const sessao = JSON.parse(sessaoStr);
   const servidores = DB.servidores();
-  
   if (sessao.role === 'admin') return servidores;
-  
-  if (sessao.role === 'gestor') {
-    const permitidos = (sessao.setores || []).map(s => s.trim().toLowerCase());
-    return servidores.filter(s => {
-      const setorSrv = (s.setor || '').trim().toLowerCase();
-      // Gestor vê servidores cujos setores estão na sua lista de autorizados
-      return permitidos.includes(setorSrv);
-    });
+  if (sessao.role === 'gestor' && sessao.setores && sessao.setores.length) {
+    return servidores.filter(s => sessao.setores.includes(s.setor));
   }
-  
-  if (sessao.role === 'servidor') {
-    // Servidor vê apenas a si mesmo
-    return servidores.filter(s => s.id === sessao.id);
-  }
-  
-  return [];
+  return servidores;
 }
 
 function getProgramacoesAcessiveis() {
-  const srvsIds = getServidoresAcessiveis().map(s => s.id);
-  return DB.programacoes().filter(p => srvsIds.includes(p.srvId));
+  const sessaoStr = sessionStorage.getItem('ferias_sessao');
+  if (!sessaoStr) return [];
+  const sessao = JSON.parse(sessaoStr);
+  const programacoes = DB.programacoes();
+  if (sessao.role === 'admin') return programacoes;
+  if (sessao.role === 'gestor') {
+    const srvIds = new Set(getServidoresAcessiveis().map(s => s.id));
+    return programacoes.filter(p => srvIds.has(p.srvId));
+  }
+  return programacoes;
 }
 
 function getFolgasAcessiveis() {
-  const srvsIds = getServidoresAcessiveis().map(s => s.id);
-  return DB.folgas().filter(f => srvsIds.includes(f.srvId));
-}
-
-function temAusenciaNoPeriodo(srvId, inicio, fim) {
-  const progs = DB.programacoes().filter(p => p.srvId === srvId && !p.concluido);
-  for (const p of progs) {
-    if (p.inicio <= fim && p.fim >= inicio) return true;
+  const sessaoStr = sessionStorage.getItem('ferias_sessao');
+  if (!sessaoStr) return [];
+  const sessao = JSON.parse(sessaoStr);
+  const folgas = DB.folgas();
+  if (sessao.role === 'admin') return folgas;
+  if (sessao.role === 'gestor') {
+    const srvIds = new Set(getServidoresAcessiveis().map(s => s.id));
+    return folgas.filter(f => srvIds.has(f.srvId));
   }
-  const folgas = DB.folgas().filter(f => f.srvId === srvId && f.tipo === 'debito');
-  for (const f of folgas) {
-    if (f.dataItems && Array.isArray(f.dataItems)) {
-      for (const di of f.dataItems) {
-        if (di.data >= inicio && di.data <= fim) return true;
-      }
-    } else if (f.data) {
-      if (f.data.includes(',')) {
-        const dates = f.data.split(',').map(d => d.trim());
-        for (const d of dates) {
-          if (d >= inicio && d <= fim) return true;
-        }
-      } else if (f.data >= inicio && f.data <= fim) {
-        return true;
-      }
-    }
-  }
-  return false;
+  return folgas;
 }
 
-// ===================== DETECTOR DE CONFLITOS =====================
-function verificarConflitosSetorFuncao(srvId, periodos) {
-  const srv = DB.servidores().find(s => s.id === srvId);
-  if (!srv || !srv.setor) return [];
-  const setor = srv.setor.trim().toLowerCase();
-  const funcao = (srv.cargo || '').trim().toLowerCase();
-  if (!setor) return [];
+function renderDashboard() {
+  renderAlertas();
+}
 
-  const outrosServidores = DB.servidores().filter(s => {
-    if (s.id === srvId) return false;
-    if ((s.setor || '').trim().toLowerCase() !== setor) return false;
-    if (funcao && (s.cargo || '').trim().toLowerCase() !== funcao) return false;
-    return true;
-  });
-  if (outrosServidores.length === 0) return [];
+// ===================== PAGINACAO =====================
+var currentPage = 1, rowsPerPage = 15;
 
-  const outrosIds = outrosServidores.map(s => s.id);
-  const conflitos = [];
-
-  // Verificar programações (férias)
-  const progs = DB.programacoes().filter(p => outrosIds.includes(p.srvId) && !p.concluido);
-  progs.forEach(p => {
-    const srvP = outrosServidores.find(s => s.id === p.srvId);
-    periodos.forEach(per => {
-      if (per.inicio <= p.fim && per.fim >= p.inicio) {
-        conflitos.push(`${srvP.nome} (${srvP.cargo || '-'}) — Férias: ${fmtDate(p.inicio)} a ${fmtDate(p.fim)}`);
-      }
-    });
-  });
-
-  // Verificar folgas (débito)
-  const folgasLista = DB.folgas().filter(f => outrosIds.includes(f.srvId) && f.tipo === 'debito');
-  folgasLista.forEach(f => {
-    const srvP = outrosServidores.find(s => s.id === f.srvId);
-    const datasFolga = f.dataItems && Array.isArray(f.dataItems)
-      ? f.dataItems.map(di => di.data)
-      : f.data ? f.data.split(',').map(d => d.trim()) : [];
-    periodos.forEach(per => {
-      const sobrepoe = datasFolga.some(d => d >= per.inicio && d <= per.fim);
-      if (sobrepoe) {
-        conflitos.push(`${srvP.nome} (${srvP.cargo || '-'}) — Folga: ${datasFolga.map(fmtDate).join(', ')}`);
-      }
-    });
-  });
-
-  return [...new Set(conflitos)];
-}
-// ================================================================
-
-// ===================== UTILS =====================
-function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2); }
-function fmtDate(d) { 
-  if (!d) return '-'; 
-  if (d.includes(',')) return d.split(',').map(part => fmtDate(part.trim())).join(', ');
-  const parts = d.split('-');
-  if (parts.length !== 3) return d;
-  const [y, m, dia] = parts;
-  return `${dia}/${m}/${y}`; 
-}
-function esc(str) {
-  if (!str) return '';
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-function getAvatarHtml(foto, nome, size = 32, extraStyles = '', extraAttrs = '') {
-  const letra = nome ? nome.charAt(0).toUpperCase() : '?';
-  const safeLetra = letra.replace(/['"&<>]/g, '');
-  const styleBase = `width:${size}px;height:${size}px;border-radius:50%;background:linear-gradient(135deg,var(--primary),var(--accent));display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:${Math.round(size*0.4)}px;color:#fff;flex-shrink:0;vertical-align:middle`;
-  if (!foto) {
-    return `<div style="${styleBase};${extraStyles}" ${extraAttrs}>${safeLetra}</div>`;
-  }
-  const fotoSafe = esc(foto);
-  const nomeAttr = esc(nome || '');
-  const fbStyle = (styleBase + ';' + extraStyles).replace(/'/g, '').replace(/"/g, '');
-  const onErrJs = `this.onerror=null;var d=document.createElement('div');d.style.cssText='${fbStyle}';d.textContent='${safeLetra}';this.replaceWith(d)`;
-  return `<img src="${fotoSafe}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;flex-shrink:0;vertical-align:middle;${extraStyles}" alt="${nomeAttr}" ${extraAttrs} onerror="${onErrJs}">`;
-}
-function parseFolgaObs(obsStr) {
-  if (!obsStr) return { coberturaNome: '', coberturaId: '', obs: '' };
-  const match = obsStr.match(/^\[Cobertura:\s*(.*?)\s*\(ID:\s*(.*?)\)\s*\]\s*(.*)/s);
-  if (match) {
-    return {
-      coberturaNome: match[1],
-      coberturaId: match[2],
-      obs: match[3]
-    };
-  }
-  return { coberturaNome: '', coberturaId: '', obs: obsStr };
-}
-function addDays(dateStr, days) {
-  const d = new Date(dateStr + 'T12:00:00');
-  d.setDate(d.getDate() + days);
-  return d.toISOString().split('T')[0];
-}
-function diffDays(dateStr) {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const target = new Date(dateStr + 'T00:00:00');
-  return Math.ceil((target - today) / 86400000);
-}
-function renderPaginacao(id, total, callback) {
-  const container = document.getElementById(id);
-  if (!container || total <= 1) { 
-    if (container) container.innerHTML = '';
-    return; 
-  }
-  
-  let html = `<button class="page-btn" onclick="currentPage=1; ${callback}()" ${currentPage===1?'disabled':''}>&laquo;</button>`;
-  html += `<button class="page-btn" onclick="currentPage--; ${callback}()" ${currentPage===1?'disabled':''}>&lsaquo;</button>`;
-  
-  // Mostrar páginas limitadas (ex: -2 e +2)
+function renderPaginacao(containerId, total, callback) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  if (total <= 1) { el.innerHTML = ''; return; }
+  let html = '';
   for (let i = 1; i <= total; i++) {
-    if (i === 1 || i === total || (i >= currentPage - 1 && i <= currentPage + 1)) {
-       html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="currentPage=${i}; ${callback}()">${i}</button>`;
-    } else if (i === currentPage - 2 || i === currentPage + 2) {
-       html += `<span style="color:var(--muted);padding:0 4px">...</span>`;
-    }
+    html += '<button class="btn btn-ghost btn-sm ' + (i === currentPage ? 'active' : '') + '" onclick="currentPage=' + i + ';' + callback + '()">' + i + '</button>';
   }
-
-  html += `<button class="page-btn" onclick="currentPage++; ${callback}()" ${currentPage===total?'disabled':''}>&rsaquo;</button>`;
-  html += `<button class="page-btn" onclick="currentPage=${total}; ${callback}()" ${currentPage===total?'disabled':''}>&raquo;</button>`;
-  
-  container.innerHTML = html;
+  el.innerHTML = html;
 }
 
-function toastMsg(msg, type='success') {
-  let container = document.getElementById('toast-container');
-  if (!container) {
-    container = document.createElement('div');
-    container.id = 'toast-container';
-    container.className = 'toast-container';
-    document.body.appendChild(container);
+// ===================== AVATAR / DATA =====================
+function getAvatarHtml(foto, nome, size, extraStyle, extraAttr) {
+  const sz = size || 50;
+  if (foto && foto.length > 100) {
+    return '<img src="' + foto + '" alt="' + esc(nome) + '" style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;object-fit:cover;' + (extraStyle||'') + '" ' + (extraAttr||'') + '>';
   }
-  
-  const toast = document.createElement('div');
-  toast.className = `toast toast-${type}`;
-  
-  const icons = {
-    success: 'fa-circle-check',
-    error: 'fa-circle-xmark',
-    warning: 'fa-triangle-exclamation',
-    info: 'fa-circle-info'
-  };
-  
-  toast.innerHTML = `
-    <i class="fa-solid ${icons[type] || icons.info}"></i>
-    <div class="toast-content">${msg}</div>
-    <div class="toast-progress"></div>
-  `;
-  
-  container.appendChild(toast);
-  
-  // Auto-remove
-  const timeoutId = setTimeout(() => {
-    toast.classList.add('leaving');
-    setTimeout(() => toast.remove(), 400);
-  }, 4000);
-  
-  // Manual remove
-  toast.onclick = () => {
-    clearTimeout(timeoutId);
-    toast.classList.add('leaving');
-    setTimeout(() => toast.remove(), 400);
-  };
+  const inicial = (nome || '?').charAt(0).toUpperCase();
+  return '<div style="width:' + sz + 'px;height:' + sz + 'px;border-radius:50%;background:var(--bg-accent);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:' + Math.round(sz*0.4) + 'px;color:var(--primary);' + (extraStyle||'') + '" ' + (extraAttr||'') + '>' + inicial + '</div>';
 }
 
-function getTodosSetores() {
-  const cfg = DB.config();
-  const servidores = DB.servidores();
-  
-  // Setores do Config (normalizados)
-  let setores = (cfg.setores || []).map(s => s.trim()).filter(Boolean);
-  
-  // Setores dos Servidores (normalizados)
-  const servidoresSetores = servidores.map(s => (s.setor || '').trim()).filter(Boolean);
-  
-  // Mesclar e remover duplicatas ignorando case (preferindo a versão do Config se houver conflito)
-  const total = [...new Set([...setores, ...servidoresSetores])];
-  return total.filter((val, idx, self) => 
-    self.findIndex(t => t.toLowerCase() === val.toLowerCase()) === idx
-  ).sort((a,b) => a.localeCompare(b, undefined, {sensitivity: 'base'}));
+function addDays(dataStr, dias) {
+  if (!dataStr) return '';
+  const dt = new Date(dataStr + 'T12:00:00');
+  if (isNaN(dt.getTime())) return dataStr;
+  dt.setDate(dt.getDate() + dias);
+  return dt.toISOString().split('T')[0];
 }
 
-// ===================== GESTORES (ADMIN ONLY) =====================
-function popularSetoresGestor() {
-  const container = document.getElementById('g-setores-check');
-  if (!container) return;
-  const setores = getTodosSetores();
-  if (!setores.length) {
-    container.innerHTML = '<p style="color:var(--danger);font-size:.82rem">⚠️ Nenhum setor cadastrado nas configurações.</p>';
-    return;
-  }
-  container.innerHTML = setores.map(s => `
-    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:0.84rem">
-      <input type="checkbox" name="g-setor" value="${s}"> ${s}
-    </label>
-  `).join('');
-}
-
-async function salvarGestor() {
-  const id = document.getElementById('g-id').value;
-  const nome = document.getElementById('g-nome').value.trim();
-  const usuario = document.getElementById('g-usuario').value.trim();
-  const senhaDigitada = document.getElementById('g-senha').value.trim();
-  const checks = document.querySelectorAll('input[name="g-setor"]:checked');
-  const setores = Array.from(checks).map(c => c.value);
-
-  const gestores = DB.gestores();
-
-  // Se for novo, verifica se usuário já existe
-  if (!id && gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase())) {
-     return toastMsg('Este usuário de login já existe!', 'error');
-  } else if (id && gestores.some(g => g.usuario.toLowerCase() === usuario.toLowerCase() && g.id !== id)) {
-     return toastMsg('Este usuário de login já está em uso por outro gestor!', 'error');
-  }
-
-  if (id) {
-    // Edição: só atualiza a senha se o campo foi preenchido
-    const idx = gestores.findIndex(g => g.id === id);
-    if (idx >= 0) {
-      if (!nome || !usuario || !setores.length) {
-        return toastMsg('Preencha nome, usuário e ao menos um setor!', 'error');
-      }
-      let senhaFinal = gestores[idx].senha; // mantém a senha atual
-      if (senhaDigitada) {
-        // Nova senha digitada — hashear
-        senhaFinal = await hashSenha(senhaDigitada);
-      }
-      gestores[idx] = { ...gestores[idx], nome, usuario, senha: senhaFinal, setores };
-    }
-  } else {
-    // Criação nova — senha obrigatória
-    if (!nome || !usuario || !senhaDigitada || !setores.length) {
-      return toastMsg('Preencha todos os campos obrigatórios e selecione ao menos um setor!', 'error');
-    }
-    const senhaHash = await hashSenha(senhaDigitada);
-    gestores.push({ id: uid(), nome, usuario, senha: senhaHash, setores });
-  }
-
-  await DB.saveGestores(gestores);
-  limparFormGestor();
-  renderGestores();
-  toastMsg(id ? 'Gestor atualizado com sucesso!' : 'Gestor cadastrado com sucesso!');
-  DB.saveLog(id ? 'Edição' : 'Criação', `${id ? 'Editou' : 'Criou'} o gestor ${nome} (Login: ${usuario})`, 'gestores', id || 'novo');
-}
-
-function abrirEditarGestor(id) {
-  const gestores = DB.gestores();
-  const g = gestores.find(x => x.id === id);
-  if (!g) return;
-
-  document.getElementById('g-id').value = g.id;
-  document.getElementById('g-nome').value = g.nome;
-  document.getElementById('g-usuario').value = g.usuario;
-  // Não exibir o hash — deixar vazio para indicar que só muda se digitar nova senha
-  document.getElementById('g-senha').value = '';
-  document.getElementById('g-senha').placeholder = 'Deixe em branco para manter a senha atual';
-  document.getElementById('g-form-title').textContent = 'Editar Gestor';
-  
-  // Marcar setores
-  document.querySelectorAll('input[name="g-setor"]').forEach(c => {
-    c.checked = g.setores.includes(c.value);
-  });
-  
-  window.scrollTo({ top: document.getElementById('panel-gestores').offsetTop - 20, behavior: 'smooth' });
-}
-
-function renderGestores() {
-  const lista = DB.gestores();
-  const tbody = document.getElementById('tbody-gestores');
-  if (!tbody) return;
-
-  if (!lista.length) {
-    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:40px">Nenhum gestor cadastrado.</td></tr>';
-    return;
-  }
-
-  tbody.innerHTML = lista.map(g => `
-    <tr>
-      <td><strong>${g.nome}</strong></td>
-      <td><span class="tag tag-blue">${g.usuario}</span></td>
-      <td>${g.setores.map(s => `<span class="tag tag-purple" style="margin-right:4px">${s}</span>`).join('')}</td>
-      <td>
-        <button class="btn btn-ghost btn-sm" onclick="abrirEditarGestor('${g.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
-        <button class="btn btn-danger btn-sm" onclick="excluirGestor('${g.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
-      </td>
-    </tr>
-  `).join('');
-}
-
-async function excluirGestor(id) {
-  if (!confirm('Deseja realmente excluir este gestor?')) return;
-  
-  // 1. Apaga do Supabase
-  await DB.deleteGestor(id);
-
-  // 2. Apaga localmente
-  const lista = DB.gestores().filter(g => g.id !== id);
-  _remoteData.gestores = lista;
-  localStorage.setItem('srv_gestores', JSON.stringify(lista));
-
-  renderGestores();
-  toastMsg('Gestor removido permanentemente.');
-  DB.saveLog('Exclusão', `Excluiu o gestor (ID: ${id})`, 'gestores', id);
-}
-
-function limparFormGestor() {
-  document.getElementById('g-id').value = '';
-  document.getElementById('g-form-title').textContent = 'Novo Gestor';
-  ['g-nome','g-usuario','g-senha'].forEach(id => document.getElementById(id).value = '');
-  document.querySelectorAll('input[name="g-setor"]').forEach(c => c.checked = false);
+// ===================== SERVIDORES =====================
+function limparFormServidor() {
+  document.getElementById('f-matricula').value = '';
+  document.getElementById('f-nome').value = '';
+  document.getElementById('f-nascimento').value = '';
+  document.getElementById('f-admissao').value = '';
+  document.getElementById('f-setor').value = '';
+  document.getElementById('f-cargo').value = '';
+  document.getElementById('f-telefone').value = '';
+  document.getElementById('f-cpf').value = '';
+  document.getElementById('f-pis').value = '';
+  document.getElementById('f-vinculo').value = 'efetivo';
+  document.querySelectorAll('#aba-f-vinculo .aba-item').forEach(function(b) { b.classList.toggle('active', b.textContent.trim().toLowerCase() === 'efetivo'); });
+  document.getElementById('f-ferias-reg').value = '0';
+  document.getElementById('f-ferias-prem').value = '0';
+  document.getElementById('f-foto-base64').value = '';
+  document.getElementById('f-foto-preview').innerHTML = '<span style="font-size:24px">📷</span><span>Adicionar foto</span>';
+  delete document.getElementById('f-matricula').dataset.editId;
 }
 
 async function salvarServidor() {
-  const nome = document.getElementById('f-nome').value.trim();
   const matricula = document.getElementById('f-matricula').value.trim();
-  if (!nome || !matricula) return toastMsg('Nome e Matrícula são obrigatórios!', 'error');
-  
-  const btn = event?.target?.closest('button') || document.querySelector('#panel-servidores .btn-primary');
-  const originalText = btn ? btn.innerHTML : 'Salvar';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Enviando...'; }
-
-  try {
-    const servidores = DB.servidores();
-    if (servidores.find(s => s.matricula === matricula)) {
-      if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
-      return toastMsg('Matrícula já cadastrada!', 'error');
+  const nome = document.getElementById('f-nome').value.trim();
+  const nascimento = document.getElementById('f-nascimento').value;
+  const admissao = document.getElementById('f-admissao').value;
+  const setor = document.getElementById('f-setor').value;
+  const cargo = document.getElementById('f-cargo').value.trim();
+  if (!matricula || !nome || !nascimento || !admissao || !setor || !cargo) {
+    toastMsg('Preencha todos os campos obrigatórios (*).', 'error'); return;
+  }
+  const editId = document.getElementById('f-matricula').dataset.editId;
+  const lista = DB.servidores();
+  if (editId) {
+    const idx = lista.findIndex(function(s) { return s.id === editId; });
+    if (idx >= 0) {
+      lista[idx] = {
+        id: editId,
+        matricula: matricula,
+        nome: nome,
+        nascimento: nascimento,
+        admissao: admissao,
+        setor: setor,
+        cargo: cargo,
+        telefone: document.getElementById('f-telefone').value.trim(),
+        cpf: document.getElementById('f-cpf').value.trim(),
+        pis: document.getElementById('f-pis').value.trim(),
+        vinculo: document.getElementById('f-vinculo').value,
+        feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
+        feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
+        foto: document.getElementById('f-foto-base64').value || lista[idx].foto || ''
+      };
     }
-
-    const senhaAuto = Math.floor(100000 + Math.random() * 900000).toString();
-    
-    // Upload da Foto para Storage (se houver)
-    let fotoUrl = null;
-    const fotoBase64 = document.getElementById('f-foto-base64').value;
-    if (fotoBase64) {
-      fotoUrl = await uploadImagemParaStorage(fotoBase64, matricula);
+  } else {
+    if (lista.some(function(s) { return s.matricula === matricula; })) {
+      toastMsg('Matrícula já cadastrada.', 'error'); return;
     }
-
-    const servidor = {
-      id: uid(),
-      nome, matricula,
-      senha: senhaAuto,
-      nascimento: document.getElementById('f-nascimento').value,
-      admissao: document.getElementById('f-admissao').value,
-      setor: document.getElementById('f-setor').value.trim(),
-      cargo: document.getElementById('f-cargo').value.trim(),
-      vinculo: document.getElementById('f-vinculo').value,
-      telefone: document.getElementById('f-telefone').value.replace(/\D/g,''),
-      feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
-      feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
+    lista.push({
+      id: uid(12),
+      matricula: matricula,
+      nome: nome,
+      nascimento: nascimento,
+      admissao: admissao,
+      setor: setor,
+      cargo: cargo,
+      telefone: document.getElementById('f-telefone').value.trim(),
       cpf: document.getElementById('f-cpf').value.trim(),
       pis: document.getElementById('f-pis').value.trim(),
-      foto: fotoUrl,
-    };
-    servidores.push(servidor);
-    await DB.saveServidores(servidores);
-    limparFormServidor();
-    renderTabela();
-    atualizarBadge();
-    
-    DB.saveLog('Criação', `Criou o servidor ${nome} (Matrícula: ${matricula})`, 'servidores', servidor.id);
-    alert(`Servidor cadastrado!\n\nID de Acesso: ${matricula}\nSenha Inicial: ${senhaAuto}\n\nInforme estes dados ao servidor.`);
-  } catch (err) {
-    console.error(err);
-    toastMsg("Erro ao salvar servidor: " + err.message, "error");
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+      vinculo: document.getElementById('f-vinculo').value,
+      feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
+      feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
+      foto: document.getElementById('f-foto-base64').value || ''
+    });
   }
+  await DB.saveServidores(lista);
+  limparFormServidor();
+  renderTabela();
+  atualizarSelectsSetores();
+  toastMsg(editId ? 'Servidor atualizado.' : 'Servidor cadastrado.');
 }
 
-function limparFormServidor() {
-  ['f-matricula','f-nome','f-nascimento','f-admissao','f-setor','f-cargo','f-telefone','f-cpf','f-pis'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('f-ferias-reg').value = 0;
-  document.getElementById('f-ferias-prem').value = 0;
-  setVinculo('efetivo');
-  document.getElementById('f-foto-base64').value = '';
-  const prev = document.getElementById('f-foto-preview');
-  prev.innerHTML = '<span style="font-size:24px">📷</span><span>Adicionar foto</span>';
-  prev.style.backgroundImage = '';
-  prev.style.backgroundSize = '';
-  prev.style.backgroundPosition = '';
+function editarServidor(id) {
+  const s = DB.servidores().find(function(x) { return x.id === id; });
+  if (!s) return;
+  document.getElementById('f-matricula').value = s.matricula;
+  document.getElementById('f-nome').value = s.nome;
+  document.getElementById('f-nascimento').value = s.nascimento || '';
+  document.getElementById('f-admissao').value = s.admissao || '';
+  document.getElementById('f-setor').value = s.setor || '';
+  document.getElementById('f-cargo').value = s.cargo || '';
+  document.getElementById('f-telefone').value = s.telefone || '';
+  document.getElementById('f-cpf').value = s.cpf || '';
+  document.getElementById('f-pis').value = s.pis || '';
+  setVinculo(s.vinculo || 'efetivo');
+  document.getElementById('f-ferias-reg').value = s.feriasReg || 0;
+  document.getElementById('f-ferias-prem').value = s.feriasPrem || 0;
+  if (s.foto) {
+    document.getElementById('f-foto-base64').value = s.foto;
+    document.getElementById('f-foto-preview').innerHTML = '<img src="' + s.foto + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
+  }
+  document.getElementById('f-matricula').dataset.editId = id;
+  document.getElementById('panel-servidores').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+async function deletarServidor(id) {
+  if (!confirm('Excluir este servidor permanentemente?')) return;
+  let lista = DB.servidores().filter(function(s) { return s.id !== id; });
+  await DB.saveServidores(lista);
+  await DB.deleteServidor(id);
+  renderTabela();
+  atualizarSelectsSetores();
+  toastMsg('Servidor excluído.');
 }
 
 function renderTabela() {
   const busca = (document.getElementById('busca-servidor')?.value || '').toLowerCase();
   const filtroSetor = document.getElementById('filtro-setor')?.value || '';
-  const servidoresAcessiveis = getServidoresAcessiveis();
-  const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
-  const isAdmin = sessao.role === 'admin';
-  
-  let lista = servidoresAcessiveis.filter(s => {
-    const sBusca = (busca || '').toLowerCase();
-    const matchBusca = !busca || 
-      (s.nome || '').toLowerCase().includes(sBusca) || 
-      (s.matricula || '').includes(sBusca) || 
-      (s.setor || '').toLowerCase().includes(sBusca);
-    
-    const matchSetor = !filtroSetor || s.setor === filtroSetor;
-    return matchBusca && matchSetor;
-  });
-
-  const setores = [...new Set(servidoresAcessiveis.map(s => s.setor).filter(Boolean))].sort();
+  const servidores = getServidoresAcessiveis();
   const sel = document.getElementById('filtro-setor');
   if (sel) {
     const cur = sel.value;
-    sel.innerHTML = '<option value="">Todos os Setores</option>' + setores.map(s => `<option value="${s}" ${s===cur?'selected':''}>${s}</option>`).join('');
+    const setores = [...new Set(DB.servidores().map(function(s) { return s.setor; }).filter(Boolean))];
+    sel.innerHTML = '<option value="">Todos os Setores</option>' + setores.map(function(s) { return '<option value="' + s + '" ' + (s===cur?'selected':'') + '>' + s + '</option>'; }).join('');
   }
-
-  // Atualiza cabeçalho para Admin (Coluna Senha)
-  const thead = document.querySelector('#tabela-servidores thead tr');
-  if (thead) {
-    thead.innerHTML = `
-      <th>Foto</th><th>Matrícula</th><th>Nome</th><th>Setor</th><th>Cargo/Cat.</th>
-      <th>CPF</th><th>PIS</th><th>Nasc.</th><th>Admissão</th><th>Reg./Prêmio</th>
-      ${isAdmin ? '<th>Senha</th>' : ''}
-      <th>Ações</th>
-    `;
-  }
-
+  const filtrados = servidores.filter(function(s) {
+    if (filtroSetor && s.setor !== filtroSetor) return false;
+    if (!busca) return true;
+    return (s.nome || '').toLowerCase().includes(busca) || (s.matricula || '').includes(busca) || (s.setor || '').toLowerCase().includes(busca);
+  });
   const tbody = document.getElementById('tbody-servidores');
-  if (!lista.length) { 
-    tbody.innerHTML = `<tr><td colspan="${isAdmin ? 12 : 11}" style="text-align:center;color:var(--muted);padding:40px">Nenhum servidor encontrado.</td></tr>`; 
-    document.getElementById('paginacao-servidores').innerHTML = '';
-    return; 
+  if (!tbody) return;
+  if (!filtrados.length) {
+    tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:40px">Nenhum servidor encontrado.</td></tr>';
+    const pagEl = document.getElementById('paginacao-servidores');
+    if (pagEl) pagEl.innerHTML = '';
+    return;
   }
-
-  // Paginação
-  const totalPages = Math.ceil(lista.length / rowsPerPage);
+  const totalPages = Math.ceil(filtrados.length / rowsPerPage);
   if (currentPage > totalPages) currentPage = totalPages || 1;
   const inicio = (currentPage - 1) * rowsPerPage;
-  const fim = inicio + rowsPerPage;
-  const paginados = lista.slice(inicio, fim);
-
+  const paginados = filtrados.slice(inicio, inicio + rowsPerPage);
   renderPaginacao('paginacao-servidores', totalPages, 'renderTabela');
-
-  tbody.innerHTML = paginados.map(s => {
-    const onclickLightbox = `abrirFotoLightbox('${(s.foto||'').replace(/'/g,"&apos;")}','${esc(s.nome).replace(/'/g,"&apos;")}','${esc(s.setor||'-').replace(/'/g,"&apos;")}')`;
-    const avatarHtml = s.foto
-      ? getAvatarHtml(s.foto, s.nome, 32, 'cursor:pointer', `title="Ver foto de ${esc(s.nome)}" onclick="${onclickLightbox}"`)
-      : getAvatarHtml(null, s.nome, 32);
-    return `
-    <tr>
-      <td style="text-align:center">${avatarHtml}</td>
-      <td><span class="tag tag-blue">${esc(s.matricula)}</span></td>
-      <td><div style="font-weight:700">${esc(s.nome)}</div></td>
-      <td><div style="font-size:0.75rem">${esc(s.setor || '-')}</div></td>
-      <td>
-        <span class="tag tag-purple">${esc(s.cargo || '-')}</span>
-        ${s.vinculo ? `<br><span class="tag ${s.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="margin-top:4px;font-size:0.6rem">${esc(s.vinculo.toUpperCase())}</span>` : ''}
-      </td>
-      <td style="font-family:monospace;font-size:0.75rem">${esc(s.cpf || '-')}</td>
-      <td style="font-family:monospace;font-size:0.75rem">${esc(s.pis || '-')}</td>
-      <td>${fmtDate(s.nascimento)}</td>
-      <td>${fmtDate(s.admissao)}</td>
-      <td style="white-space:nowrap"><span class="tag tag-green">${s.feriasReg || 0}</span> / <span class="tag tag-warn">${s.feriasPrem || 0}</span></td>
-      ${isAdmin ? `<td><code style="background:var(--bg);padding:4px 8px;border-radius:4px;font-size:0.85rem;font-family:monospace;border:1px solid var(--border)">${esc(s.senha || '---')}</code></td>` : ''}
-      <td style="display:flex;gap:6px">
-        <button class="btn btn-ghost btn-sm" onclick="abrirEditar('${s.id}')" title="Editar">✏️</button>
-        <button class="btn btn-ghost btn-sm" onclick="abrirHistoricoCompleto('${s.id}')" title="Histórico Completo">📋</button>
-        <button class="btn btn-danger btn-sm" onclick="excluirServidor('${s.id}')" title="Excluir">🗑️</button>
-      </td>
-    </tr>`;
+  tbody.innerHTML = paginados.map(function(s) {
+    const fotoHtml = getAvatarHtml(s.foto, s.nome, 40, '', '');
+    return '<tr><td>' + fotoHtml + '</td><td>' + esc(s.matricula) + '</td><td><strong>' + esc(s.nome) + '</strong></td><td>' + fmtDate(s.nascimento) + '</td><td>' + fmtDate(s.admissao) + '</td><td>' + esc(s.setor || '-') + '</td><td>' + esc(s.cargo || '-') + '</td><td>' + (s.feriasReg || 0) + '</td><td>' + (s.feriasPrem || 0) + '</td><td><button class="btn btn-ghost btn-sm" onclick="editarServidor(\'' + s.id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarServidor(\'' + s.id + '\')">🗑️</button></td></tr>';
   }).join('');
 }
 
-async function renderAuditoria() {
-  const tbody = document.getElementById('tbody-auditoria');
-  if (!tbody) return;
-  
-  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px"><i class="fa-solid fa-spinner fa-spin"></i> Buscando logs no Supabase...</td></tr>';
-  
-  try {
-    const logs = await DB.getLogs(150);
-    if (!logs || !logs.length) {
-      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--muted)">Nenhum log encontrado.</td></tr>';
-      return;
-    }
-    
-    tbody.innerHTML = logs.map(l => {
-      const dataFmt = new Date(l.criadoEm).toLocaleString('pt-BR');
-      return `
-        <tr>
-          <td style="font-size:0.75rem; color:var(--muted)">${dataFmt}</td>
-          <td>
-            <div style="font-weight:700; font-size:0.82rem">${esc(l.usuarioNome)}</div>
-            <div style="font-size:0.65rem; color:var(--muted)">${esc(l.usuarioRole.toUpperCase())}</div>
-          </td>
-          <td><span class="tag ${l.acao.toLowerCase().includes('excluir') ? 'tag-danger' : 'tag-blue'}" style="font-size:0.65rem">${esc(l.acao)}</span></td>
-          <td style="font-size:0.78rem; line-height:1.4">${esc(l.detalhes)}</td>
-        </tr>
-      `;
-    }).join('');
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--danger)">Erro ao carregar logs: ${e.message}</td></tr>`;
+// ===================== GESTORES =====================
+function limparFormGestor() {
+  document.getElementById('g-id').value = '';
+  document.getElementById('g-nome').value = '';
+  document.getElementById('g-usuario').value = '';
+  document.getElementById('g-senha').value = '';
+  document.getElementById('g-form-title').textContent = 'Novo Gestor';
+  popularSetoresGestor();
+}
+
+function popularSetoresGestor() {
+  const container = document.getElementById('g-setores-check');
+  if (!container) return;
+  const cfg = DB.config();
+  const setores = cfg.setores || [];
+  if (!setores.length) {
+    container.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Nenhum setor cadastrado. Vá em Configurações para adicionar setores.</p>';
+    return;
   }
-}
-
-
-function abrirEditar(id) {
-  const s = DB.servidores().find(x => x.id === id);
-  if (!s) return;
-  editId = id;
-  document.getElementById('edit-id').value = id;
-  document.getElementById('edit-matricula').value = s.matricula;
-  document.getElementById('edit-nome').value = s.nome;
-  document.getElementById('edit-nascimento').value = s.nascimento;
-  document.getElementById('edit-admissao').value = s.admissao;
-  document.getElementById('edit-setor').value = s.setor;
-  document.getElementById('edit-cargo').value = s.cargo;
-  setVinculoEdit(s.vinculo || 'efetivo');
-  document.getElementById('edit-telefone').value = s.telefone || '';
-  document.getElementById('edit-cpf').value = s.cpf || '';
-  document.getElementById('edit-pis').value = s.pis || '';
-  document.getElementById('edit-ferias-reg').value = s.feriasReg;
-  document.getElementById('edit-ferias-prem').value = s.feriasPrem;
-  // Foto
-  document.getElementById('edit-foto-base64').value = s.foto || '';
-  const prevEl = document.getElementById('edit-foto-preview');
-  if (s.foto) {
-    prevEl.style.cssText = 'width:70px;height:70px;padding:0;border:none;border-radius:50%;overflow:hidden;cursor:pointer;';
-    prevEl.innerHTML = getAvatarHtml(s.foto, s.nome, 70, 'border:3px solid var(--primary)', `onclick="document.getElementById('edit-foto-input').click()"`);
-  } else {
-    prevEl.style.cssText = 'width:70px;height:70px;';
-    prevEl.innerHTML = '<span style="font-size:22px">📷</span><span>Foto</span>';
+  const editId = document.getElementById('g-id').value;
+  let gestorSetores = [];
+  if (editId) {
+    const g = DB.gestores().find(function(x) { return x.id === editId; });
+    if (g) gestorSetores = g.setores || [];
   }
-  document.getElementById('modal-editar').classList.add('open');
+  container.innerHTML = setores.map(function(s) {
+    const checked = gestorSetores.includes(s);
+    return '<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;cursor:pointer;background:' + (checked ? 'var(--bg-accent)' : 'transparent') + ';border:1px solid ' + (checked ? 'var(--primary)' : 'var(--border)') + '"><input type="checkbox" value="' + esc(s) + '" ' + (checked ? 'checked' : '') + ' onchange="this.parentElement.style.background=this.checked?\'var(--bg-accent)\':\'transparent\';this.parentElement.style.borderColor=this.checked?\'var(--primary)\':\'var(--border)\'">' + esc(s) + '</label>';
+  }).join('');
 }
 
-function abrirHistoricoCompleto(id) {
-  const srv = DB.servidores().find(s => s.id === id);
-  if (!srv) return toastMsg('Servidor não encontrado.', 'error');
-
-  const programacoes = DB.programacoes().filter(p => p.srvId === id).sort((a, b) => new Date(b.inicio) - new Date(a.inicio));
-  const folgas = DB.folgas().filter(f => f.srvId === id).sort((a, b) => new Date(b.data) - new Date(a.data));
-  const solicitacoes = DB.solicitacoes().filter(s => s.srvId === id).sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
-
-  const saldoFolgas = folgas.reduce((acc, f) => {
-    const q = parseFloat(f.qtd) || 0;
-    return (f.tipo === 'credito') ? acc + q : acc - q;
-  }, 0);
-
-  const avatarHtml = getAvatarHtml(srv.foto, srv.nome, 60, 'border:3px solid var(--primary)');
-
-  const progHtml = programacoes.length
-    ? programacoes.map(p => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${p.tipo === 'premio' ? '#a78bfa' : '#4d7bff'}">
-        <div>
-          <span style="font-weight:600;font-size:.85rem">${p.tipo === 'premio' ? '🏆 Prêmio' : '🌴 Anual'}</span>
-          <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${fmtDate(p.inicio)} → ${fmtDate(p.fim)}</span>
-        </div>
-        <span class="tag ${p.concluido ? 'tag-green' : p.status === 'programado' ? 'tag-blue' : 'tag-warn'}">${p.concluido ? 'Concluído' : p.status || 'Programado'}</span>
-      </div>`).join('')
-    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhuma programação de férias.</p>';
-
-  const folgasHtml = folgas.length
-    ? folgas.map(f => {
-        const isCredito = f.tipo === 'credito';
-        return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${isCredito ? 'var(--success)' : 'var(--danger)'}">
-          <div>
-            <span style="font-weight:600;font-size:.85rem">${fmtDate(f.data)}</span>
-            <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${f.motivo || (isCredito ? 'Crédito' : 'Débito')}</span>
-          </div>
-          <span class="tag ${isCredito ? 'tag-green' : 'tag-red'}">${isCredito ? '+' : '-'}${parseFloat(f.qtd) || 0} dia(s)</span>
-        </div>`;
-      }).join('')
-    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhum registro de folgas.</p>';
-
-  const solHtml = solicitacoes.length
-    ? solicitacoes.map(s => `
-      <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-radius:8px;background:var(--surface);margin-bottom:6px;border-left:4px solid ${s.status === 'aprovado' ? 'var(--success)' : s.status === 'rejeitado' ? 'var(--danger)' : 'var(--warning)'}">
-        <div>
-          <span style="font-weight:600;font-size:.85rem">${s.tipo === 'folga' ? '🏖️ Folga' : '🌴 Férias'}</span>
-          <span style="color:var(--muted);font-size:.78rem;margin-left:8px">${fmtDate(s.criadoEm)}</span>
-          ${s.obs ? `<br><small style="color:var(--muted)">${esc(s.obs)}</small>` : ''}
-        </div>
-        <span class="tag ${s.status === 'aprovado' ? 'tag-green' : s.status === 'rejeitado' ? 'tag-red' : 'tag-warn'}">${s.status || 'pendente'}</span>
-      </div>`).join('')
-    : '<p style="color:var(--muted);font-size:.82rem;padding:12px">Nenhuma solicitação.</p>';
-
-  const fecharBtn = '<button class="btn btn-ghost" onclick="fecharModal(\'modal-historico\')">Fechar</button>';
-
-  document.getElementById('hist-conteudo').innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:20px">
-      <h3 style="margin:0">📋 Histórico Completo</h3>
-      ${fecharBtn}
-    </div>
-
-    <div style="display:flex;gap:16px;align-items:center;padding:16px;background:var(--surface);border-radius:12px;margin-bottom:20px;border:1px solid var(--border-low)">
-      ${avatarHtml}
-      <div style="flex:1">
-        <div style="font-size:1.2rem;font-weight:700">${esc(srv.nome)}</div>
-        <div style="font-size:.82rem;color:var(--muted);margin-top:2px">
-          Mat. ${esc(srv.matricula)} · ${esc(srv.setor || '-')} · ${esc(srv.cargo || '-')}
-          ${srv.vinculo ? ` · <span class="tag ${srv.vinculo === 'efetivo' ? 'tag-blue' : 'tag-warn'}" style="font-size:0.6rem">${srv.vinculo.toUpperCase()}</span>` : ''}
-        </div>
-      </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary btn-sm" onclick="fecharModal('modal-historico');abrirEditar('${srv.id}')">✏️ Editar</button>
-      </div>
-    </div>
-
-    <div class="grid-3" style="margin-bottom:20px">
-      <div class="saldo-box ${srv.feriasReg > 0 ? 'positivo' : 'zero'}">
-        <span class="saldo-num" style="color:var(--primary)">${srv.feriasReg || 0}</span>
-        <div><strong>Férias Reg.</strong><br><small style="color:var(--muted)">Períodos acumulados</small></div>
-      </div>
-      <div class="saldo-box ${srv.feriasPrem > 0 ? 'positivo' : 'zero'}">
-        <span class="saldo-num" style="color:#a78bfa">${srv.feriasPrem || 0}</span>
-        <div><strong>Férias Prêmio</strong><br><small style="color:var(--muted)">Períodos acumulados</small></div>
-      </div>
-      <div class="saldo-box ${saldoFolgas > 0 ? 'positivo' : saldoFolgas < 0 ? 'negativo' : 'zero'}">
-        <span class="saldo-num">${saldoFolgas > 0 ? '+' : ''}${saldoFolgas}</span>
-        <div><strong>Saldo Folgas</strong><br><small style="color:var(--muted)">${saldoFolgas === 0 ? 'Zerado' : saldoFolgas > 0 ? 'Disponível' : 'Negativo'}</small></div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="card" style="padding:14px;margin:0">
-        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--text)">📅 Dados Pessoais</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.82rem">
-          <span style="color:var(--muted)">CPF:</span><span>${esc(srv.cpf || '-')}</span>
-          <span style="color:var(--muted)">PIS:</span><span>${esc(srv.pis || '-')}</span>
-          <span style="color:var(--muted)">Nascimento:</span><span>${fmtDate(srv.nascimento)}</span>
-          <span style="color:var(--muted)">Admissão:</span><span>${fmtDate(srv.admissao)}</span>
-          <span style="color:var(--muted)">Telefone:</span><span>${esc(srv.telefone || '-')}</span>
-        </div>
-      </div>
-      <div class="card" style="padding:14px;margin:0">
-        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--text)">🏖️ Resumo Férias</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:.82rem">
-          <span style="color:var(--muted)">Programações:</span><span>${programacoes.length}</span>
-          <span style="color:var(--muted)">Concluídas:</span><span>${programacoes.filter(p => p.concluido).length}</span>
-          <span style="color:var(--muted)">Férias Reg.:</span><span>${srv.feriasReg || 0} períodos</span>
-          <span style="color:var(--muted)">Férias Prêmio:</span><span>${srv.feriasPrem || 0} períodos</span>
-          <span style="color:var(--muted)">Solicitações:</span><span>${solicitacoes.length}</span>
-        </div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
-      <div class="card" style="padding:14px;margin:0">
-        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--primary)">🌴 Programações de Férias</div>
-        ${progHtml}
-      </div>
-      <div class="card" style="padding:14px;margin:0">
-        <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--success)">💰 Banco de Folgas</div>
-        ${folgasHtml}
-      </div>
-    </div>
-
-    <div class="card" style="padding:14px;margin:0">
-      <div style="font-size:.85rem;font-weight:700;margin-bottom:10px;color:var(--warning)">📨 Solicitações</div>
-      ${solHtml}
-    </div>
-
-    <div class="modal-footer" style="border:none;margin-top:16px;padding-top:0">
-      ${fecharBtn}
-    </div>
-  `;
-
-  document.getElementById('modal-historico').classList.add('open');
-}
-
-async function salvarEdicao() {
-  const id = document.getElementById('edit-id').value;
-  let lista = DB.servidores();
-  const idx = lista.findIndex(s => s.id === id);
-  if (idx < 0) return;
-
-  const btn = event?.target?.closest('button') || document.querySelector('#modal-editar .btn-primary');
-  const originalText = btn ? btn.innerHTML : 'Salvar';
-  if (btn) { btn.disabled = true; btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Salvando...'; }
-
-  try {
-    // Se trocar a foto (houver novo Base64 no input), faz o upload
-    const fotoBase64 = document.getElementById('edit-foto-base64').value;
-    let fotoFinal = lista[idx].foto;
-
-    if (fotoBase64 && fotoBase64.startsWith('data:image')) {
-      const novaUrl = await uploadImagemParaStorage(fotoBase64, lista[idx].matricula);
-      if (novaUrl) fotoFinal = novaUrl;
-    }
-
-    lista[idx] = { ...lista[idx],
-      matricula: document.getElementById('edit-matricula').value,
-      nome: document.getElementById('edit-nome').value,
-      nascimento: document.getElementById('edit-nascimento').value,
-      admissao: document.getElementById('edit-admissao').value,
-      setor: document.getElementById('edit-setor').value,
-      cargo: document.getElementById('edit-cargo').value,
-      vinculo: document.getElementById('edit-vinculo').value,
-      telefone: document.getElementById('edit-telefone').value.replace(/\D/g,''),
-      cpf: document.getElementById('edit-cpf').value.trim(),
-      pis: document.getElementById('edit-pis').value.trim(),
-      feriasReg: parseInt(document.getElementById('edit-ferias-reg').value) || 0,
-      feriasPrem: parseInt(document.getElementById('edit-ferias-prem').value) || 0,
-      foto: fotoFinal,
-    };
-    await DB.saveServidores(lista);
-    fecharModal('modal-editar');
-    renderTabela();
-    toastMsg('Servidor atualizado!');
-    DB.saveLog('Edição', `Editou dados do servidor ${lista[idx].nome} (Matrícula: ${lista[idx].matricula})`, 'servidores', id);
-  } catch (err) {
-    console.error(err);
-    toastMsg("Erro ao atualizar: " + err.message, "error");
-  } finally {
-    if (btn) { btn.disabled = false; btn.innerHTML = originalText; }
+async function salvarGestor() {
+  const nome = document.getElementById('g-nome').value.trim();
+  const usuario = document.getElementById('g-usuario').value.trim();
+  const senha = document.getElementById('g-senha').value;
+  if (!nome || !usuario || !senha) {
+    toastMsg('Preencha nome, usuário e senha.', 'error'); return;
   }
-}
-
-async function resetarSenhaServidor() {
-  const id = document.getElementById('edit-id').value;
-  const srv = DB.servidores().find(s => s.id === id);
-  if (!srv) return;
-  if (!confirm(`Deseja resetar a senha de ${srv.nome} para o padrão (123456)?`)) return;
-  
-  let lista = DB.servidores();
-  const idx = lista.findIndex(s => s.id === id);
-  lista[idx].senha = await hashSenha('123456');
-  await DB.saveServidores(lista);
-  toastMsg('Senha resetada com sucesso para o padrão (123456).');
-  DB.saveLog('Segurança', `Resetou a senha do servidor ${srv.nome} (Matrícula: ${srv.matricula})`, 'servidores', id);
-}
-
-function abrirModalAlterarSenha() {
-  document.getElementById('modal-alterar-senha').classList.add('open');
-}
-
-async function alterarMinhaSenha() {
-  const nova = document.getElementById('mn-nova-senha').value.trim();
-  const conf = document.getElementById('mn-conf-senha').value.trim();
-  
-  if (!nova || nova.length < 4) return toastMsg('A senha deve ter pelo menos 4 caracteres!', 'error');
-  if (nova !== conf) return toastMsg('As senhas não conferem!', 'error');
-
-  const novaHash = await hashSenha(nova);
-  const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao'));
-
-  if (sessao.role === 'servidor') {
-    // Servidor: salva hash na tabela servidores
-    let lista = DB.servidores();
-    const idx = lista.findIndex(s => s.id === sessao.id);
+  const checks = document.querySelectorAll('#g-setores-check input[type=checkbox]:checked');
+  const setores = Array.from(checks).map(function(c) { return c.value; });
+  if (!setores.length) {
+    toastMsg('Selecione ao menos um setor.', 'error'); return;
+  }
+  const editId = document.getElementById('g-id').value;
+  let lista = DB.gestores();
+  if (editId) {
+    const idx = lista.findIndex(function(g) { return g.id === editId; });
     if (idx >= 0) {
-      lista[idx].senha = novaHash;
-      await DB.saveServidores(lista);
-      toastMsg('Senha alterada com sucesso!');
-      fecharModal('modal-alterar-senha');
+      if (lista[idx].usuario !== usuario && lista.some(function(g) { return g.usuario === usuario && g.id !== editId; })) {
+        toastMsg('Usuário de login já existe.', 'error'); return;
+      }
+      lista[idx] = { id: editId, nome: nome, usuario: usuario, senha: senha, setores: setores };
     }
   } else {
-    // Admin/Gestor: salva hash na tabela gestores + fallback local
-    const gestores = DB.gestores();
-    const idxGestor = gestores.findIndex(g => g.usuario.toLowerCase() === sessao.usuario.toLowerCase());
-
-    if (idxGestor >= 0) {
-      gestores[idxGestor].senha = novaHash;
-      await DB.saveGestores(gestores);
-    } else {
-      // Admin padrão — criar registro no banco
-      const uid_admin = 'admin-' + Date.now();
-      const novoAdmin = {
-        id: sessao.id || uid_admin,
-        usuario: sessao.usuario,
-        nome: sessao.nome || 'Administrador',
-        senha: novaHash,
-        role: 'admin',
-        setores: []
-      };
-      gestores.push(novoAdmin);
-      await DB.saveGestores(gestores);
-      sessao.id = novoAdmin.id;
-      sessionStorage.setItem('ferias_sessao', JSON.stringify(sessao));
+    if (lista.some(function(g) { return g.usuario === usuario; })) {
+      toastMsg('Usuário de login já existe.', 'error'); return;
     }
-
-    // Fallback local (acesso offline) — também guarda o hash
-    let creds = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
-    const idxLocal = creds.findIndex(c => c.usuario.toLowerCase() === sessao.usuario.toLowerCase());
-    if (idxLocal >= 0) {
-      creds[idxLocal].senha = novaHash;
-    } else {
-      creds.push({ usuario: sessao.usuario, senha: novaHash, nome: sessao.nome || 'Administrador' });
-    }
-    localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
-
-    toastMsg('✅ Senha alterada e salva com segurança no banco de dados!');
-    fecharModal('modal-alterar-senha');
+    lista.push({ id: uid(12), nome: nome, usuario: usuario, senha: senha, setores: setores });
   }
+  await DB.saveGestores(lista);
+  limparFormGestor();
+  renderGestores();
+  toastMsg(editId ? 'Gestor atualizado.' : 'Gestor cadastrado.');
 }
 
-async function excluirServidor(id) {
-  if (!confirm('Excluir este servidor? TODAS as férias, folgas e registros ligados a ele também serão apagados.')) return;
-  
-  // 1. Apaga do Supabase (Cascata Manual)
-  const srv = DB.servidores().find(s => s.id === id);
-  if (srv && srv.foto && srv.foto.includes('/FOTOS/')) {
-    const filePath = srv.foto.split('/FOTOS/')[1];
-    await supabaseClient.storage.from('FOTOS').remove([filePath]);
-  }
-
-  const delOk = {};
-  const { error: errSrv } = await supabaseClient.from('servidores').delete().eq('id', id);
-  delOk.servidores = !errSrv || !isQuotaError(errSrv);
-  if (!delOk.servidores) registrarPendenteExclusao('servidores', id);
-  if (errSrv && !isQuotaError(errSrv)) console.error('Erro ao deletar servidor:', errSrv);
-
-  const { error: errProg } = await supabaseClient.from('programacoes').delete().eq('srvId', id);
-  if (errProg && isQuotaError(errProg)) {
-    for (const p of DB.programacoes().filter(x => x.srvId === id)) registrarPendenteExclusao('programacoes', p.id);
-  }
-
-  const { error: errFol } = await supabaseClient.from('folgas').delete().eq('srvId', id);
-  if (errFol && isQuotaError(errFol)) {
-    for (const f of DB.folgas().filter(x => x.srvId === id)) registrarPendenteExclusao('folgas', f.id);
-  }
-
-  const { error: errSol } = await supabaseClient.from('solicitacoes').delete().eq('srvId', id);
-  if (errSol && isQuotaError(errSol)) {
-    for (const s of DB.solicitacoes().filter(x => x.srvId === id)) registrarPendenteExclusao('solicitacoes', s.id);
-  }
-
-  const { error: errBH } = await supabaseClient.from('banco_horas').delete().eq('srvId', id);
-  if (errBH && isQuotaError(errBH)) {
-    for (const b of DB.bancoHoras().filter(x => x.srvId === id)) registrarPendenteExclusao('bancoHoras', b.id);
-  }
-
-  // 2. Apaga localmente
-  const servidoresNovos = DB.servidores().filter(s => s.id !== id);
-  _remoteData.servidores = servidoresNovos;
-  localStorage.setItem('srv_servidores', JSON.stringify(servidoresNovos));
-  
-  const progsNovas = DB.programacoes().filter(p => p.srvId !== id);
-  _remoteData.programacoes = progsNovas;
-  localStorage.setItem('srv_programacoes', JSON.stringify(progsNovas));
-  
-  const folgasNovas = DB.folgas().filter(f => f.srvId !== id);
-  _remoteData.folgas = folgasNovas;
-  localStorage.setItem('srv_folgas', JSON.stringify(folgasNovas));
-
-  const solicNovas = DB.solicitacoes().filter(s => s.srvId !== id);
-  _remoteData.solicitacoes = solicNovas;
-  localStorage.setItem('srv_solicitacoes', JSON.stringify(solicNovas));
-
-  const bhNovas = DB.bancoHoras().filter(b => b.srvId !== id);
-  _remoteData.bancoHoras = bhNovas;
-  localStorage.setItem('srv_banco_horas', JSON.stringify(bhNovas));
-
-  // 3. Atualiza TODAS as telas
-  renderTabela();
-  renderAlertas();
-  renderAniversariantes();
-  renderDashboard();
-  atualizarBadge();
-  const msgPendente = _pendingDeletions.length > 0
-    ? ' (alguns registros serão sincronizados com a nuvem quando a conexão for restaurada)'
-    : '';
-  toastMsg(`Servidor e registros vinculados excluídos permanentemente!${msgPendente}`);
-  DB.saveLog('Exclusão', `Excluiu o servidor (ID: ${id}) e todos os seus registros vinculados.`, 'servidores', id);
+function editarGestor(id) {
+  const g = DB.gestores().find(function(x) { return x.id === id; });
+  if (!g) return;
+  document.getElementById('g-id').value = g.id;
+  document.getElementById('g-nome').value = g.nome;
+  document.getElementById('g-usuario').value = g.usuario;
+  document.getElementById('g-senha').value = g.senha;
+  document.getElementById('g-form-title').textContent = '✏️ Editando Gestor';
+  popularSetoresGestor();
+  document.getElementById('panel-gestores').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ===================== FOTO DE PERFIL =====================
-function previewFoto(inputId, previewId, hiddenId) {
-  const file = document.getElementById(inputId).files[0];
-  if (!file) return;
-  if (file.size > 1 * 1024 * 1024) return toastMsg('Foto muito grande! Máximo: 1MB.', 'error');
-  const reader = new FileReader();
-  reader.onload = e => {
-    const base64 = e.target.result;
-    document.getElementById(hiddenId).value = base64;
-    const prev = document.getElementById(previewId);
-    prev.style.backgroundImage = `url('${base64}')`;
-    prev.style.backgroundSize = 'cover';
-    prev.style.backgroundPosition = 'center';
-    prev.style.borderRadius = '50%';
-    prev.style.border = '3px solid var(--primary)';
-    prev.innerHTML = '';
-  };
-  reader.readAsDataURL(file);
+async function deletarGestor(id) {
+  if (!confirm('Excluir este gestor permanentemente?')) return;
+  let lista = DB.gestores().filter(function(g) { return g.id !== id; });
+  await DB.saveGestores(lista);
+  await DB.deleteGestor(id);
+  renderGestores();
+  toastMsg('Gestor excluído.');
 }
 
-// ===================== PROGRAMAÇÃO DE FÉRIAS =====================
-let fpTipoPeriodo = 0;
-
-function selecionarTipoPeriodoNova(tipo) {
-  fpTipoPeriodo = tipo;
-  document.querySelectorAll('#fp-periodos-grid .periodo-option').forEach(o => o.classList.remove('selected'));
-  document.getElementById('fp-per-' + tipo).classList.add('selected');
-
-  const diasPorPeriodo = tipo === 1 ? [30] : tipo === 2 ? [15, 15] : [10, 10, 10];
-  const section = document.getElementById('fp-datas-section');
-  section.style.display = 'block';
-
-  let html = '<div class="periodo-dates-section">';
-  diasPorPeriodo.forEach((dias, i) => {
-    const num = i + 1;
-    html += `
-      <div class="periodo-date-group">
-        <label>${num}º Período — ${dias} dias</label>
-        <div class="form-row cols-2" style="margin:0">
-          <div class="field" style="margin:0">
-            <label style="font-size:.72rem;color:var(--muted)">Início *</label>
-            <input id="fp-inicio-${num}" type="date" oninput="calcularFimPeriodoNova(${num}, ${dias})">
-          </div>
-          <div class="field" style="margin:0">
-            <label style="font-size:.72rem;color:var(--muted)">Fim (auto)</label>
-            <input id="fp-fim-${num}" type="date" readonly style="opacity:.6">
-          </div>
-        </div>
-      </div>
-    `;
-  });
-  section.innerHTML = html;
+function renderGestores() {
+  const tbody = document.getElementById('tbody-gestores');
+  if (!tbody) return;
+  const gestores = DB.gestores();
+  if (!gestores.length) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:40px">Nenhum gestor cadastrado.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = gestores.map(function(g) {
+    return '<tr><td><strong>' + esc(g.nome) + '</strong></td><td>' + esc(g.usuario) + '</td><td>' + ((g.setores||[]).map(function(s) { return '<span class="tag tag-blue" style="margin:2px">' + esc(s) + '</span>'; }).join(' ') || '-') + '</td><td><button class="btn btn-ghost btn-sm" onclick="editarGestor(\'' + g.id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarGestor(\'' + g.id + '\')">🗑️</button></td></tr>';
+  }).join('');
 }
 
-function calcularFimPeriodoNova(num, dias) {
-  const inicio = document.getElementById('fp-inicio-' + num).value;
-  if (!inicio) return;
-  const fim = addDays(inicio, dias - 1);
-  document.getElementById('fp-fim-' + num).value = fim;
-}
-
+// ===================== PROGRAMACOES =====================
 function popularSelectServidor() {
   const sel = document.getElementById('fp-servidor');
   if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Selecione...</option>' + DB.servidores().sort((a,b)=>a.nome.localeCompare(b.nome)).map(s => `<option value="${s.id}" ${s.id===cur?'selected':''}>${s.nome} (${s.matricula})</option>`).join('');
+  const servidores = getServidoresAcessiveis();
+  sel.innerHTML = '<option value="">Selecione...</option>' + servidores.map(function(s) { return '<option value="' + s.id + '">' + esc(s.nome) + ' (Mat. ' + esc(s.matricula) + ')</option>'; }).join('');
+}
+
+function selecionarTipoPeriodoNova(num) {
+  document.querySelectorAll('#fp-periodos-grid .periodo-option').forEach(function(b) { b.classList.remove('active'); });
+  const el = document.getElementById('fp-per-' + num);
+  if (el) el.classList.add('active');
+  const section = document.getElementById('fp-datas-section');
+  section.style.display = 'block';
+  section.innerHTML = '';
+  for (let i = 1; i <= num; i++) {
+    section.innerHTML += '<div style="margin-bottom:12px;padding:12px;border:1px solid var(--border);border-radius:var(--r-sm)"><label style="font-weight:700;font-size:.82rem;display:block;margin-bottom:8px">Período ' + i + '</label><div style="display:flex;gap:12px;align-items:center"><div class="field" style="margin:0;flex:1"><label>Data Início</label><input type="date" id="fp-data-ini-' + i + '"></div><div class="field" style="margin:0;flex:1"><label>Data Fim</label><input type="date" id="fp-data-fim-' + i + '"></div></div></div>';
+  }
+}
+
+function limparFormFerias() {
+  document.getElementById('fp-servidor').value = '';
+  document.getElementById('fp-tipo').value = 'anual';
+  document.getElementById('fp-periodo').value = '';
+  document.getElementById('fp-obs').value = '';
+  document.getElementById('fp-datas-section').innerHTML = '';
+  document.getElementById('fp-datas-section').style.display = 'none';
+  document.querySelectorAll('#fp-periodos-grid .periodo-option').forEach(function(b) { b.classList.remove('active'); });
 }
 
 async function salvarProgramacao() {
   const srvId = document.getElementById('fp-servidor').value;
   const tipo = document.getElementById('fp-tipo').value;
-  const periodoRef = document.getElementById('fp-periodo').value;
-  const obs = document.getElementById('fp-obs').value;
-
-  if (!srvId) return toastMsg('Selecione o servidor!', 'error');
-  if (fpTipoPeriodo === 0) return toastMsg('Selecione o tipo de parcelamento!', 'error');
-
-  const diasPorPeriodo = fpTipoPeriodo === 1 ? [30] : fpTipoPeriodo === 2 ? [15, 15] : [10, 10, 10];
-  const novasProg = [];
-
-  for (let i = 1; i <= diasPorPeriodo.length; i++) {
-    const inicio = document.getElementById('fp-inicio-' + i).value;
-    const fim = document.getElementById('fp-fim-' + i).value;
-    if (!inicio) return toastMsg(`Informe o início do ${i}º período!`, 'error');
-    
-    novasProg.push({
-      id: uid(),
-      srvId,
-      tipo,
-      periodoRef,
-      inicio,
-      fim,
-      obs: obs + (diasPorPeriodo.length > 1 ? ` (Período ${i}/${diasPorPeriodo.length})` : ''),
-      status: 'programado',
+  const periodo = document.getElementById('fp-periodo').value.trim();
+  const obs = document.getElementById('fp-obs').value.trim();
+  if (!srvId || !tipo) { toastMsg('Selecione o servidor e o tipo de férias.', 'error'); return; }
+  const perSel = document.querySelector('#fp-periodos-grid .periodo-option.active');
+  if (!perSel) { toastMsg('Selecione o tipo de parcelamento.', 'error'); return; }
+  const numPeriodos = parseInt((perSel.id || '').replace('fp-per-', '')) || 1;
+  const datas = [];
+  for (let i = 1; i <= numPeriodos; i++) {
+    const ini = document.getElementById('fp-data-ini-' + i)?.value;
+    const fim = document.getElementById('fp-data-fim-' + i)?.value;
+    if (!ini || !fim) { toastMsg('Preencha as datas do período ' + i + '.', 'error'); return; }
+    datas.push({ inicio: ini, fim: fim });
+  }
+  const programacoes = DB.programacoes();
+  datas.forEach(function(d, i) {
+    programacoes.push({
+      id: uid(12),
+      srvId: srvId,
+      tipo: tipo,
+      periodo: periodo,
+      inicio: d.inicio,
+      fim: d.fim,
+      retorno: addDays(d.fim, 1),
+      obs: obs,
       concluido: false,
+      parcelamento: numPeriodos,
+      parcela: i + 1,
       criadoEm: new Date().toISOString()
     });
-  }
-
-  // ==== DETECTOR DE CONFLITOS (MESMA FUNÇÃO + SETOR) ====
-  const conflitos = verificarConflitosSetorFuncao(srvId, novasProg.map(np => ({ inicio: np.inicio, fim: np.fim })));
-  if (conflitos.length > 0) {
-    const srvTarget = DB.servidores().find(s => s.id === srvId);
-    const msg = `⚠️ ALERTA DE CONFLITO — ${srvTarget?.setor || ''} / ${srvTarget?.cargo || 'sem função'}\n\n` +
-                `Servidores da mesma função e setor já ausentes no período:\n\n` +
-                conflitos.map(c => `• ${c}`).join('\n') +
-                `\n\nDeseja salvar esta programação mesmo assim?`;
-    if (!confirm(msg)) return;
-  }
-  // ===============================================================
-
-  let lista = DB.programacoes();
-  lista.push(...novasProg);
-  await DB.saveProgramacoes(lista);
-
+  });
+  await DB.saveProgramacoes(programacoes);
+  toastMsg('Férias programadas com sucesso!');
   limparFormFerias();
   renderProgramacoes();
   atualizarBadge();
-  toastMsg(`${novasProg.length} período(s) de férias programado(s)!`);
-  DB.saveLog('Programação', `Programou férias para (SrvID: ${srvId}): ${novasProg.length} período(s)`, 'programacoes', srvId);
-}
-
-function limparFormFerias() {
-  const srv = document.getElementById('fp-servidor');
-  if (srv) srv.value = '';
-  const tipo = document.getElementById('fp-tipo');
-  if (tipo) tipo.value = 'anual';
-  const per = document.getElementById('fp-periodo');
-  if (per) per.value = '';
-  const obs = document.getElementById('fp-obs');
-  if (obs) obs.value = '';
-  
-  fpTipoPeriodo = 0;
-  document.querySelectorAll('#fp-periodos-grid .periodo-option').forEach(o => o.classList.remove('selected'));
-  const section = document.getElementById('fp-datas-section');
-  if (section) {
-    section.style.display = 'none';
-    section.innerHTML = '';
-  }
+  renderDashboard();
 }
 
 function renderProgramacoes() {
-  let lista = DB.programacoes().reverse();
-  const busca = document.getElementById('fp-busca-nome')?.value.toLowerCase().trim();
-  const servidores = DB.servidores();
   const container = document.getElementById('lista-programacoes');
-
-  if (busca) {
-    lista = lista.filter(p => {
-      const srv = servidores.find(s => s.id === p.srvId);
-      return srv?.nome.toLowerCase().includes(busca) || srv?.matricula?.includes(busca);
-    });
-  } else {
-    lista = lista.slice(0, 10);
+  if (!container) return;
+  const busca = (document.getElementById('fp-busca-nome')?.value || '').toLowerCase();
+  const programacoes = getProgramacoesAcessiveis();
+  const servidores = DB.servidores();
+  const filtradas = programacoes.filter(function(p) {
+    if (!busca) return true;
+    const srv = servidores.find(function(s) { return s.id === p.srvId; });
+    return srv && (srv.nome.toLowerCase().includes(busca) || srv.matricula.includes(busca));
+  }).sort(function(a, b) { return new Date(b.criadoEm || b.inicio) - new Date(a.criadoEm || a.inicio); });
+  if (!filtradas.length) {
+    container.innerHTML = '<div class="empty"><div class="icon">📅</div><p>' + (busca ? 'Nenhuma programação encontrada.' : 'Nenhuma programação cadastrada.') + '</p></div>';
+    return;
   }
-
-  if (!lista.length) { 
-    container.innerHTML = `<div class="empty"><div class="icon">🔍</div><p>${busca ? 'Nenhum servidor encontrado com este nome.' : 'Nenhuma programação cadastrada.'}</p></div>`; 
-    return; 
-  }
-  
-  const hojeIso = new Date().toISOString().split('T')[0];
-
-  container.innerHTML = lista.map(p => {
-    const srv = servidores.find(s => s.id === p.srvId);
-    const retorno = p.fim ? addDays(p.fim, 1) : '';
-    const status = p.status || (p.concluido ? 'concluido' : 'programado');
-    
-    // Lógica de "Em Gozo" automática
-    const emGozo = status !== 'concluido' && p.inicio <= hojeIso && p.fim >= hojeIso;
-    
-    let statusClass = 'tag-blue';
-    let statusLabel = '📅 Programado';
-    let btnIcon = 'fa-pen-nib';
-    let btnTitle = 'Confirmar Assinatura';
-    let btnClass = 'btn-ghost';
-
-    if (status === 'assinou') {
-      statusClass = 'tag-warn';
-      statusLabel = '✍️ Assinou';
-      btnIcon = 'fa-check-double';
-      btnTitle = 'Concluir / Dar Baixa';
-      btnClass = 'btn-primary';
-    } else if (status === 'concluido') {
-      statusClass = 'tag-green';
-      statusLabel = '✅ Concluído';
-      btnIcon = 'fa-rotate-left';
-      btnTitle = 'Resetar Status';
-      btnClass = 'btn-success';
-    }
-
-    return `
-      <div class="card" style="margin-bottom:12px;padding:16px; border-left: 4px solid ${emGozo ? 'var(--success)' : 'transparent'}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start">
-          <div style="flex:1">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:4px">
-               <h4 style="font-size:.9rem;margin:0">${esc(srv?.nome || 'Servidor')}</h4>
-               ${emGozo ? '<span class="tag tag-green" style="animation: pulse 2s infinite; font-size:10px">🌴 EM GOZO HOJE</span>' : ''}
-            </div>
-            <div style="font-size:.78rem;color:var(--muted)">
-              <i class="fa-solid fa-calendar"></i> <strong>${fmtDate(p.inicio)}</strong> → <strong>${fmtDate(p.fim)}</strong>
-              <span style="margin-left:8px;color:var(--success);font-weight:600">Retorno: ${fmtDate(retorno)}</span>
-            </div>
-            <div style="margin-top:8px; display:flex; gap:6px; flex-wrap:wrap">
-              <span class="tag ${p.tipo==='anual'?'tag-blue':'tag-purple'}">${p.tipo==='anual'?'🌴 Anual':'🏆 Prêmio'}</span>
-              ${p.periodoRef ? `<span class="tag tag-warn">Ref: ${esc(p.periodoRef)}</span>` : ''}
-              <span class="tag ${statusClass}">${statusLabel}</span>
-            </div>
-            ${(() => {
-              if (!p.obs) return '';
-              const parsed = parseFolgaObs(p.obs);
-              const tagCob = parsed.coberturaNome ? `<br style="margin-bottom:4px"><span class="tag tag-purple" style="display:inline-block;margin-top:4px">👥 Substituto (Cobertura): ${esc(parsed.coberturaNome)}</span>` : '';
-              return `<div style="font-size:.75rem;color:var(--muted);margin-top:8px;background:rgba(0,0,0,0.1);padding:6px;border-radius:6px">📝 ${esc(parsed.obs || '-')}${tagCob}</div>`;
-            })()}
-          </div>
-          <div style="display:flex;gap:6px">
-            <button class="btn ${btnClass} btn-sm" onclick="avancarStatusProg('${p.id}')" title="${btnTitle}">
-              <i class="fa-solid ${btnIcon}"></i>
-            </button>
-            <button class="btn btn-ghost btn-sm" onclick="abrirEditarProg('${p.id}')" title="Editar"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-danger btn-sm" onclick="excluirProg('${p.id}')" title="Excluir"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </div>
-      </div>
-    `;
+  container.innerHTML = filtradas.map(function(p) {
+    const srv = servidores.find(function(s) { return s.id === p.srvId; });
+    const diff = diffDays(p.inicio);
+    const sit = diff < 0 ? 'Concluída' : diff === 0 ? 'Iniciando HOJE' : diff <= 10 ? 'Urgente' : diff <= 35 ? 'Próxima' : 'Agendada';
+    const cls = diff < 0 ? 'tag-green' : diff === 0 ? 'tag-red' : diff <= 10 ? 'tag-red' : diff <= 35 ? 'tag-warn' : 'tag-blue';
+    return '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><strong>' + esc(srv?.nome || 'Servidor removido') + '</strong><div style="font-size:.78rem;color:var(--muted)">' + (p.tipo === 'anual' ? '🌴 Férias Anuais' : '🏆 Férias Prêmio') + ' · ' + fmtDate(p.inicio) + ' → ' + fmtDate(p.fim || p.inicio) + ' · Retorno: ' + fmtDate(p.retorno || addDays(p.fim || p.inicio, 1)) + '</div><div style="font-size:.75rem;color:var(--muted)">Período: ' + (p.periodo || '-') + '</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tag ' + cls + '">' + sit + '</span><button class="btn btn-danger btn-sm" onclick="excluirProgRel(\'' + p.id + '\')">🗑️</button></div></div>';
   }).join('');
 }
 
-async function excluirProg(id) {
-  if (!confirm('Excluir esta programação?')) return;
-  
-  // 1. Apaga do Supabase
-  await DB.deleteProgramacao(id);
-
-  // 2. Apaga localmente
-  const novaLista = DB.programacoes().filter(p => p.id !== id);
-  _remoteData.programacoes = novaLista;
-  localStorage.setItem('srv_programacoes', JSON.stringify(novaLista));
-
-  renderProgramacoes();
-  renderAlertas(); // Atualiza contadores do Dashboard
-  renderDashboard();
-  atualizarBadge();
-  toastMsg('Programação excluída permanentemente.');
-  DB.saveLog('Exclusão', `Excluiu uma programação de férias (ID: ${id})`, 'programacoes', id);
-}
-
-async function avancarStatusProg(id) {
-  const lista = DB.programacoes();
-  const idx = lista.findIndex(p => p.id === id);
-  if (idx < 0) return;
-  
-  const statusAtual = lista[idx].status || (lista[idx].concluido ? 'concluido' : 'programado');
-  
-  if (statusAtual === 'programado') {
-    lista[idx].status = 'assinou';
-    lista[idx].concluido = false;
-    toastMsg('Status atualizado: Servidor assinou a autorização! ✍️');
-  } else if (statusAtual === 'assinou') {
-    lista[idx].status = 'concluido';
-    lista[idx].concluido = true;
-    toastMsg('Status atualizado: Férias concluídas / Baixa dada! ✅');
-  } else {
-    lista[idx].status = 'programado';
-    lista[idx].concluido = false;
-    toastMsg('Status resetado para Programado.');
-  }
-  
-  await DB.saveProgramacoes(lista);
-  renderProgramacoes();
-  renderDashboard();
-  atualizarBadge();
-}
-
-// ===================== EDITAR PROGRAMAÇÃO =====================
-function abrirEditarProg(id) {
-  const p = DB.programacoes().find(x => x.id === id);
-  if (!p) return;
-  // Popular select de servidores
-  const srvSel = document.getElementById('ep-servidor');
-  srvSel.innerHTML = '<option value="">Selecione...</option>' +
-    DB.servidores().map(s => `<option value="${s.id}" ${s.id === p.srvId ? 'selected' : ''}>${s.nome} (${s.matricula})</option>`).join('');
-  document.getElementById('ep-id').value = id;
-  document.getElementById('ep-tipo').value = p.tipo;
-  document.getElementById('ep-periodo').value = p.periodo || '';
-  document.getElementById('ep-inicio').value = p.inicio;
-  document.getElementById('ep-fim').value = p.fim || '';
-  document.getElementById('ep-obs').value = p.obs || '';
-  
-  // Adicionar seletor de status na edição se não existir
-  let statusEl = document.getElementById('ep-status');
-  if (statusEl) statusEl.value = p.status || (p.concluido ? 'concluido' : 'programado');
-  
-  recalcRetornoEdicao();
-  document.getElementById('modal-editar-prog').classList.add('open');
-}
-
-function recalcRetornoEdicao() {
-  const inicio = document.getElementById('ep-inicio').value;
-  const elDisp = document.getElementById('ep-retorno-display');
-  if (!inicio) { elDisp.style.display = 'none'; return; }
-  const fim = addDays(inicio, 29);
-  const retorno = addDays(inicio, 30);
-  document.getElementById('ep-fim').value = fim;
-  elDisp.style.display = 'block';
-  elDisp.textContent = `📅 Data de Retorno: ${fmtDate(retorno)} (30 dias corridos)`;
-}
-
-async function salvarEdicaoProg() {
-  const id = document.getElementById('ep-id').value;
-  const srvId = document.getElementById('ep-servidor').value;
-  const inicio = document.getElementById('ep-inicio').value;
-  if (!srvId) return toastMsg('Selecione o servidor!', 'error');
-  if (!inicio) return toastMsg('Informe a data de início!', 'error');
-  
-  const novaFim = document.getElementById('ep-fim').value;
-
-  // ==== DETECTOR DE CONFLITOS (MESMA FUNÇÃO + SETOR) ====
-  const conflitos = verificarConflitosSetorFuncao(srvId, [{ inicio, fim: novaFim }]);
-  if (conflitos.length > 0) {
-    const srvTarget = DB.servidores().find(s => s.id === srvId);
-    const msg = `⚠️ ALERTA DE CONFLITO — ${srvTarget?.setor || ''} / ${srvTarget?.cargo || 'sem função'}\n\n` +
-                `Servidores da mesma função e setor já ausentes no período:\n\n` +
-                conflitos.map(c => `• ${c}`).join('\n') +
-                `\n\nDeseja salvar esta edição mesmo assim?`;
-    if (!confirm(msg)) return;
-  }
-  // ===============================================================
-
-  let lista = DB.programacoes();
-  const idx = lista.findIndex(p => p.id === id);
-  if (idx < 0) return;
-  lista[idx] = {
-    ...lista[idx],
-    srvId,
-    tipo: document.getElementById('ep-tipo').value,
-    periodo: document.getElementById('ep-periodo').value,
-    inicio,
-    fim: document.getElementById('ep-fim').value,
-    retorno: addDays(inicio, 30),
-    obs: document.getElementById('ep-obs').value,
-    status: document.getElementById('ep-status')?.value || 'programado',
-    concluido: document.getElementById('ep-status')?.value === 'concluido'
-  };
-  await DB.saveProgramacoes(lista);
-  fecharModal('modal-editar-prog');
-  renderProgramacoes();
-  renderDashboard();
-  atualizarBadge();
-  toastMsg('Programação atualizada!');
-  DB.saveLog('Edição', `Atualizou programação de férias (ID: ${id})`, 'programacoes', id);
-}
-
-// ===================== DASHBOARD & GRAFICOS =====================
-let dashboardCharts = { ferias: null, setores: null, folgas: null };
-
-function renderDashboard() {
-  removerSkeletonsCharts();
-  const servidores = getServidoresAcessiveis();
-  const programacoes = getProgramacoesAcessiveis();
-  const folgas = getFolgasAcessiveis();
-  const painelVisivel = document.getElementById('panel-alertas')?.classList.contains('active');
-
-  // Se o painel estiver visível, renderiza os gráficos normalmente
-  if (painelVisivel) {
-    // 1. Férias por Mês (Próximos 6 meses)
-    const hoje = new Date();
-    const labelsMeses = [];
-    const dadosMeses = [];
-    const nomesMeses = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
-
-    for (let i = 0; i < 6; i++) {
-      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
-      const m = d.getMonth();
-      const y = d.getFullYear();
-      labelsMeses.push(`${nomesMeses[m]}/${y.toString().slice(-2)}`);
-
-      const count = programacoes.filter(p => {
-        const pDate = new Date(p.inicio + 'T00:00:00');
-        return pDate.getMonth() === m && pDate.getFullYear() === y;
-      }).length;
-      dadosMeses.push(count);
+// ===================== AUDITORIA =====================
+async function renderAuditoria() {
+  const tbody = document.getElementById('tbody-auditoria');
+  if (!tbody) return;
+  tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px">Carregando logs...</td></tr>';
+  try {
+    const logs = await DB.getLogs(100);
+    if (!logs.length) {
+      tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px">Nenhum registro de auditoria encontrado.</td></tr>';
+      return;
     }
-
-    // 2. Distribuição por Setor
-    const setoresMap = {};
-    servidores.forEach(s => {
-      const setor = s.setor || 'Não Informado';
-      setoresMap[setor] = (setoresMap[setor] || 0) + 1;
-    });
-    const labelsSetores = Object.keys(setoresMap);
-    const dadosSetores = Object.values(setoresMap);
-
-    // 3. Maiores Saldos de Folga (Top 10)
-    const saldos = servidores.map(s => {
-      const saldo = saldoFolgas(s.id);
-      return { nome: s.nome, saldo };
-    }).filter(s => s.saldo > 0).sort((a,b) => b.saldo - a.saldo).slice(0, 10);
-
-    const labelsFolgas = saldos.map(s => s.nome.split(' ')[0]);
-    const dadosFolgas = saldos.map(s => s.saldo);
-
-    // Renderização
-    renderChart('chart-ferias-mes', 'bar', labelsMeses, dadosMeses, 'Férias', 'ferias', '#4d7bff');
-    renderChart('chart-setores', 'doughnut', labelsSetores, dadosSetores, 'Servidores', 'setores');
-    renderChart('chart-folgas-saldo', 'bar', labelsFolgas, dadosFolgas, 'Dias', 'folgas', '#0fd488');
+    tbody.innerHTML = logs.map(function(l) {
+      const dt = l.criadoEm ? new Date(l.criadoEm) : null;
+      const dataStr = dt ? dt.toLocaleDateString('pt-BR') + ' ' + dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '-';
+      return '<tr><td style="white-space:nowrap">' + dataStr + '</td><td>' + esc(l.usuarioNome || l.usuarioId || '-') + '</td><td>' + esc(l.acao || '-') + '</td><td style="font-size:.82rem;color:var(--muted)">' + esc(l.detalhes || '') + '</td></tr>';
+    }).join('');
+  } catch (e) {
+    tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:40px;color:var(--danger)">Erro ao carregar logs.</td></tr>';
   }
-
-  renderResumoAlertas();
-  renderAlertas();
-
-  const statTotal = document.getElementById('stat-total');
-  if (statTotal) statTotal.textContent = servidores.length;
-}
-
-function renderChart(canvasId, type, labels, data, label, key, color) {
-  const el = document.getElementById(canvasId);
-  if (!el || typeof Chart === 'undefined') return;
-  const ctx = el.getContext('2d');
-  
-  if (dashboardCharts[key]) dashboardCharts[key].destroy();
-  
-  const options = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: { display: type === 'doughnut', position: 'bottom', labels: { color: '#9aaac4', font: { size: 10, family: 'Sora' }, usePointStyle: true, padding: 15 } },
-      tooltip: { backgroundColor: '#141929', titleFont: { family: 'Sora' }, bodyFont: { family: 'Sora' }, borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1 }
-    },
-    scales: type === 'bar' ? {
-      y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }, ticks: { color: '#526080', font: { size: 10, family: 'DM Mono' } } },
-      x: { grid: { display: false }, ticks: { color: '#9aaac4', font: { size: 10, family: 'Sora' } } }
-    } : {}
-  };
-
-  dashboardCharts[key] = new Chart(ctx, {
-    type,
-    data: {
-      labels,
-      datasets: [{
-        label,
-        data,
-        backgroundColor: type === 'doughnut' 
-          ? ['#4d7bff', '#8557f5', '#0fd488', '#f5b731', '#ff4d6a', '#526080', '#00d2ff', '#3a7bd5']
-          : color + 'dd',
-        borderColor: type === 'doughnut' ? '#141929' : color,
-        borderWidth: type === 'doughnut' ? 2 : 1,
-        borderRadius: type === 'bar' ? 6 : 0,
-        hoverOffset: 4
-      }]
-    },
-    options
-  });
 }
 
 function renderResumoAlertas() {
@@ -7254,6 +6777,15 @@ function renderListaSetores() {
       <span class="remove-tag" onclick="removerSetor('${s}')" title="Remover">&times;</span>
     </div>
   `).join('');
+}
+
+function getTodosSetores() {
+  const cfg = DB.config();
+  const configSetores = cfg.setores || [];
+  const servSetores = DB.servidores().map(function(s) { return s.setor; }).filter(Boolean);
+  const todos = [...new Set(configSetores.concat(servSetores))];
+  todos.sort(function(a, b) { return a.localeCompare(b); });
+  return todos;
 }
 
 function atualizarSelectsSetores() {
@@ -9679,6 +9211,74 @@ function atualizarBadgeFolgas() {
   badge.style.display = temNeg ? 'inline-block' : 'none';
 }
 
+function parseFolgaObs(str) {
+  const result = { coberturaNome: null, coberturaId: null, obs: str || '' };
+  if (!str) return result;
+  const match = str.match(/^\[Cobertura:\s*(.+?)\s*\(ID:\s*(.+?)\)\]\s*(.*)/);
+  if (match) {
+    result.coberturaNome = match[1];
+    result.coberturaId = match[2];
+    result.obs = match[3] || '';
+  }
+  return result;
+}
+
+function temAusenciaNoPeriodo(srvId, inicio, fim) {
+  const programacoes = getProgramacoesAcessiveis().filter(function(p) { return p.srvId === srvId; });
+  for (let i = 0; i < programacoes.length; i++) {
+    const p = programacoes[i];
+    if (p.inicio <= fim && (p.fim || p.inicio) >= inicio) return true;
+  }
+  const folgas = getFolgasAcessiveis().filter(function(f) { return f.srvId === srvId && f.tipo === 'debito'; });
+  for (let i = 0; i < folgas.length; i++) {
+    const f = folgas[i];
+    if (f.dataItems) {
+      for (let j = 0; j < f.dataItems.length; j++) {
+        if (f.dataItems[j].data >= inicio && f.dataItems[j].data <= fim) return true;
+      }
+    } else if (f.data) {
+      const datas = f.data.split(',').map(function(x) { return x.trim(); });
+      for (let j = 0; j < datas.length; j++) {
+        if (datas[j] >= inicio && datas[j] <= fim) return true;
+      }
+    }
+  }
+  return false;
+}
+
+function verificarConflitosSetorFuncao(srvId, periodos) {
+  const srv = DB.servidores().find(function(s) { return s.id === srvId; });
+  if (!srv || !srv.setor || !srv.cargo) return [];
+  const conflitos = [];
+  const outros = DB.servidores().filter(function(s) { return s.id !== srvId && s.setor === srv.setor && s.cargo === srv.cargo; });
+  for (let i = 0; i < outros.length; i++) {
+    const outro = outros[i];
+    const progs = getProgramacoesAcessiveis().filter(function(p) { return p.srvId === outro.id; });
+    for (let j = 0; j < periodos.length; j++) {
+      const pIni = periodos[j].inicio || periodos[j].data;
+      const pFim = periodos[j].fim || periodos[j].data;
+      if (progs.some(function(p) { return p.inicio <= pFim && (p.fim || p.inicio) >= pIni && !p.concluido; })) {
+        conflitos.push(outro.nome + ' (' + outro.setor + ') — ausente de ' + fmtDate(pIni) + ' a ' + fmtDate(pFim));
+        break;
+      }
+    }
+    const folgas = DB.folgas().filter(function(f) { return f.srvId === outro.id && f.tipo === 'debito'; });
+    for (let j = 0; j < periodos.length; j++) {
+      const pIni = periodos[j].inicio || periodos[j].data;
+      const pFim = periodos[j].fim || periodos[j].data;
+      if (folgas.some(function(f) {
+        if (f.dataItems) return f.dataItems.some(function(di) { return di.data >= pIni && di.data <= pFim; });
+        if (f.data) return f.data.split(',').map(function(x) { return x.trim(); }).some(function(d) { return d >= pIni && d <= pFim; });
+        return false;
+      })) {
+        conflitos.push(outro.nome + ' (' + outro.setor + ') — folga de ' + fmtDate(pIni) + ' a ' + fmtDate(pFim));
+        break;
+      }
+    }
+  }
+  return conflitos;
+}
+
 // ===================== BANCO DE HORAS (SEM PAGAS) =====================
 function renderBancoHoras() {
   const hoje = new Date();
@@ -11572,10 +11172,713 @@ function abrirModalAusencias(cell) {
 
   modal.classList.add('open');
 }
+
+// ===================== EVENTOS & VEÍCULOS MODULE =====================
+// Categorias profissionais padrão
+const CATEGORIAS_PROFISSIONAIS = [
+  'Médico', 'Enfermeiro', 'Técnico de Enfermagem', 'Dentista',
+  'Técnico em Saúde Bucal', 'Fisioterapeuta', 'Psicólogo',
+  'Assistente Social', 'Farmacêutico', 'Nutricionista',
+  'Agente Comunitário de Saúde', 'Agente de Combate às Endemias',
+  'Motorista', 'Condutor de Ambulância', 'Vigilante',
+  'Administrativo', 'Recepcionista', 'Auxiliar de Serviços Gerais',
+  'Coordenador', 'Outro'
+];
+
+// ---- DATA STORAGE ----
+let _eventosData = JSON.parse(localStorage.getItem('srv_eventos') || '[]');
+let _veiculosData = JSON.parse(localStorage.getItem('srv_veiculos') || '[]');
+
+function salvarEventosStorage() {
+  DB.saveEventos(_eventosData);
+}
+function salvarVeiculosStorage() {
+  DB.saveVeiculos(_veiculosData);
+}
+
+// ---- VEÍCULOS (painel independente) ----
+function renderVeiculos() {
+  const container = document.getElementById('lista-veiculos');
+  if (!container) return;
+  if (_veiculosData.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div>';
+    return;
+  }
+  container.innerHTML = _veiculosData.map(v => `
+    <div class="ev-list-item completo">
+      <div class="ev-list-header">
+        <div>
+          <div class="ev-list-nome">🚗 ${esc(v.nome)}</div>
+          <div class="ev-list-meta">${esc(v.placa||'-')} · ${esc(v.modelo||'-')} · ${esc(v.cor||'-')}</div>
+          ${v.obs ? `<div style="font-size:0.75rem;color:var(--muted);margin-top:4px">${esc(v.obs)}</div>` : ''}
+        </div>
+        <div class="ev-list-actions">
+          <button class="btn btn-ghost btn-sm" onclick="editarVeiculo('${v.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirVeiculo('${v.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function salvarVeiculo() {
+  const id = document.getElementById('veic-id').value;
+  const nome = document.getElementById('veic-nome').value.trim();
+  if (!nome) return toastMsg('Informe o nome do veículo.', 'warning');
+
+  const dados = {
+    nome,
+    placa: document.getElementById('veic-placa').value.trim(),
+    modelo: document.getElementById('veic-modelo').value.trim(),
+    cor: document.getElementById('veic-cor').value.trim(),
+    obs: document.getElementById('veic-obs').value.trim(),
+    criadoEm: new Date().toISOString()
+  };
+
+  if (id) {
+    const idx = _veiculosData.findIndex(v => v.id === id);
+    if (idx >= 0) { _veiculosData[idx] = { ..._veiculosData[idx], ...dados }; }
+    toastMsg('Veículo atualizado!', 'success');
+  } else {
+    dados.id = uid();
+    _veiculosData.push(dados);
+    toastMsg('Veículo cadastrado!', 'success');
+  }
+  salvarVeiculosStorage();
+  limparFormVeiculo();
+  renderVeiculos();
+  popularSelectVeiculos('ev-veiculo');
+  if (document.getElementById('ev-sub-veiculos')?.style.display !== 'none') renderVeiculosSub();
+}
+
+function editarVeiculo(id) {
+  const v = _veiculosData.find(v => v.id === id);
+  if (!v) return;
+  document.getElementById('veic-id').value = v.id;
+  document.getElementById('veic-nome').value = v.nome;
+  document.getElementById('veic-placa').value = v.placa || '';
+  document.getElementById('veic-modelo').value = v.modelo || '';
+  document.getElementById('veic-cor').value = v.cor || '';
+  document.getElementById('veic-obs').value = v.obs || '';
+  document.getElementById('panel-veiculos').scrollIntoView({ behavior: 'smooth' });
+}
+
+function excluirVeiculo(id) {
+  if (!confirm('Excluir este veículo?')) return;
+  _veiculosData = _veiculosData.filter(v => v.id !== id);
+  salvarVeiculosStorage();
+  renderVeiculos();
+  popularSelectVeiculos('ev-veiculo');
+  if (document.getElementById('ev-sub-veiculos')?.style.display !== 'none') renderVeiculosSub();
+}
+
+function limparFormVeiculo() {
+  document.getElementById('veic-id').value = '';
+  document.getElementById('veic-nome').value = '';
+  document.getElementById('veic-placa').value = '';
+  document.getElementById('veic-modelo').value = '';
+  document.getElementById('veic-cor').value = '';
+  document.getElementById('veic-obs').value = '';
+}
+
+function popularSelectVeiculos(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Nenhum</option>' +
+    _veiculosData.map(v => `<option value="${v.id}">${esc(v.nome)}${v.placa ? ' ('+esc(v.placa)+')' : ''}</option>`).join('');
+  if (atual) sel.value = atual;
+}
+
+// ---- VEÍCULOS (sub-painel dentro de Eventos) ----
+function renderVeiculosSub() {
+  const container = document.getElementById('ev-sub-lista-veiculos');
+  if (!container) return;
+  renderVeiculosNoContainer(container);
+}
+
+function renderVeiculosNoContainer(container) {
+  if (_veiculosData.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">🚗</div><p>Nenhum veículo.</p></div>';
+    return;
+  }
+  container.innerHTML = _veiculosData.map(v => `
+    <div class="ev-list-item completo" style="cursor:default">
+      <div class="ev-list-header">
+        <div>
+          <div class="ev-list-nome">🚗 ${esc(v.nome)}</div>
+          <div class="ev-list-meta">${esc(v.placa||'-')} · ${esc(v.modelo||'-')} · ${esc(v.cor||'-')}</div>
+        </div>
+        <div class="ev-list-actions">
+          <button class="btn btn-danger btn-sm" onclick="excluirVeiculoSub('${v.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function salvarVeiculoEv() {
+  const nome = document.getElementById('ev-veic-nome').value.trim();
+  if (!nome) return toastMsg('Informe o nome do veículo.', 'warning');
+  const dados = {
+    id: uid(),
+    nome,
+    placa: document.getElementById('ev-veic-placa').value.trim(),
+    modelo: document.getElementById('ev-veic-modelo').value.trim(),
+    cor: document.getElementById('ev-veic-cor').value.trim(),
+    obs: document.getElementById('ev-veic-obs').value.trim(),
+    criadoEm: new Date().toISOString()
+  };
+  _veiculosData.push(dados);
+  salvarVeiculosStorage();
+  limparFormVeiculoEv();
+  renderVeiculosSub();
+  popularSelectVeiculos('ev-veiculo');
+  toastMsg('Veículo cadastrado!', 'success');
+}
+
+function excluirVeiculoSub(id) {
+  if (!confirm('Excluir este veículo?')) return;
+  _veiculosData = _veiculosData.filter(v => v.id !== id);
+  salvarVeiculosStorage();
+  renderVeiculosSub();
+  popularSelectVeiculos('ev-veiculo');
+}
+
+function limparFormVeiculoEv() {
+  document.getElementById('ev-veic-nome').value = '';
+  document.getElementById('ev-veic-placa').value = '';
+  document.getElementById('ev-veic-modelo').value = '';
+  document.getElementById('ev-veic-cor').value = '';
+  document.getElementById('ev-veic-obs').value = '';
+}
+
+// ---- SUBTAB NAVIGATION (dentro do painel Eventos) ----
+function toggleEvSubtab(subtab, btn) {
+  document.querySelectorAll('#ev-subtabs .ev-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  document.getElementById('ev-sub-eventos').style.display = subtab === 'eventos' ? '' : 'none';
+  document.getElementById('ev-sub-veiculos').style.display = subtab === 'veiculos' ? '' : 'none';
+  if (subtab === 'veiculos') renderVeiculosSub();
+  if (subtab === 'eventos') popularSelectVeiculos('ev-veiculo');
+}
+
+// ---- EVENTOS ----
+let _evCategorias = [{ categoria: '', quantidade: 1 }];
+
+function uid(size = 8) {
+  return Math.random().toString(36).substring(2, 2 + size) + Date.now().toString(36);
+}
+
+function renderEventos() {
+  popularSelectVeiculos('ev-veiculo');
+  const container = document.getElementById('lista-eventos');
+  if (!container) return;
+  const busca = (document.getElementById('ev-busca')?.value || '').toLowerCase();
+  const filtroStatus = document.getElementById('ev-filtro-status')?.value || '';
+
+  let lista = _eventosData;
+  if (busca) lista = lista.filter(e => e.nome.toLowerCase().includes(busca) || (e.local||'').toLowerCase().includes(busca));
+  if (filtroStatus) lista = lista.filter(e => e.status === filtroStatus);
+  lista.sort((a, b) => new Date(b.data) - new Date(a.data));
+
+  if (lista.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">📅</div><p>Nenhum evento encontrado.</p></div>';
+    return;
+  }
+
+  const profNomes = {};
+  const servList = DB.servidores();
+  servList.forEach(s => { profNomes[s.id] = s.nome; });
+
+  container.innerHTML = lista.map(e => {
+    const categoriasOk = (e.categoriasNecessarias || []).every(c => {
+      const qtd = (c.quantidade || 0);
+      const escalados = (e.profissionais || []).filter(p => p.categoria === c.categoria).length;
+      return qtd === 0 || escalados >= qtd;
+    });
+    const status = categoriasOk ? 'completo' : 'incompleto';
+    const profsHtml = (e.profissionais || []).map(p =>
+      `<span class="tag ${p.tipoPagamento === 'dinheiro' ? 'tag-warn' : 'tag-green'}" style="margin:2px">${esc(profNomes[p.srvId] || '?')} (${esc(p.categoria)})${p.diasFolga ? ' 🌴'+p.diasFolga+'d' : ''}${p.valorHE ? ' 💰'+p.valorHE+'h' : ''}</span>`
+    ).join('');
+
+    const veicNome = e.veiculoId ? (_veiculosData.find(v => v.id === e.veiculoId)?.nome || '?') : null;
+
+    return `<div class="ev-list-item ${status}" onclick="editarEvento('${e.id}')">
+      <div class="ev-list-header">
+        <div>
+          <div class="ev-list-nome">${status === 'completo' ? '✅' : '🔴'} ${esc(e.nome)}</div>
+          <div class="ev-list-meta">
+            <span>📅 ${e.data}</span>
+            <span>⏰ ${e.hrInicio} - ${e.hrTermino}</span>
+            ${e.local ? `<span>📍 ${esc(e.local)}</span>` : ''}
+            ${veicNome ? `<span>🚗 ${esc(veicNome)}</span>` : ''}
+          </div>
+          ${profsHtml ? `<div style="margin-top:6px">${profsHtml}</div>` : ''}
+          ${!categoriasOk ? `<div class="ev-list-faltam">⚠️ Faltam profissionais em alguma categoria</div>` : ''}
+        </div>
+        <div class="ev-list-actions">
+          <button class="btn btn-ghost btn-sm" onclick="event.stopPropagation();imprimirEvento('${e.id}')">🖨️</button>
+          <button class="btn btn-danger btn-sm" onclick="event.stopPropagation();excluirEvento('${e.id}')">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function addCategoriaRow(cat, qtd) {
+  const container = document.getElementById('ev-categorias-container');
+  const div = document.createElement('div');
+  div.className = 'ev-cat-row';
+  const idx = container.children.length;
+  div.innerHTML = `
+    <select id="ev-cat-${idx}" onchange="atualizarCategorias()">
+      <option value="">Selecione...</option>
+      ${CATEGORIAS_PROFISSIONAIS.map(c => `<option value="${c}" ${cat === c ? 'selected' : ''}>${c}</option>`).join('')}
+    </select>
+    <span style="font-size:0.72rem;color:var(--muted);font-weight:600">Qtd:</span>
+    <input type="number" id="ev-cat-qtd-${idx}" min="1" max="99" value="${qtd || 1}" onchange="atualizarCategorias()" style="width:55px">
+    <span class="ev-cat-remove" onclick="this.parentElement.remove();atualizarCategorias()">✕</span>
+  `;
+  container.appendChild(div);
+  atualizarCategorias();
+}
+
+function atualizarCategorias() {
+  const container = document.getElementById('ev-categorias-container');
+  const rows = container.querySelectorAll('.ev-cat-row');
+  _evCategorias = [];
+  rows.forEach(row => {
+    const sel = row.querySelector('select');
+    const qtd = row.querySelector('input[type=number]');
+    if (sel && sel.value) {
+      _evCategorias.push({ categoria: sel.value, quantidade: parseInt(qtd?.value || 1) });
+    }
+  });
+  popularSelectCategoriasProf();
+  renderProfissionaisEvento();
+}
+
+function popularSelectCategoriasProf() {
+  const sel = document.getElementById('ev-add-cat');
+  if (!sel) return;
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    _evCategorias.map(c => `<option value="${c.categoria}">${c.categoria}</option>`).join('');
+  if (atual) sel.value = atual;
+}
+
+function toggleEvPagtoCampos() {
+  const tipo = document.getElementById('ev-add-pagto').value;
+  const label = document.getElementById('ev-add-qtd-label');
+  const input = document.getElementById('ev-add-qtd');
+  if (tipo === 'dinheiro') {
+    label.textContent = 'Horas Extras';
+    input.placeholder = 'Ex: 4';
+    input.step = '0.5';
+  } else {
+    label.textContent = 'Dias de Folga';
+    input.placeholder = '';
+    input.step = '0.5';
+  }
+}
+
+function toggleEvPagtoCamposEdit() {
+  const tipo = document.getElementById('eprof-pagto').value;
+  const label = document.getElementById('eprof-qtd-label');
+  const input = document.getElementById('eprof-qtd');
+  if (tipo === 'dinheiro') {
+    label.textContent = 'Horas Extras';
+    input.placeholder = 'Ex: 4';
+    input.step = '0.5';
+  } else {
+    label.textContent = 'Dias de Folga';
+    input.placeholder = '';
+    input.step = '0.5';
+  }
+}
+
+function abrirAddProfissional(categoria) {
+  document.getElementById('ev-add-prof-area').style.display = 'block';
+  document.getElementById('ev-add-cat').value = categoria || '';
+  popularSelectServidoresProf();
+  popularSelectCategoriasProf();
+  if (categoria) document.getElementById('ev-add-cat').value = categoria;
+}
+
+function cancelarAddProfissional() {
+  document.getElementById('ev-add-prof-area').style.display = 'none';
+}
+
+function popularSelectServidoresProf() {
+  const sel = document.getElementById('ev-add-srv');
+  if (!sel) return;
+  const servidores = DB.servidores();
+  const atual = sel.value;
+  sel.innerHTML = '<option value="">Selecione...</option>' +
+    servidores.map(s => `<option value="${s.id}">${esc(s.nome)} (${esc(s.matricula)})</option>`).join('');
+  if (atual) sel.value = atual;
+}
+
+function adicionarProfissionalEvento() {
+  const srvId = document.getElementById('ev-add-srv').value;
+  const categoria = document.getElementById('ev-add-cat').value;
+  const tipoPagto = document.getElementById('ev-add-pagto').value;
+  const qtd = parseFloat(document.getElementById('ev-add-qtd').value) || 0;
+
+  if (!srvId) return toastMsg('Selecione um profissional.', 'warning');
+  if (!categoria) return toastMsg('Selecione a categoria.', 'warning');
+
+  // Verificar se já existe
+  if ((_eventoEditingProf || []).some(p => p.srvId === srvId)) {
+    return toastMsg('Este profissional já está escalado neste evento.', 'warning');
+  }
+
+  // Verificar conflito de data/horário
+  const data = document.getElementById('ev-data').value;
+  const hrInicio = document.getElementById('ev-hr-inicio').value;
+  const hrFim = document.getElementById('ev-hr-fim').value;
+  const evId = document.getElementById('ev-id').value;
+
+  if (data && hrInicio && hrFim) {
+    const conflito = verificarConflitoProfissional(srvId, data, hrInicio, hrFim, evId);
+    if (conflito) {
+      return toastMsg(`⚠️ ${conflito}`, 'error');
+    }
+  }
+
+  const prof = { srvId, categoria, tipoPagamento: tipoPagto };
+  if (tipoPagto === 'folga') prof.diasFolga = qtd;
+  else prof.valorHE = qtd;
+
+  _eventoEditingProf.push(prof);
+  renderProfissionaisEvento();
+  cancelarAddProfissional();
+}
+
+function removerProfissionalEvento(idx) {
+  _eventoEditingProf.splice(idx, 1);
+  renderProfissionaisEvento();
+}
+
+function editarProfEvento(idx) {
+  const p = _eventoEditingProf[idx];
+  if (!p) return;
+  document.getElementById('eprof-idx').value = idx;
+  document.getElementById('eprof-pagto').value = p.tipoPagamento || 'folga';
+  document.getElementById('eprof-qtd').value = p.diasFolga || p.valorHE || 1;
+  toggleEvPagtoCamposEdit();
+  document.getElementById('modal-editar-prof-event').classList.add('open');
+}
+
+function salvarEdicaoProfEvento() {
+  const idx = parseInt(document.getElementById('eprof-idx').value);
+  const p = _eventoEditingProf[idx];
+  if (!p) return;
+  const tipo = document.getElementById('eprof-pagto').value;
+  const qtd = parseFloat(document.getElementById('eprof-qtd').value) || 0;
+  p.tipoPagamento = tipo;
+  if (tipo === 'folga') { p.diasFolga = qtd; delete p.valorHE; }
+  else { p.valorHE = qtd; delete p.diasFolga; }
+  _eventoEditingProf[idx] = p;
+  renderProfissionaisEvento();
+  fecharModal('modal-editar-prof-event');
+  toastMsg('Profissional atualizado!', 'success');
+}
+
+let _eventoEditingProf = [];
+
+function renderProfissionaisEvento() {
+  const container = document.getElementById('ev-profissionais-lista');
+  if (!container) return;
+  const servidores = DB.servidores();
+  const srvMap = {};
+  servidores.forEach(s => { srvMap[s.id] = s; });
+
+  // Verificar categorias incompletas
+  const catCount = {};
+  _eventoEditingProf.forEach(p => {
+    catCount[p.categoria] = (catCount[p.categoria] || 0) + 1;
+  });
+  const catNeeded = {};
+  _evCategorias.forEach(c => { catNeeded[c.categoria] = c.quantidade; });
+
+  if (_eventoEditingProf.length === 0) {
+    container.innerHTML = '<div class="empty" style="padding:12px"><p>Nenhum profissional escalado ainda.</p></div>';
+  } else {
+    container.innerHTML = _eventoEditingProf.map((p, i) => {
+      const srv = srvMap[p.srvId];
+      const nome = srv ? srv.nome : '?';
+      const setor = srv ? (srv.setor || '') : '';
+      const needed = catNeeded[p.categoria] || 0;
+      const actual = catCount[p.categoria] || 0;
+      const ok = actual >= needed;
+    const pagtoInfo = p.tipoPagamento === 'dinheiro'
+      ? (p.valorHE ? `💰 ${p.valorHE}h extra` : '💰 Voluntário')
+      : (p.diasFolga ? `🌴 ${p.diasFolga} dias de folga` : '🌴 Voluntário');
+      return `<div class="ev-prof-item" style="${!ok ? 'border-left:3px solid var(--danger)' : ''}">
+        <div class="ev-prof-info">
+          <div class="ev-prof-nome">${esc(nome)}</div>
+          <div class="ev-prof-cat">${esc(p.categoria)} ${setor ? '· '+esc(setor) : ''} · ${pagtoInfo}</div>
+        </div>
+        <span class="ev-prof-remove" onclick="editarProfEvento(${i})" title="Editar">✏️</span>
+        <span class="ev-prof-remove" onclick="removerProfissionalEvento(${i})" title="Remover">✕</span>
+      </div>`;
+    }).join('');
+  }
+
+  // Botão "Adicionar Profissional" para cada categoria (sempre mostra se precisar)
+  const addBtns = _evCategorias.map(c => {
+    const actual = catCount[c.categoria] || 0;
+    const needed = c.quantidade;
+    if (actual >= needed) return '';
+    return `<button class="btn btn-ghost btn-sm" onclick="abrirAddProfissional('${c.categoria}')" style="margin-top:4px;margin-right:6px">
+      ➕ ${c.categoria} (${actual}/${needed})
+    </button>`;
+  }).filter(Boolean).join('');
+
+  if (addBtns) {
+    container.innerHTML += `<div style="margin-top:8px">${addBtns}</div>`;
+  }
+}
+
+function verificarConflitoProfissional(srvId, data, hrInicio, hrFim, evIdIgnore) {
+  const eventos = _eventosData.filter(e => e.id !== evIdIgnore && e.data === data);
+  for (const e of eventos) {
+    if (!e.hrInicio || !e.hrTermino) continue;
+    // Conflito se horários se sobrepõem
+    if (hrInicio < e.hrTermino && hrFim > e.hrInicio) {
+      if ((e.profissionais || []).some(p => p.srvId === srvId)) {
+        const srv = DB.servidores().find(s => s.id === srvId);
+        return `"${srv ? srv.nome : '?'}" já está escalado em "${e.nome}" neste mesmo dia/horário.`;
+      }
+    }
+  }
+  return null;
+}
+
+function creditarFolgaAutomatica(srvId, dias, eventoNome) {
+  if (!dias || dias <= 0) return;
+  const folga = {
+    id: uid(),
+    srvId,
+    tipo: 'credito',
+    data: new Date().toISOString().split('T')[0],
+    qtd: dias,
+    motivo: `Evento: ${eventoNome}`,
+    criadoEm: new Date().toISOString()
+  };
+  const folgas = DB.folgas();
+  folgas.push(folga);
+  DB.saveFolgas(folgas, [folga]);
+}
+
+function salvarEvento() {
+  const id = document.getElementById('ev-id').value;
+  const nome = document.getElementById('ev-nome').value.trim();
+  const data = document.getElementById('ev-data').value;
+  const hrInicio = document.getElementById('ev-hr-inicio').value;
+  const hrFim = document.getElementById('ev-hr-fim').value;
+
+  if (!nome) return toastMsg('Informe o nome do evento.', 'warning');
+  if (!data) return toastMsg('Informe a data do evento.', 'warning');
+  if (!hrInicio) return toastMsg('Informe o horário de início.', 'warning');
+  if (!hrFim) return toastMsg('Informe o horário de término.', 'warning');
+
+  // Verificar categorias
+  const categorias = _evCategorias.filter(c => c.categoria && c.quantidade > 0);
+  if (categorias.length === 0) return toastMsg('Adicione ao menos uma categoria de profissional.', 'warning');
+
+  // Verificar se há profissionais para todas as categorias necessárias
+  const profCount = {};
+  _eventoEditingProf.forEach(p => {
+    profCount[p.categoria] = (profCount[p.categoria] || 0) + 1;
+  });
+  const catFaltando = categorias.filter(c => (profCount[c.categoria] || 0) < c.quantidade);
+  const status = catFaltando.length === 0 ? 'completo' : 'incompleto';
+
+  // Verificar conflitos
+  for (const p of _eventoEditingProf) {
+    const conflito = verificarConflitoProfissional(p.srvId, data, hrInicio, hrFim, id);
+    if (conflito) return toastMsg(conflito, 'error');
+  }
+
+  const dados = {
+    nome,
+    data,
+    hrInicio,
+    hrFim,
+    local: document.getElementById('ev-local').value.trim(),
+    descricao: document.getElementById('ev-desc').value.trim(),
+    categoriasNecessarias: categorias,
+    profissionais: _eventoEditingProf,
+    veiculoId: document.getElementById('ev-veiculo').value || null,
+    status,
+    criadoEm: new Date().toISOString()
+  };
+
+  if (id) {
+    const eventoAntigo = _eventoEditingProf || [];
+    const idx = _eventosData.findIndex(e => e.id === id);
+    if (idx >= 0) {
+      _eventosData[idx] = { ..._eventosData[idx], ...dados };
+      toastMsg('Evento atualizado!', 'success');
+    }
+  } else {
+    dados.id = uid();
+    // Creditar folgas automaticamente
+    _eventoEditingProf.forEach(p => {
+      if (p.tipoPagamento === 'folga' && p.diasFolga) {
+        creditarFolgaAutomatica(p.srvId, p.diasFolga, nome);
+      }
+    });
+    _eventosData.push(dados);
+    toastMsg('Evento cadastrado!', 'success');
+  }
+  salvarEventosStorage();
+  limparFormEvento();
+  renderEventos();
+  atualizarBadgeEventos();
+}
+
+function editarEvento(id) {
+  const e = _eventosData.find(e => e.id === id);
+  if (!e) return;
+  document.getElementById('ev-id').value = e.id;
+  document.getElementById('ev-nome').value = e.nome;
+  document.getElementById('ev-data').value = e.data;
+  document.getElementById('ev-hr-inicio').value = e.hrInicio;
+  document.getElementById('ev-hr-fim').value = e.hrFim;
+  document.getElementById('ev-local').value = e.local || '';
+  document.getElementById('ev-desc').value = e.descricao || '';
+  if (e.veiculoId) document.getElementById('ev-veiculo').value = e.veiculoId;
+
+  document.getElementById('ev-form-title').textContent = 'Editar Evento';
+  document.getElementById('ev-btn-imprimir').style.display = 'inline-flex';
+
+  // Carregar categorias
+  const container = document.getElementById('ev-categorias-container');
+  container.innerHTML = '';
+  (e.categoriasNecessarias || []).forEach(c => addCategoriaRow(c.categoria, c.quantidade));
+
+  // Carregar profissionais
+  _eventoEditingProf = JSON.parse(JSON.stringify(e.profissionais || []));
+  renderProfissionaisEvento();
+
+  // Scroll para o formulário
+  document.getElementById('panel-eventos').scrollIntoView({ behavior: 'smooth' });
+}
+
+function excluirEvento(id) {
+  if (!confirm('Excluir este evento?')) return;
+  _eventosData = _eventosData.filter(e => e.id !== id);
+  salvarEventosStorage();
+  renderEventos();
+  atualizarBadgeEventos();
+  toastMsg('Evento excluído.', 'info');
+}
+
+function limparFormEvento() {
+  document.getElementById('ev-id').value = '';
+  document.getElementById('ev-nome').value = '';
+  document.getElementById('ev-data').value = '';
+  document.getElementById('ev-hr-inicio').value = '';
+  document.getElementById('ev-hr-fim').value = '';
+  document.getElementById('ev-local').value = '';
+  document.getElementById('ev-desc').value = '';
+  document.getElementById('ev-veiculo').value = '';
+  document.getElementById('ev-form-title').textContent = 'Novo Evento';
+  document.getElementById('ev-btn-imprimir').style.display = 'none';
+  document.getElementById('ev-categorias-container').innerHTML = '';
+  _evCategorias = [];
+  _eventoEditingProf = [];
+  renderProfissionaisEvento();
+  // Adicionar uma linha de categoria vazia
+  addCategoriaRow();
+}
+
+function atualizarBadgeEventos() {
+  const incompletos = _eventosData.filter(e => e.status === 'incompleto').length;
+  const badge = document.getElementById('badge-eventos');
+  if (badge) {
+    badge.textContent = incompletos;
+    badge.style.display = incompletos > 0 ? 'inline-flex' : 'none';
+    badge.style.background = incompletos > 0 ? 'var(--danger)' : 'var(--accent)';
+  }
+}
+
+// ---- IMPRIMIR EVENTO ----
+function imprimirEvento(id) {
+  const e = id
+    ? _eventosData.find(e => e.id === id)
+    : _eventosData.find(e => e.id === document.getElementById('ev-id').value);
+  if (!e) return toastMsg('Selecione um evento para imprimir.', 'warning');
+
+  const servidores = DB.servidores();
+  const srvMap = {};
+  servidores.forEach(s => { srvMap[s.id] = s; });
+  const veic = e.veiculoId ? _veiculosData.find(v => v.id === e.veiculoId) : null;
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <html><head><title>Evento: ${esc(e.nome)}</title>
+    <style>
+      body { font-family: Arial, sans-serif; padding: 40px; color: #222; }
+      h1 { font-size: 22px; margin-bottom: 5px; }
+      .header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
+      .info { margin-bottom: 20px; }
+      .info td { padding: 4px 12px 4px 0; font-size: 14px; }
+      .info td:first-child { font-weight: 700; color: #555; }
+      table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+      th { background: #eee; padding: 8px 10px; text-align: left; font-size: 12px; text-transform: uppercase; }
+      td { padding: 8px 10px; border-bottom: 1px solid #ddd; font-size: 13px; }
+      .footer { margin-top: 40px; border-top: 1px solid #ccc; padding-top: 15px; font-size: 11px; color: #888; text-align: center; }
+      .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; margin:1px; }
+      .tag-green { background:#d4edda; color:#155724; }
+      .tag-warn { background:#fff3cd; color:#856404; }
+      @media print { body { padding: 20px; } }
+    </style></head><body>
+    <div class="header">
+      <h1>📅 ${esc(e.nome)}</h1>
+      <div style="color:#666;margin-top:4px">${e.data} | ${e.hrInicio} - ${e.hrTermino}${e.local ? ' | '+esc(e.local) : ''}</div>
+    </div>
+    <table class="info">
+      ${e.descricao ? `<tr><td>Descrição:</td><td>${esc(e.descricao)}</td></tr>` : ''}
+      ${veic ? `<tr><td>Veículo:</td><td>🚗 ${esc(veic.nome)} ${veic.placa ? '('+esc(veic.placa)+')' : ''} ${veic.modelo ? '- '+esc(veic.modelo) : ''}</td></tr>` : ''}
+      <tr><td>Status:</td><td>${e.status === 'completo' ? '✅ Completo' : '🔴 Incompleto'}</td></tr>
+    </table>
+    <h3 style="margin-top:25px">👥 Profissionais Escalados</h3>
+    <table>
+      <thead><tr><th>Profissional</th><th>Categoria</th><th>Pagamento</th></tr></thead>
+      <tbody>
+        ${(e.profissionais || []).map(p => {
+          const srv = srvMap[p.srvId];
+          const nome = srv ? srv.nome : '?';
+          const pagto = p.tipoPagamento === 'dinheiro'
+            ? `<span class="tag tag-warn">💰 ${p.valorHE}h extras</span>`
+            : `<span class="tag tag-green">🌴 ${p.diasFolga} dias de folga</span>`;
+          return `<tr><td>${esc(nome)}</td><td>${esc(p.categoria)}</td><td>${pagto}</td></tr>`;
+        }).join('')}
+      </tbody>
+    </table>
+    <div class="footer">
+      Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão APS<br>
+      ${e.nome} - ${e.data}
+    </div>
+    <script>window.onload=function(){window.print();}<\/script>
+    </body></html>
+  `);
+  win.document.close();
+}
+
+// Badge de eventos incompletos
+atualizarBadgeEventos();
 </script>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container" class="toast-container"></div>
+
+</div> <!-- close app-container -->
 
 </body>
 </html>
