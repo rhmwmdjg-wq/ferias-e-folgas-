@@ -4514,9 +4514,10 @@ async function syncComSupabase(silencioso = false) {
   });
 
   await syncTabela('configuracoes', 'chave,valor', (data) => {
-    const configObj = {};
+    const localCfg = JSON.parse(localStorage.getItem('srv_config') || '{}');
+    const configObj = { ...localCfg };
     data.forEach(item => {
-      if (!item.chave.startsWith('img_')) {
+      if (!item.chave.startsWith('img_') && !(item.chave in localCfg)) {
         let val = item.valor;
         if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
           try {
@@ -5513,8 +5514,139 @@ function getFolgasAcessiveis() {
   return folgas;
 }
 
+var _chartsInstances = {};
+
 function renderDashboard() {
   renderAlertas();
+  renderCharts();
+}
+
+function renderCharts() {
+  Object.values(_chartsInstances).forEach(c => { try { c.destroy(); } catch(e) {} });
+  _chartsInstances = {};
+  removerSkeletonsCharts();
+
+  const isDark = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim().toLowerCase() !== '#f8fafc';
+  const textoColor = isDark ? '#e6ecf8' : '#1e293b';
+  const gridColor = isDark ? 'rgba(80,105,200,0.12)' : 'rgba(0,0,0,0.06)';
+
+  // Dados
+  const programacoes = getProgramacoesAcessiveis().filter(p => !p.concluido);
+  const servidores = getServidoresAcessiveis();
+  const folgas = getFolgasAcessiveis();
+  const hoje = new Date();
+
+  // --- 1. Férias por Mês (próximos 6 meses) ---
+  (function() {
+    const el = document.getElementById('chart-ferias-mes');
+    if (!el) return;
+    const meses = [];
+    for (let i = 0; i < 6; i++) {
+      const d = new Date(hoje.getFullYear(), hoje.getMonth() + i, 1);
+      meses.push({ label: MESES_PT[d.getMonth()] + '/' + d.getFullYear(), idx: d.getMonth(), ano: d.getFullYear(), count: 0 });
+    }
+    programacoes.forEach(p => {
+      const d = new Date(p.inicio + 'T12:00:00');
+      for (const m of meses) {
+        if (d.getMonth() === m.idx && d.getFullYear() === m.ano) { m.count++; break; }
+      }
+    });
+    _chartsInstances['chart-ferias-mes'] = new Chart(el.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: meses.map(m => m.label),
+        datasets: [{
+          label: 'Programações',
+          data: meses.map(m => m.count),
+          backgroundColor: 'rgba(91, 127, 255, 0.5)',
+          borderColor: '#5b7fff',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: textoColor }, grid: { color: gridColor } },
+          y: { beginAtZero: true, ticks: { stepSize: 1, color: textoColor }, grid: { color: gridColor } }
+        }
+      }
+    });
+  })();
+
+  // --- 2. Distribuição por Setor ---
+  (function() {
+    const el = document.getElementById('chart-setores');
+    if (!el) return;
+    const setorCount = {};
+    servidores.forEach(s => {
+      const setor = s.setor || 'N/I';
+      setorCount[setor] = (setorCount[setor] || 0) + 1;
+    });
+    const entries = Object.entries(setorCount).sort((a, b) => b[1] - a[1]);
+    const top = entries.slice(0, 8);
+    const outros = entries.slice(8).reduce((acc, e) => acc + e[1], 0);
+    const labels = top.map(e => e[0]);
+    const data = top.map(e => e[1]);
+    if (outros > 0) { labels.push('Outros'); data.push(outros); }
+    const cores = ['#5b7fff','#ff6b6b','#48bb78','#f6ad55','#9f7aea','#4fd1c5','#fc8181','#68d391','#a0aec0'];
+    _chartsInstances['chart-setores'] = new Chart(el.getContext('2d'), {
+      type: 'doughnut',
+      data: {
+        labels: labels,
+        datasets: [{ data: data, backgroundColor: cores.slice(0, labels.length), borderWidth: 0 }]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { color: textoColor, boxWidth: 12, padding: 8, font: { size: 11 } } }
+        }
+      }
+    });
+  })();
+
+  // --- 3. Maiores Saldos de Folga ---
+  (function() {
+    const el = document.getElementById('chart-folgas-saldo');
+    if (!el) return;
+    const saldoMap = {};
+    folgas.forEach(f => {
+      const qtd = f.tipo === 'credito' ? (f.qtd || 0) : -(f.qtd || 0);
+      saldoMap[f.srvId] = (saldoMap[f.srvId] || 0) + qtd;
+    });
+    const comSaldo = Object.entries(saldoMap)
+      .map(([srvId, saldo]) => {
+        const srv = servidores.find(s => s.id === srvId);
+        return { srvId, saldo, nome: srv ? srv.nome : '?' };
+      })
+      .filter(x => x.saldo > 0)
+      .sort((a, b) => b.saldo - a.saldo)
+      .slice(0, 10);
+    _chartsInstances['chart-folgas-saldo'] = new Chart(el.getContext('2d'), {
+      type: 'bar',
+      data: {
+        labels: comSaldo.map(x => x.nome.length > 18 ? x.nome.slice(0, 16) + '..' : x.nome),
+        datasets: [{
+          label: 'Saldo (dias)',
+          data: comSaldo.map(x => x.saldo),
+          backgroundColor: 'rgba(72, 187, 120, 0.5)',
+          borderColor: '#48bb78',
+          borderWidth: 1,
+          borderRadius: 4
+        }]
+      },
+      options: {
+        indexAxis: 'y',
+        responsive: true, maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { beginAtZero: true, ticks: { color: textoColor, stepSize: 1 }, grid: { color: gridColor } },
+          y: { ticks: { color: textoColor, font: { size: 10 } }, grid: { color: gridColor } }
+        }
+      }
+    });
+  })();
 }
 
 // ===================== PAGINACAO =====================
