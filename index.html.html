@@ -5590,7 +5590,7 @@ const DB = {
     let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.from('eventos').upsert(d[i], { onConflict: 'id' });
+        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: d[i] });
         if (error) {
           if (isQuotaError(error)) { saveToSyncQueue('eventos', d[i]); }
           else { console.error("Erro Supabase (eventos):", error); todosOk = false; }
@@ -5606,8 +5606,10 @@ const DB = {
   },
   deleteEvento: async (id) => {
     try {
-      const { error } = await supabaseClient.from('eventos').delete().eq('id', id);
-      if (error) console.error("Erro Supabase ao deletar evento:", error);
+      const { error } = await supabaseClient.rpc('deletar_evento', { p_id: id });
+      if (error) { console.error("Erro Supabase ao deletar evento (RPC):", error); }
+      const { error: err2 } = await supabaseClient.from('eventos').delete().eq('id', id);
+      if (err2 && err2.code !== 'PGRST116') console.error("Erro Supabase ao deletar evento (direto):", err2);
     } catch (e) { console.error("Erro ao deletar evento:", e); }
   },
 
@@ -5618,7 +5620,7 @@ const DB = {
     let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.from('veiculos').upsert(d[i], { onConflict: 'id' });
+        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
         if (error && !isQuotaError(error)) {
           console.error("Erro Supabase (veiculos):", error);
           todosOk = false;
@@ -5640,8 +5642,10 @@ const DB = {
   },
   deleteVeiculo: async (id) => {
     try {
-      const { error } = await supabaseClient.from('veiculos').delete().eq('id', id);
-      if (error) console.error("Erro Supabase ao deletar veículo:", error);
+      const { error } = await supabaseClient.rpc('deletar_veiculo', { p_id: id });
+      if (error) { console.error("Erro Supabase ao deletar veículo (RPC):", error); }
+      const { error: err2 } = await supabaseClient.from('veiculos').delete().eq('id', id);
+      if (err2 && err2.code !== 'PGRST116') console.error("Erro Supabase ao deletar veículo (direto):", err2);
     } catch (e) { console.error("Erro ao deletar veículo:", e); }
   },
 
