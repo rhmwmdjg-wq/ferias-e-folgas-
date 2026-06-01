@@ -3317,6 +3317,10 @@ Coordenação de RH
             <option value="incompleto">🔴 Incompletos</option>
           </select>
         </div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+          <input id="ev-print-mes" type="month" style="background:var(--card);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:8px 10px;color:var(--text);font-family:var(--font);font-size:.82rem">
+          <button class="btn btn-primary btn-sm" onclick="imprimirEventosMes()">🖨️ Imprimir Eventos do Mês</button>
+        </div>
         <div id="lista-eventos"><div class="empty"><div class="icon">📅</div><p>Nenhum evento cadastrado.</p></div></div>
       </div>
     </div>
@@ -12843,6 +12847,91 @@ function imprimirEvento(id) {
     <script>window.onload=function(){window.print();}<\/script>
     </body></html>
   `);
+  win.document.close();
+}
+
+function imprimirEventosMes() {
+  const mesref = document.getElementById('ev-print-mes').value;
+  if (!mesref) { toastMsg('Selecione o mês/ano.', 'warning'); return; }
+  const mes = parseInt(mesref.split('-')[1]);
+  const ano = parseInt(mesref.split('-')[0]);
+  const filtrados = _eventosData.filter(e => {
+    if (!e.data) return false;
+    const d = new Date(e.data + 'T00:00:00');
+    return d.getMonth() + 1 === mes && d.getFullYear() === ano;
+  }).sort((a, b) => a.data.localeCompare(b.data));
+  if (!filtrados.length) { toastMsg('Nenhum evento neste mês.', 'info'); return; }
+
+  const servidores = DB.servidores();
+  const srvMap = {};
+  servidores.forEach(s => { srvMap[s.id] = s; });
+  const imgPrint = getImg('print');
+  const cfg = DB.config();
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+  let html = `
+  <html><head><title>Eventos - ${meses[mes-1]} ${ano}</title>
+  <style>
+    @page { margin: 12mm 8mm; }
+    body { font-family: Arial, sans-serif; padding: 20px; color: #222; font-size: 11px; }
+    .logo-area { text-align: center; margin-bottom: 10px; }
+    .logo-area img { max-height: 70px; max-width: 100%; object-fit: contain; }
+    h1 { text-align: center; font-size: 18px; margin-bottom: 4px; }
+    .subtitle { text-align: center; color: #555; font-size: 12px; margin-bottom: 20px; }
+    .evento { border: 1px solid #ccc; border-radius: 6px; padding: 12px; margin-bottom: 14px; page-break-inside: avoid; }
+    .evento h3 { margin: 0 0 6px; font-size: 14px; color: #1a3a5c; }
+    .evento .meta { font-size: 10px; color: #666; margin-bottom: 8px; }
+    table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+    th { background: #eee; padding: 5px 7px; text-align: left; font-size: 10px; text-transform: uppercase; }
+    td { padding: 5px 7px; border-bottom: 1px solid #ddd; font-size: 11px; }
+    .sig-area { text-align: center; margin-top: 40px; }
+    .sig-line { width: 280px; border-top: 1.5px solid #000; margin: 0 auto 6px; }
+    .sig-nome { font-weight: 700; font-size: 13px; }
+    .sig-cargo { font-size: 10px; color: #555; }
+    .footer { text-align: center; margin-top: 20px; font-size: 9px; color: #888; border-top: 1px solid #ccc; padding-top: 8px; }
+    @media print { body { padding: 10px; } }
+  </style></head><body>
+    ${imgPrint ? `<div class="logo-area"><img src="${imgPrint}"></div>` : ''}
+    <h1>Relatório Mensal de Eventos</h1>
+    <div class="subtitle">${orgNome} — ${meses[mes-1]} ${ano}</div>`;
+
+  for (const e of filtrados) {
+    const veic = e.veiculoId ? _veiculosData.find(v => v.id === e.veiculoId) : null;
+    html += `
+    <div class="evento">
+      <h3>📅 ${esc(e.nome)}</h3>
+      <div class="meta">${e.data} | ${e.hrInicio} - ${e.hrFim || e.hrTermino}${e.local ? ' | '+esc(e.local) : ''} | ${e.status === 'completo' ? '✅ Completo' : '🔴 Incompleto'}</div>
+      ${e.descricao ? '<div style="margin-bottom:6px;font-size:10px;color:#555">'+esc(e.descricao)+'</div>' : ''}
+      ${veic ? '<div style="margin-bottom:6px;font-size:10px;color:#555">🚗 '+esc(veic.nome)+(veic.placa ? ' ('+esc(veic.placa)+')' : '')+'</div>' : ''}
+      ${(e.profissionais || []).length ? `
+      <table>
+        <thead><tr><th>Profissional</th><th>Categoria</th></tr></thead>
+        <tbody>
+          ${e.profissionais.map(p => {
+            const srv = srvMap[p.srvId];
+            return `<tr><td>${esc(srv ? srv.nome : '?')}</td><td>${esc(p.categoria)}</td></tr>`;
+          }).join('')}
+        </tbody>
+      </table>` : '<div style="color:#999;font-size:10px">Nenhum profissional escalado.</div>'}
+    </div>`;
+  }
+
+  html += `
+    <div class="sig-area">
+      <div class="sig-line"></div>
+      <div class="sig-nome">RUAN PABLO FERREIRA DOS SANTOS</div>
+      <div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div>
+    </div>
+    <div class="footer">
+      ${esc(orgNome)}<br>
+      Relatório gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão
+    </div>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
   win.document.close();
 }
 
