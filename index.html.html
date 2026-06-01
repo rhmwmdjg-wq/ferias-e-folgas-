@@ -1476,6 +1476,31 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   margin-bottom: 14px;
 }
 
+#panel-ponto .ev-grid {
+  grid-template-columns: 1fr;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+#panel-ponto .ev-card {
+  width: 100%;
+}
+
+#panel-ponto .ev-top-bar {
+  max-width: 960px;
+  margin: 0 auto 16px auto;
+}
+
+#panel-ponto .section-title {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+#pt-sub-relatorio .ev-card {
+  max-width: 960px;
+  margin: 0 auto;
+}
 
 .ev-prof-item {
   display: flex;
@@ -3785,9 +3810,9 @@ Coordenação de RH
             <option value="mes">📅 Por Mês</option>
           </select>
         </div>
-        <div class="field" id="pt-rel-mes-field" style="display:none"><label>Mês/Ano *</label><input id="pt-rel-mes" type="month"></div>
+        <div class="field" id="pt-rel-mes-field" style="display:none"><label>Mês/Ano <span id="pt-rel-mes-label" style="color:var(--muted)">(opcional no Individual)</span></label><input id="pt-rel-mes" type="month"></div>
       </div>
-      <div id="pt-rel-individual">
+      <div id="pt-rel-individual" style="margin-top:12px">
         <div class="field"><label>Credenciado *</label><select id="pt-rel-credenciado"><option value="">Selecione...</option></select></div>
       </div>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
@@ -5565,7 +5590,7 @@ const DB = {
     let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: d[i] });
+        const { error } = await supabaseClient.from('eventos').upsert(d[i], { onConflict: 'id' });
         if (error) {
           if (isQuotaError(error)) { saveToSyncQueue('eventos', d[i]); }
           else { console.error("Erro Supabase (eventos):", error); todosOk = false; }
@@ -5581,8 +5606,9 @@ const DB = {
   },
   deleteEvento: async (id) => {
     try {
-      await supabaseClient.rpc('deletar_evento', { p_id: id });
-    } catch (e) { /* silent */ }
+      const { error } = await supabaseClient.from('eventos').delete().eq('id', id);
+      if (error) console.error("Erro Supabase ao deletar evento:", error);
+    } catch (e) { console.error("Erro ao deletar evento:", e); }
   },
 
   veiculos: () => _remoteData.veiculos.length ? _remoteData.veiculos : JSON.parse(localStorage.getItem('srv_veiculos') || '[]'),
@@ -5592,7 +5618,7 @@ const DB = {
     let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
+        const { error } = await supabaseClient.from('veiculos').upsert(d[i], { onConflict: 'id' });
         if (error && !isQuotaError(error)) {
           console.error("Erro Supabase (veiculos):", error);
           todosOk = false;
@@ -5614,8 +5640,9 @@ const DB = {
   },
   deleteVeiculo: async (id) => {
     try {
-      await supabaseClient.rpc('deletar_veiculo', { p_id: id });
-    } catch (e) { /* silent */ }
+      const { error } = await supabaseClient.from('veiculos').delete().eq('id', id);
+      if (error) console.error("Erro Supabase ao deletar veículo:", error);
+    } catch (e) { console.error("Erro ao deletar veículo:", e); }
   },
 
   // =================== PONTO CREDENCIADOS ===================
@@ -5705,7 +5732,9 @@ function esc(str) {
 
 function getImg(lado) {
   const cfg = DB.config();
-  return cfg['img_' + lado] || localStorage.getItem('srv_img_' + lado);
+  const val = cfg['img_' + lado];
+  if (val && val !== 'stored_locally') return val;
+  return localStorage.getItem('srv_img_' + lado);
 }
 
 // ===================== PONTO CREDENCIADOS =====================
@@ -6050,18 +6079,22 @@ async function excluirFechamento(id) {
 // =================== RELATÓRIOS / IMPRESSÃO ===================
 function togglePtRelTipo() {
   const tipo = document.getElementById('pt-rel-tipo').value;
-  document.getElementById('pt-rel-mes-field').style.display = tipo === 'mes' ? 'block' : 'none';
+  document.getElementById('pt-rel-mes-field').style.display = tipo === 'mes' || tipo === 'individual' ? 'block' : 'none';
   document.getElementById('pt-rel-individual').style.display = tipo === 'individual' ? 'block' : 'none';
+  const label = document.getElementById('pt-rel-mes-label');
+  if (label) label.style.display = tipo === 'individual' ? 'inline' : 'none';
 }
 
 function imprimirRelPonto() {
   const tipo = document.getElementById('pt-rel-tipo').value;
+  const mesref = document.getElementById('pt-rel-mes').value;
   if (tipo === 'individual') {
     const credId = document.getElementById('pt-rel-credenciado').value;
     if (!credId) { toastMsg('Selecione o credenciado.', 'warning'); return; }
-    imprimirRelPontoIndividual(credId);
+    const mes = mesref ? parseInt(mesref.split('-')[1]) : null;
+    const ano = mesref ? parseInt(mesref.split('-')[0]) : null;
+    imprimirRelPontoIndividual(credId, mes, ano);
   } else {
-    const mesref = document.getElementById('pt-rel-mes').value;
     if (!mesref) { toastMsg('Informe o mês/ano.', 'warning'); return; }
     const mes = parseInt(mesref.split('-')[1]);
     const ano = parseInt(mesref.split('-')[0]);
@@ -6069,14 +6102,17 @@ function imprimirRelPonto() {
   }
 }
 
-function imprimirRelPontoIndividual(credId) {
+function imprimirRelPontoIndividual(credId, filtroMes, filtroAno) {
   const creds = DB.credenciados();
   const cargos = DB.cargos();
   const pontos = DB.pontoMensal();
   const cred = creds.find(c => c.id === credId);
   if (!cred) return;
   const cargo = cargos.find(c => c.id === cred.cargoId);
-  const credPontos = pontos.filter(p => p.credenciadoId === credId);
+  let credPontos = pontos.filter(p => p.credenciadoId === credId);
+  if (filtroMes && filtroAno) {
+    credPontos = credPontos.filter(p => parseInt(p.mes) === filtroMes && parseInt(p.ano) === filtroAno);
+  }
   const cfg = DB.config();
   const logoEsq = getImg('print') || getImg('esq');
   const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
@@ -6108,12 +6144,16 @@ function imprimirRelPontoIndividual(credId) {
     <div class="info-grid">
       <div class="info-item"><label>Nome</label><span>${esc(cred.nome)}</span></div>
       <div class="info-item"><label>CPF</label><span>${esc(cred.cpf || '-')}</span></div>
+      <div class="info-item"><label>PIS/NIS</label><span>${esc(cred.pis || '-')}</span></div>
+      <div class="info-item"><label>Telefone</label><span>${esc(cred.tel || '-')}</span></div>
+      <div class="info-item"><label>E-mail</label><span>${esc(cred.email || '-')}</span></div>
+      <div class="info-item"><label>Endereço</label><span>${esc(cred.endereco || '-')}</span></div>
+      <div class="info-item"><label>Lotação</label><span>${esc(cred.lotacao || '-')}</span></div>
       <div class="info-item"><label>Cargo</label><span>${esc(cargo ? cargo.nome : '-')}</span></div>
       <div class="info-item"><label>Valor da Hora</label><span>R$ ${(cargo ? parseFloat(cargo.valorHora) : 0).toFixed(2)}</span></div>
-      <div class="info-item"><label>Lotação</label><span>${esc(cred.lotacao || '-')}</span></div>
       <div class="info-item"><label>Forma de Pagamento</label><span>${esc(cred.formaPagamento || '-')}</span></div>
       ${cred.formaPagamento === 'pix' && cred.chavePix ? '<div class="info-item"><label>Chave PIX</label><span>' + esc(cred.chavePix) + '</span></div>' : ''}
-      ${cred.formaPagamento === 'ted' ? '<div class="info-item"><label>Banco</label><span>' + esc(cred.banco || '-') + '</span></div><div class="info-item"><label>Agência/Conta</label><span>' + esc(cred.agencia || '-') + ' / ' + esc(cred.conta || '-') + '</span></div>' : ''}
+      ${cred.formaPagamento === 'ted' ? '<div class="info-item"><label>Banco</label><span>' + esc(cred.banco || '-') + '</span></div><div class="info-item"><label>Agência</label><span>' + esc(cred.agencia || '-') + '</span></div><div class="info-item"><label>Conta</label><span>' + esc(cred.conta || '-') + '</span></div><div class="info-item"><label>Tipo de Conta</label><span>' + esc(cred.tipoConta || '-') + '</span></div>' : ''}
     </div>`;
 
   if (credPontos.length) {
