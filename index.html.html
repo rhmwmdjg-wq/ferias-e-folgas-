@@ -1474,7 +1474,13 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
 .ev-card h3 {
   font-size: 0.86rem; font-weight: 700;
   margin-bottom: 14px;
-  display: flex; align-items: center; gap: 8px;
+}
+.pt-container {
+  max-width: 960px;
+  margin: 0 auto;
+}
+@media (max-width: 768px) {
+  .pt-container { max-width: 100%; }
 }
 
 .ev-prof-item {
@@ -1710,6 +1716,14 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
       <button class="tab-btn" onclick="showTab('veiculos')" id="tab-veiculos" style="margin-bottom:4px">
         <i class="fa-solid fa-truck"></i>
         <span class="tab-label">Veículos</span>
+      </button>
+
+      <!-- ===== Ponto Credenciados ===== -->
+      <div class="sidebar-section-label">Ponto Credenciados</div>
+      <button class="tab-btn" onclick="showTab('ponto')" id="tab-ponto" style="margin-bottom:4px">
+        <i class="fa-solid fa-clock"></i>
+        <span class="tab-label">Ponto Credenciados</span>
+        <span class="badge" id="badge-ponto" style="background:var(--accent);display:none">0</span>
       </button>
 
       <!-- ===== Relatórios ===== -->
@@ -3066,8 +3080,31 @@ Coordenação de RH
       <button class="btn btn-primary" onclick="migrarDadosParaSupabase()" style="background:var(--accent)">📤 Enviar dados locais para o Supabase</button>
       <p style="font-size:0.7rem; color:var(--muted); margin-top:8px">ℹ️ Após migrar, o sistema passará a ler e salvar tudo na nuvem.</p>
     </div>
-  </div> <!-- close panel-config -->
 
+    <!-- Ponto Credenciados -->
+    <div class="card" style="margin-top:20px">
+      <h3><span class="icon">⏱</span> Ponto dos Credenciados</h3>
+      <p style="font-size:.82rem;color:var(--muted);margin-bottom:14px">Gerencie cargos, credenciados e fechamentos mensais de ponto.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:20px;align-items:flex-start">
+        <div>
+          <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">📋 Cargos Cadastrados</label>
+          <span style="font-size:1.2rem;font-weight:700;color:var(--primary)" id="cfg-total-cargos">0</span>
+        </div>
+        <div>
+          <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">👤 Credenciados</label>
+          <span style="font-size:1.2rem;font-weight:700;color:var(--primary)" id="cfg-total-credenciados">0</span>
+        </div>
+        <div>
+          <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:6px">📊 Fechamentos</label>
+          <span style="font-size:1.2rem;font-weight:700;color:var(--primary)" id="cfg-total-fechamentos">0</span>
+        </div>
+        <div style="display:flex;gap:10px;align-items:flex-end;margin-left:auto">
+          <button class="btn btn-primary" onclick="showTab('ponto')">⏱ Ir para o Módulo</button>
+        </div>
+      </div>
+    </div>
+
+  </div> <!-- close panel-config -->
   <!-- ======================= ABA AUDITORIA ======================= -->
   <div class="tab-panel" id="panel-auditoria">
     <div class="section-title">📋 Logs de Auditoria</div>
@@ -3625,6 +3662,129 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ===================== PANEL PONTO CREDENCIADOS ===================== -->
+<div class="tab-panel" id="panel-ponto">
+  <div class="section-title">⏱ Ponto dos Credenciados</div>
+  <div class="ev-top-bar">
+    <div class="ev-tabs" id="pt-subtabs">
+      <button class="ev-tab active" onclick="togglePtSubtab('cargos',this)">📋 Cargos</button>
+      <button class="ev-tab" onclick="togglePtSubtab('credenciados',this)">👤 Credenciados</button>
+      <button class="ev-tab" onclick="togglePtSubtab('fechamento',this)">📊 Fechamento Mensal</button>
+      <button class="ev-tab" onclick="togglePtSubtab('relatorio',this)">🖨️ Relatórios</button>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Cargos -->
+  <div id="pt-sub-cargos" class="pt-container">
+    <div class="ev-grid">
+      <div class="ev-card">
+        <h3>✍️ <span id="cargo-form-title">Novo Cargo</span></h3>
+        <input type="hidden" id="cargo-id">
+        <div class="form-row cols-2">
+          <div class="field"><label>Nome do Cargo *</label><input id="cargo-nome" placeholder="Ex: Agente Administrativo"></div>
+          <div class="field"><label>Valor da Hora (R$) *</label><input id="cargo-valor" type="number" step="0.01" min="0" placeholder="Ex: 25.50"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="salvarCargo()">💾 Salvar</button>
+          <button class="btn btn-ghost" onclick="limparFormCargo()">🔄 Novo</button>
+        </div>
+      </div>
+      <div class="ev-card">
+        <h3>📋 Cargos Cadastrados</h3>
+        <div id="tabela-cargos" style="overflow-x:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Credenciados -->
+  <div id="pt-sub-credenciados" class="pt-container" style="display:none">
+    <div class="ev-grid">
+      <div class="ev-card">
+        <h3>✍️ <span id="cred-form-title">Novo Credenciado</span></h3>
+        <input type="hidden" id="cred-id">
+        <div class="form-row cols-2">
+          <div class="field"><label>Nome Completo *</label><input id="cred-nome" placeholder="Nome completo"></div>
+          <div class="field"><label>CPF *</label><input id="cred-cpf" placeholder="000.000.000-00"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>PIS/NIS</label><input id="cred-pis" placeholder="PIS/NIS"></div>
+          <div class="field"><label>Telefone</label><input id="cred-tel" placeholder="(99) 99999-9999"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
+          <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
+        </div>
+        <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>
+          <div class="field"><label>Forma de Pagamento *</label><select id="cred-pgto"><option value="">Selecione...</option><option value="pix">💳 PIX</option><option value="ted">🏦 TED</option><option value="dinheiro">💵 Dinheiro</option><option value="cheque">📄 Cheque</option></select></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="salvarCredenciado()">💾 Salvar</button>
+          <button class="btn btn-ghost" onclick="limparFormCredenciado()">🔄 Novo</button>
+        </div>
+      </div>
+      <div class="ev-card">
+        <h3>📋 Credenciados Cadastrados</h3>
+        <input id="busca-credenciado" class="input-filtro" placeholder="Buscar credenciado..." oninput="renderCredenciados()">
+        <div id="tabela-credenciados" style="overflow-x:auto;margin-top:10px"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Fechamento Mensal -->
+  <div id="pt-sub-fechamento" class="pt-container" style="display:none">
+    <div class="ev-grid">
+      <div class="ev-card">
+        <h3>📊 Registrar Fechamento Mensal</h3>
+        <input type="hidden" id="ponto-id">
+        <div class="form-row cols-2">
+          <div class="field"><label>Credenciado *</label><select id="ponto-credenciado" onchange="carregarDadosCredFechamento()"><option value="">Selecione...</option></select></div>
+          <div class="field"><label>Mês/Ano de Referência *</label><input id="ponto-mesref" type="month"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Cargo</label><input id="ponto-cargo" readonly style="opacity:.6;background:var(--card)"></div>
+          <div class="field"><label>Valor da Hora (R$)</label><input id="ponto-valor-hora" type="number" step="0.01" readonly style="opacity:.6;background:var(--card)"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Horas Trabalhadas *</label><input id="ponto-horas" type="number" step="0.5" min="0" oninput="calcularValorFechamento()" placeholder="Ex: 160"></div>
+          <div class="field"><label>Valor Total (R$)</label><input id="ponto-valor-total" type="text" readonly style="font-size:1rem;font-weight:700;color:var(--success);opacity:.7"></div>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="salvarFechamento()">💾 Salvar Fechamento</button>
+          <button class="btn btn-ghost" onclick="limparFormFechamento()">🔄 Novo</button>
+        </div>
+      </div>
+      <div class="ev-card">
+        <h3>📋 Fechamentos Registrados</h3>
+        <div id="tabela-fechamentos" style="overflow-x:auto"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sub-painel: Relatórios -->
+  <div id="pt-sub-relatorio" class="pt-container" style="display:none">
+    <div class="ev-card">
+      <h3>🖨️ Imprimir Relatório de Ponto</h3>
+      <div class="form-row cols-2">
+        <div class="field"><label>Tipo de Relatório *</label>
+          <select id="pt-rel-tipo" onchange="togglePtRelTipo()">
+            <option value="individual">👤 Individual</option>
+            <option value="mes">📅 Por Mês</option>
+          </select>
+        </div>
+        <div class="field" id="pt-rel-mes-field" style="display:none"><label>Mês/Ano *</label><input id="pt-rel-mes" type="month"></div>
+      </div>
+      <div id="pt-rel-individual">
+        <div class="field"><label>Credenciado *</label><select id="pt-rel-credenciado"><option value="">Selecione...</option></select></div>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-primary" onclick="imprimirRelPonto()">🖨️ Imprimir</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ===================== CONSTANTES DE ESTILO =====================
@@ -3967,7 +4127,7 @@ function setupRealtime() {
     _realtimeChannel = null;
   }
 
-  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes', 'eventos', 'veiculos'];
+  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes', 'eventos', 'veiculos', 'cargos', 'credenciados', 'ponto_mensal'];
 
   _realtimeChannel = supabaseClient.channel('sync-global');
 
@@ -4061,6 +4221,9 @@ function renderAposSync(tabelaAlterada) {
       break;
     case 'panel-veiculos':
       if (typeof renderVeiculos === 'function') { _veiculosData = DB.veiculos(); renderVeiculos(); }
+      break;
+    case 'panel-ponto':
+      if (typeof renderCargos === 'function') { renderCargos(); renderCredenciados(); renderFechamentos(); }
       break;
     case 'panel-alertas':
       // Dashboard já foi re-renderizado acima
@@ -4375,6 +4538,9 @@ let _remoteData = {
   autorizacoes: [],
   eventos: [],
   veiculos: [],
+  cargos: [],
+  credenciados: [],
+  pontoMensal: [],
   config: {}
 };
 
@@ -4516,6 +4682,36 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.veiculos = unificados;
     localStorage.setItem('srv_veiculos', JSON.stringify(unificados));
+  });
+
+  await syncTabela('cargos', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_cargos') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('cargos', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.cargos = unificados;
+    localStorage.setItem('srv_cargos', JSON.stringify(unificados));
+  });
+
+  await syncTabela('credenciados', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_credenciados') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('credenciados', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.credenciados = unificados;
+    localStorage.setItem('srv_credenciados', JSON.stringify(unificados));
+  });
+
+  await syncTabela('ponto_mensal', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_ponto_mensal') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_mensal', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.pontoMensal = unificados;
+    localStorage.setItem('srv_ponto_mensal', JSON.stringify(unificados));
   });
 
   await syncTabela('configuracoes', 'chave,valor', (data) => {
@@ -4663,7 +4859,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
@@ -5410,6 +5606,70 @@ const DB = {
     } catch (e) { /* silent */ }
   },
 
+  // =================== PONTO CREDENCIADOS ===================
+  cargos: () => _remoteData.cargos.length ? _remoteData.cargos : JSON.parse(localStorage.getItem('srv_cargos') || '[]'),
+  saveCargos: async (d) => {
+    _remoteData.cargos = d;
+    localStorage.setItem('srv_cargos', JSON.stringify(d));
+    for (let i = 0; i < d.length; i++) {
+      try {
+        const { error } = await supabaseClient.from('cargos').upsert(d[i], { onConflict: 'id' });
+        if (error && !isQuotaError(error)) console.error("Erro Supabase (cargos):", error);
+        else if (error) saveToSyncQueue('cargos', d[i]);
+      } catch (e) {
+        if (isQuotaError(e)) saveToSyncQueue('cargos', d[i]);
+        else console.error("Erro ao salvar cargo:", e);
+      }
+    }
+  },
+  deleteCargo: async (id) => {
+    try {
+      await supabaseClient.from('cargos').delete().eq('id', id);
+    } catch (e) { /* silent */ }
+  },
+
+  credenciados: () => _remoteData.credenciados.length ? _remoteData.credenciados : JSON.parse(localStorage.getItem('srv_credenciados') || '[]'),
+  saveCredenciados: async (d) => {
+    _remoteData.credenciados = d;
+    localStorage.setItem('srv_credenciados', JSON.stringify(d));
+    for (let i = 0; i < d.length; i++) {
+      try {
+        const { error } = await supabaseClient.from('credenciados').upsert(d[i], { onConflict: 'id' });
+        if (error && !isQuotaError(error)) console.error("Erro Supabase (credenciados):", error);
+        else if (error) saveToSyncQueue('credenciados', d[i]);
+      } catch (e) {
+        if (isQuotaError(e)) saveToSyncQueue('credenciados', d[i]);
+        else console.error("Erro ao salvar credenciado:", e);
+      }
+    }
+  },
+  deleteCredenciado: async (id) => {
+    try {
+      await supabaseClient.from('credenciados').delete().eq('id', id);
+    } catch (e) { /* silent */ }
+  },
+
+  pontoMensal: () => _remoteData.pontoMensal.length ? _remoteData.pontoMensal : JSON.parse(localStorage.getItem('srv_ponto_mensal') || '[]'),
+  savePontoMensal: async (d) => {
+    _remoteData.pontoMensal = d;
+    localStorage.setItem('srv_ponto_mensal', JSON.stringify(d));
+    for (let i = 0; i < d.length; i++) {
+      try {
+        const { error } = await supabaseClient.from('ponto_mensal').upsert(d[i], { onConflict: 'id' });
+        if (error && !isQuotaError(error)) console.error("Erro Supabase (ponto_mensal):", error);
+        else if (error) saveToSyncQueue('ponto_mensal', d[i]);
+      } catch (e) {
+        if (isQuotaError(e)) saveToSyncQueue('ponto_mensal', d[i]);
+        else console.error("Erro ao salvar ponto_mensal:", e);
+      }
+    }
+  },
+  deletePontoMensal: async (id) => {
+    try {
+      await supabaseClient.from('ponto_mensal').delete().eq('id', id);
+    } catch (e) { /* silent */ }
+  },
+
 };
 
 // ===================== UTILITARIOS =====================
@@ -5431,6 +5691,478 @@ function esc(str) {
   return String(str).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+function getImg(lado) {
+  const cfg = DB.config();
+  return cfg['img_' + lado] || localStorage.getItem('srv_img_' + lado);
+}
+
+// ===================== PONTO CREDENCIADOS =====================
+function togglePtSubtab(subtab, btn) {
+  document.querySelectorAll('#pt-subtabs .ev-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderPtSubtab(subtab);
+}
+
+function renderPtSubtab(subtab) {
+  const map = {cargos:0,credenciados:1,fechamento:2,relatorio:3};
+  document.querySelectorAll('#pt-subtabs .ev-tab').forEach((b,i) => b.classList.toggle('active', i === map[subtab]));
+  ['cargos','credenciados','fechamento','relatorio'].forEach(s => {
+    document.getElementById('pt-sub-' + s).style.display = s === subtab ? 'block' : 'none';
+  });
+  if (subtab === 'cargos') renderCargos();
+  if (subtab === 'credenciados') renderCredenciados();
+  if (subtab === 'fechamento') { renderFechamentos(); popularSelectCredFechamento(); }
+  if (subtab === 'relatorio') popularSelectCredRelatorio();
+}
+
+// =================== CARGOS ===================
+function renderCargos() {
+  const dados = DB.cargos();
+  let html = '<table><thead><tr><th>Nome</th><th>Valor Hora</th><th>Ações</th></tr></thead><tbody>';
+  for (let i = 0; i < dados.length; i++) {
+    const c = dados[i];
+    html += '<tr><td>' + esc(c.nome) + '</td><td>R$ ' + (parseFloat(c.valorHora) || 0).toFixed(2) + '</td><td class="actions">'
+      + '<button class="btn btn-sm btn-ghost" onclick="editarCargo(\'' + c.id + '\')">✏️</button> '
+      + '<button class="btn btn-sm btn-ghost" onclick="excluirCargo(\'' + c.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  if (!dados.length) html = '<p style="color:var(--muted);font-size:.84rem;padding:12px 0">Nenhum cargo cadastrado.</p>';
+  document.getElementById('tabela-cargos').innerHTML = html;
+  popularSelectCargos();
+}
+
+function popularSelectCargos() {
+  const dados = DB.cargos();
+  ['cred-cargo'].forEach(id => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const val = sel.value;
+    sel.innerHTML = '<option value="">Selecione o cargo...</option>';
+    for (let i = 0; i < dados.length; i++) {
+      sel.innerHTML += '<option value="' + dados[i].id + '">' + esc(dados[i].nome) + ' - R$ ' + (parseFloat(dados[i].valorHora) || 0).toFixed(2) + '</option>';
+    }
+    if (val) sel.value = val;
+  });
+}
+
+function salvarCargo() {
+  const id = document.getElementById('cargo-id').value;
+  const nome = document.getElementById('cargo-nome').value.trim();
+  const valorHora = parseFloat(document.getElementById('cargo-valor').value);
+  if (!nome) { toastMsg('Informe o nome do cargo.', 'warning'); return; }
+  if (isNaN(valorHora) || valorHora <= 0) { toastMsg('Informe um valor da hora válido.', 'warning'); return; }
+  const dados = DB.cargos();
+  if (id) {
+    const idx = dados.findIndex(c => c.id === id);
+    if (idx >= 0) { dados[idx].nome = nome; dados[idx].valorHora = valorHora; }
+  } else {
+    dados.push({ id: uid(), nome, valorHora });
+  }
+  DB.saveCargos(dados);
+  limparFormCargo();
+  renderCargos();
+  toastMsg('Cargo salvo com sucesso!', 'success');
+}
+
+function editarCargo(id) {
+  const dados = DB.cargos();
+  const c = dados.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('cargo-id').value = c.id;
+  document.getElementById('cargo-nome').value = c.nome;
+  document.getElementById('cargo-valor').value = c.valorHora;
+  document.getElementById('cargo-form-title').textContent = 'Editar Cargo';
+  document.querySelector('#pt-sub-cargos .ev-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function limparFormCargo() {
+  document.getElementById('cargo-id').value = '';
+  document.getElementById('cargo-nome').value = '';
+  document.getElementById('cargo-valor').value = '';
+  document.getElementById('cargo-form-title').textContent = 'Novo Cargo';
+}
+
+async function excluirCargo(id) {
+  if (!confirm('Excluir este cargo permanentemente?')) return;
+  let dados = DB.cargos();
+  dados = dados.filter(c => c.id !== id);
+  DB.saveCargos(dados);
+  await DB.deleteCargo(id);
+  renderCargos();
+  toastMsg('Cargo excluído permanentemente.', 'info');
+}
+
+// =================== CREDENCIADOS ===================
+function renderCredenciados() {
+  const dados = DB.credenciados();
+  const cargos = DB.cargos();
+  const busca = (document.getElementById('busca-credenciado').value || '').toLowerCase();
+  const filtrados = busca ? dados.filter(c => c.nome.toLowerCase().includes(busca) || (c.cpf || '').includes(busca)) : dados;
+  let html = '<table><thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Lotação</th><th>Forma Pgto</th><th>Ações</th></tr></thead><tbody>';
+  for (let i = 0; i < filtrados.length; i++) {
+    const c = filtrados[i];
+    const cargoNome = cargos.find(cg => cg.id === c.cargoId);
+    html += '<tr><td>' + esc(c.nome) + '</td><td>' + esc(c.cpf || '-') + '</td><td>' + esc(cargoNome ? cargoNome.nome : '-') + '</td>'
+      + '<td>' + esc(c.lotacao || '-') + '</td><td>' + esc(c.formaPagamento || '-') + '</td>'
+      + '<td class="actions">'
+      + '<button class="btn btn-sm btn-ghost" onclick="editarCredenciado(\'' + c.id + '\')">✏️</button> '
+      + '<button class="btn btn-sm btn-ghost" onclick="excluirCredenciado(\'' + c.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  if (!filtrados.length) html = '<p style="color:var(--muted);font-size:.84rem;padding:12px 0">Nenhum credenciado encontrado.</p>';
+  document.getElementById('tabela-credenciados').innerHTML = html;
+}
+
+function salvarCredenciado() {
+  const id = document.getElementById('cred-id').value;
+  const nome = document.getElementById('cred-nome').value.trim();
+  const cpf = document.getElementById('cred-cpf').value.trim();
+  const pis = document.getElementById('cred-pis').value.trim();
+  const tel = document.getElementById('cred-tel').value.trim();
+  const email = document.getElementById('cred-email').value.trim();
+  const lotacao = document.getElementById('cred-lotacao').value.trim();
+  const endereco = document.getElementById('cred-endereco').value.trim();
+  const cargoId = document.getElementById('cred-cargo').value;
+  const formaPagamento = document.getElementById('cred-pgto').value;
+  if (!nome) { toastMsg('Informe o nome do credenciado.', 'warning'); return; }
+  if (!cpf) { toastMsg('Informe o CPF.', 'warning'); return; }
+  if (!cargoId) { toastMsg('Selecione o cargo.', 'warning'); return; }
+  if (!formaPagamento) { toastMsg('Selecione a forma de pagamento.', 'warning'); return; }
+  const dados = DB.credenciados();
+  if (id) {
+    const idx = dados.findIndex(c => c.id === id);
+    if (idx >= 0) { dados[idx] = { ...dados[idx], nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento }; }
+  } else {
+    dados.push({ id: uid(), nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento });
+  }
+  DB.saveCredenciados(dados);
+  limparFormCredenciado();
+  renderCredenciados();
+  toastMsg('Credenciado salvo com sucesso!', 'success');
+}
+
+function editarCredenciado(id) {
+  const dados = DB.credenciados();
+  const c = dados.find(x => x.id === id);
+  if (!c) return;
+  document.getElementById('cred-id').value = c.id;
+  document.getElementById('cred-nome').value = c.nome;
+  document.getElementById('cred-cpf').value = c.cpf || '';
+  document.getElementById('cred-pis').value = c.pis || '';
+  document.getElementById('cred-tel').value = c.tel || '';
+  document.getElementById('cred-email').value = c.email || '';
+  document.getElementById('cred-lotacao').value = c.lotacao || '';
+  document.getElementById('cred-endereco').value = c.endereco || '';
+  document.getElementById('cred-cargo').value = c.cargoId || '';
+  document.getElementById('cred-pgto').value = c.formaPagamento || '';
+  document.getElementById('cred-form-title').textContent = 'Editar Credenciado';
+  document.querySelector('#pt-sub-credenciados .ev-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function limparFormCredenciado() {
+  ['cred-id','cred-nome','cred-cpf','cred-pis','cred-tel','cred-email','cred-lotacao','cred-endereco'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cred-cargo').value = '';
+  document.getElementById('cred-pgto').value = '';
+  document.getElementById('cred-form-title').textContent = 'Novo Credenciado';
+}
+
+async function excluirCredenciado(id) {
+  if (!confirm('Excluir este credenciado permanentemente?')) return;
+  let dados = DB.credenciados();
+  dados = dados.filter(c => c.id !== id);
+  DB.saveCredenciados(dados);
+  await DB.deleteCredenciado(id);
+  renderCredenciados();
+  toastMsg('Credenciado excluído permanentemente.', 'info');
+}
+
+// =================== FECHAMENTO MENSAL ===================
+function popularSelectCredFechamento() {
+  const dados = DB.credenciados();
+  const sel = document.getElementById('ponto-credenciado');
+  if (!sel) return;
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Selecione o credenciado...</option>';
+  for (let i = 0; i < dados.length; i++) {
+    sel.innerHTML += '<option value="' + dados[i].id + '">' + esc(dados[i].nome) + ' - ' + esc(dados[i].cpf || '') + '</option>';
+  }
+  if (val) sel.value = val;
+}
+
+function popularSelectCredRelatorio() {
+  const dados = DB.credenciados();
+  const sel = document.getElementById('pt-rel-credenciado');
+  if (!sel) return;
+  const val = sel.value;
+  sel.innerHTML = '<option value="">Selecione...</option>';
+  for (let i = 0; i < dados.length; i++) {
+    sel.innerHTML += '<option value="' + dados[i].id + '">' + esc(dados[i].nome) + ' - ' + esc(dados[i].cpf || '') + '</option>';
+  }
+  if (val) sel.value = val;
+}
+
+function carregarDadosCredFechamento() {
+  const credId = document.getElementById('ponto-credenciado').value;
+  const cargos = DB.cargos();
+  const creds = DB.credenciados();
+  const cred = creds.find(c => c.id === credId);
+  const cargo = cred ? cargos.find(c => c.id === cred.cargoId) : null;
+  document.getElementById('ponto-cargo').value = cargo ? cargo.nome : '';
+  document.getElementById('ponto-valor-hora').value = cargo ? (parseFloat(cargo.valorHora) || 0).toFixed(2) : '0.00';
+  calcularValorFechamento();
+}
+
+function calcularValorFechamento() {
+  const horas = parseFloat(document.getElementById('ponto-horas').value) || 0;
+  const valorHora = parseFloat(document.getElementById('ponto-valor-hora').value) || 0;
+  const total = horas * valorHora;
+  document.getElementById('ponto-valor-total').value = total > 0 ? 'R$ ' + total.toFixed(2) : '';
+}
+
+function renderFechamentos() {
+  const dados = DB.pontoMensal();
+  const creds = DB.credenciados();
+  const cargos = DB.cargos();
+  let html = '<table><thead><tr><th>Credenciado</th><th>Mês/Ano</th><th>Cargo</th><th>Horas</th><th>Valor Hora</th><th>Valor Total</th><th>Ações</th></tr></thead><tbody>';
+  for (let i = 0; i < dados.length; i++) {
+    const p = dados[i];
+    const cred = creds.find(c => c.id === p.credenciadoId);
+    const cargo = cargos.find(c => c.id === p.cargoId);
+    const mesAno = (p.mes || '').toString().padStart(2, '0') + '/' + (p.ano || '');
+    html += '<tr><td>' + esc(cred ? cred.nome : '-') + '</td><td>' + mesAno + '</td>'
+      + '<td>' + esc(cargo ? cargo.nome : '-') + '</td>'
+      + '<td>' + (parseFloat(p.horas) || 0).toFixed(1) + '</td>'
+      + '<td>R$ ' + (parseFloat(p.valorHora) || 0).toFixed(2) + '</td>'
+      + '<td><strong>R$ ' + (parseFloat(p.valorTotal) || 0).toFixed(2) + '</strong></td>'
+      + '<td class="actions">'
+      + '<button class="btn btn-sm btn-ghost" onclick="editarFechamento(\'' + p.id + '\')">✏️</button> '
+      + '<button class="btn btn-sm btn-ghost" onclick="excluirFechamento(\'' + p.id + '\')">🗑️</button>'
+      + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  if (!dados.length) html = '<p style="color:var(--muted);font-size:.84rem;padding:12px 0">Nenhum fechamento registrado.</p>';
+  document.getElementById('tabela-fechamentos').innerHTML = html;
+}
+
+function salvarFechamento() {
+  const id = document.getElementById('ponto-id').value;
+  const credenciadoId = document.getElementById('ponto-credenciado').value;
+  const mesref = document.getElementById('ponto-mesref').value;
+  const horas = parseFloat(document.getElementById('ponto-horas').value);
+  const valorHora = parseFloat(document.getElementById('ponto-valor-hora').value) || 0;
+  const creds = DB.credenciados();
+  const cargos = DB.cargos();
+  const cred = creds.find(c => c.id === credenciadoId);
+  if (!credenciadoId) { toastMsg('Selecione o credenciado.', 'warning'); return; }
+  if (!mesref) { toastMsg('Informe o mês/ano de referência.', 'warning'); return; }
+  if (isNaN(horas) || horas <= 0) { toastMsg('Informe as horas trabalhadas.', 'warning'); return; }
+  const mes = parseInt(mesref.split('-')[1]);
+  const ano = parseInt(mesref.split('-')[0]);
+  const cargo = cred ? cargos.find(c => c.id === cred.cargoId) : null;
+  const cargoId = cargo ? cargo.id : '';
+  const valorTotal = horas * valorHora;
+  const dados = DB.pontoMensal();
+  if (id) {
+    const idx = dados.findIndex(p => p.id === id);
+    if (idx >= 0) { dados[idx] = { ...dados[idx], credenciadoId, mes, ano, horas, valorHora, valorTotal, cargoId }; }
+  } else {
+    dados.push({ id: uid(), credenciadoId, mes, ano, horas, valorHora, valorTotal, cargoId, criadoEm: new Date().toISOString() });
+  }
+  DB.savePontoMensal(dados);
+  limparFormFechamento();
+  renderFechamentos();
+  toastMsg('Fechamento salvo com sucesso!', 'success');
+}
+
+function editarFechamento(id) {
+  const dados = DB.pontoMensal();
+  const p = dados.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('ponto-id').value = p.id;
+  document.getElementById('ponto-credenciado').value = p.credenciadoId;
+  document.getElementById('ponto-mesref').value = (p.ano || '') + '-' + (p.mes || '').toString().padStart(2, '0');
+  carregarDadosCredFechamento();
+  document.getElementById('ponto-horas').value = p.horas;
+  calcularValorFechamento();
+}
+
+function limparFormFechamento() {
+  document.getElementById('ponto-id').value = '';
+  document.getElementById('ponto-credenciado').value = '';
+  document.getElementById('ponto-mesref').value = '';
+  document.getElementById('ponto-horas').value = '';
+  document.getElementById('ponto-cargo').value = '';
+  document.getElementById('ponto-valor-hora').value = '';
+  document.getElementById('ponto-valor-total').value = '';
+}
+
+async function excluirFechamento(id) {
+  if (!confirm('Excluir este fechamento permanentemente?')) return;
+  let dados = DB.pontoMensal();
+  dados = dados.filter(p => p.id !== id);
+  DB.savePontoMensal(dados);
+  await DB.deletePontoMensal(id);
+  renderFechamentos();
+  toastMsg('Fechamento excluído permanentemente.', 'info');
+}
+
+// =================== RELATÓRIOS / IMPRESSÃO ===================
+function togglePtRelTipo() {
+  const tipo = document.getElementById('pt-rel-tipo').value;
+  document.getElementById('pt-rel-mes-field').style.display = tipo === 'mes' ? 'block' : 'none';
+  document.getElementById('pt-rel-individual').style.display = tipo === 'individual' ? 'block' : 'none';
+}
+
+function imprimirRelPonto() {
+  const tipo = document.getElementById('pt-rel-tipo').value;
+  if (tipo === 'individual') {
+    const credId = document.getElementById('pt-rel-credenciado').value;
+    if (!credId) { toastMsg('Selecione o credenciado.', 'warning'); return; }
+    imprimirRelPontoIndividual(credId);
+  } else {
+    const mesref = document.getElementById('pt-rel-mes').value;
+    if (!mesref) { toastMsg('Informe o mês/ano.', 'warning'); return; }
+    const mes = parseInt(mesref.split('-')[1]);
+    const ano = parseInt(mesref.split('-')[0]);
+    imprimirRelPontoMes(mes, ano);
+  }
+}
+
+function imprimirRelPontoIndividual(credId) {
+  const creds = DB.credenciados();
+  const cargos = DB.cargos();
+  const pontos = DB.pontoMensal();
+  const cred = creds.find(c => c.id === credId);
+  if (!cred) return;
+  const cargo = cargos.find(c => c.id === cred.cargoId);
+  const credPontos = pontos.filter(p => p.credenciadoId === credId);
+  const cfg = DB.config();
+  const logoEsq = getImg('print') || getImg('esq');
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+
+  let html = `
+  <html><head><style>
+    @page { margin: 15mm 10mm; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; font-size: 12px; line-height: 1.5; }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1a3a5c; padding-bottom: 12px; }
+    .header img { max-height: 70px; margin-bottom: 6px; }
+    .header h2 { margin: 4px 0; color: #1a3a5c; font-size: 16px; }
+    .header p { margin: 2px 0; color: #555; font-size: 11px; }
+    h3 { color: #1a3a5c; border-bottom: 1px solid #ccc; padding-bottom: 4px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; font-size: 11px; }
+    th { background: #1a3a5c; color: #fff; }
+    .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 10px 0; }
+    .info-item label { font-weight: 700; color: #1a3a5c; font-size: 10px; text-transform: uppercase; }
+    .info-item span { display: block; font-size: 12px; }
+    .total { font-size: 14px; font-weight: 700; color: #1a3a5c; text-align: right; margin-top: 10px; }
+    .footer { text-align: center; margin-top: 30px; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 8px; }
+  </style></head><body>
+    <div class="header">
+      ${logoEsq ? '<img src="' + logoEsq + '">' : ''}
+      <h2>${esc(orgNome)}</h2>
+      <p>Relatório Individual de Ponto - Credenciado</p>
+    </div>
+    <h3>Dados do Credenciado</h3>
+    <div class="info-grid">
+      <div class="info-item"><label>Nome</label><span>${esc(cred.nome)}</span></div>
+      <div class="info-item"><label>CPF</label><span>${esc(cred.cpf || '-')}</span></div>
+      <div class="info-item"><label>Cargo</label><span>${esc(cargo ? cargo.nome : '-')}</span></div>
+      <div class="info-item"><label>Valor da Hora</label><span>R$ ${(cargo ? parseFloat(cargo.valorHora) : 0).toFixed(2)}</span></div>
+      <div class="info-item"><label>Lotação</label><span>${esc(cred.lotacao || '-')}</span></div>
+      <div class="info-item"><label>Forma de Pagamento</label><span>${esc(cred.formaPagamento || '-')}</span></div>
+    </div>`;
+
+  if (credPontos.length) {
+    let totalGeral = 0;
+    html += '<h3>Registros de Ponto</h3><table><thead><tr><th>Mês/Ano</th><th>Horas</th><th>Valor Hora</th><th>Valor Total</th></tr></thead><tbody>';
+    for (let i = 0; i < credPontos.length; i++) {
+      const p = credPontos[i];
+      const mesAno = (p.mes || '').toString().padStart(2, '0') + '/' + (p.ano || '');
+      const vt = parseFloat(p.valorTotal) || 0;
+      totalGeral += vt;
+      html += '<tr><td>' + mesAno + '</td><td>' + (parseFloat(p.horas) || 0).toFixed(1) + '</td><td>R$ ' + (parseFloat(p.valorHora) || 0).toFixed(2) + '</td><td>R$ ' + vt.toFixed(2) + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    html += '<div class="total">Total Geral: R$ ' + totalGeral.toFixed(2) + '</div>';
+  } else {
+    html += '<p style="color:#888;text-align:center;margin:20px 0">Nenhum registro de ponto encontrado.</p>';
+  }
+
+  html += '<div class="footer">Relatório gerado em ' + new Date().toLocaleString('pt-BR') + '</div>';
+  html += '</body></html>';
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+function imprimirRelPontoMes(mes, ano) {
+  const creds = DB.credenciados();
+  const cargos = DB.cargos();
+  const pontos = DB.pontoMensal().filter(p => p.mes === mes && p.ano === ano);
+  const cfg = DB.config();
+  const logoEsq = getImg('print') || getImg('esq');
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+
+  const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const mesNome = meses[mes - 1] || mes;
+
+  let html = `
+  <html><head><style>
+    @page { margin: 15mm 10mm; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; color: #222; font-size: 12px; line-height: 1.5; }
+    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1a3a5c; padding-bottom: 12px; }
+    .header img { max-height: 70px; margin-bottom: 6px; }
+    .header h2 { margin: 4px 0; color: #1a3a5c; font-size: 16px; }
+    .header p { margin: 2px 0; color: #555; font-size: 11px; }
+    h3 { color: #1a3a5c; border-bottom: 1px solid #ccc; padding-bottom: 4px; font-size: 14px; }
+    table { width: 100%; border-collapse: collapse; margin: 10px 0; }
+    th, td { border: 1px solid #ccc; padding: 5px 8px; text-align: left; font-size: 11px; }
+    th { background: #1a3a5c; color: #fff; }
+    .total { font-size: 14px; font-weight: 700; color: #1a3a5c; text-align: right; margin-top: 10px; }
+    .footer { text-align: center; margin-top: 30px; font-size: 10px; color: #888; border-top: 1px solid #ccc; padding-top: 8px; }
+  </style></head><body>
+    <div class="header">
+      ${logoEsq ? '<img src="' + logoEsq + '">' : ''}
+      <h2>${esc(orgNome)}</h2>
+      <p>Relatório Mensal de Ponto - ${mesNome}/${ano}</p>
+    </div>`;
+
+  if (pontos.length) {
+    let totalGeral = 0;
+    let totalHoras = 0;
+    html += '<table><thead><tr><th>Credenciado</th><th>CPF</th><th>Cargo</th><th>Horas</th><th>Valor Hora</th><th>Valor Total</th></tr></thead><tbody>';
+    for (let i = 0; i < pontos.length; i++) {
+      const p = pontos[i];
+      const cred = creds.find(c => c.id === p.credenciadoId);
+      const cargo = cargos.find(c => c.id === (p.cargoId || (cred ? cred.cargoId : '')));
+      const vt = parseFloat(p.valorTotal) || 0;
+      totalGeral += vt;
+      totalHoras += parseFloat(p.horas) || 0;
+      html += '<tr><td>' + esc(cred ? cred.nome : '-') + '</td><td>' + esc(cred ? cred.cpf || '-' : '-') + '</td>'
+        + '<td>' + esc(cargo ? cargo.nome : '-') + '</td><td>' + (parseFloat(p.horas) || 0).toFixed(1) + '</td>'
+        + '<td>R$ ' + (parseFloat(p.valorHora) || 0).toFixed(2) + '</td><td>R$ ' + vt.toFixed(2) + '</td></tr>';
+    }
+    html += '</tbody></table>';
+    html += '<div class="total">Total de Horas: ' + totalHoras.toFixed(1) + 'h | Valor Total: R$ ' + totalGeral.toFixed(2) + '</div>';
+  } else {
+    html += '<p style="color:#888;text-align:center;margin:20px 0">Nenhum registro de ponto para ' + mesNome + '/' + ano + '.</p>';
+  }
+
+  html += '<div class="footer">Relatório gerado em ' + new Date().toLocaleString('pt-BR') + '</div>';
+  html += '</body></html>';
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  setTimeout(() => { win.print(); }, 500);
+}
+
+// ===================== UTILITARIOS =====================
 function fmtDate(d) {
   if (!d) return '';
   const dt = new Date(d + 'T00:00:00');
@@ -5454,6 +6186,7 @@ function showTab(tab) {
   if (document.getElementById('filtro-setor')) document.getElementById('filtro-setor').value = '';
   if (tab === 'alertas') renderDashboard();
   if (tab === 'servidores') { renderTabela(); atualizarSelectsSetores(); }
+  if (tab === 'config') renderConfig();
   if (tab === 'gestores') renderGestores(), popularSetoresGestor();
   if (tab === 'ferias') renderProgramacoes(), popularSelectServidor();
   if (tab === 'calendario') iniciarCalendario();
@@ -5468,6 +6201,7 @@ function showTab(tab) {
   if (tab === 'bancohoras') renderBancoHoras();
   if (tab === 'eventos') { _eventosData = DB.eventos(); _veiculosData = DB.veiculos(); renderEventos(); popularSelectVeiculos('ev-veiculo'); }
   if (tab === 'veiculos') { _veiculosData = DB.veiculos(); renderVeiculos(); }
+  if (tab === 'ponto') { renderPtSubtab('cargos'); renderCredenciados(); renderFechamentos(); }
   currentPage = 1;
 }
 
@@ -6819,8 +7553,6 @@ function carregarConfig() {
   atualizarPreview();
   
   // Imagens: Tenta pegar do Supabase (config._remoteData), depois LocalStorage
-  const getImg = (lado) => cfg['img_' + lado] || localStorage.getItem('srv_img_' + lado);
-  
   aplicarImagemHeader('esq', getImg('esq'));
   aplicarImagemHeader('dir', getImg('dir'));
   aplicarImagemHeader('print', getImg('print'));
@@ -8345,9 +9077,22 @@ function initApp() {
   initFlatpickrFolga();
   initFlatpickrSolicitacao();
   renderDashboard();
+  renderConfig();
 
   // Iniciar sincronização em tempo real
   setupRealtime();
+}
+
+function renderConfig() {
+  const cargos = DB.cargos();
+  const creds = DB.credenciados();
+  const pontos = DB.pontoMensal();
+  const elCargos = document.getElementById('cfg-total-cargos');
+  const elCreds = document.getElementById('cfg-total-credenciados');
+  const elPontos = document.getElementById('cfg-total-fechamentos');
+  if (elCargos) elCargos.textContent = cargos.length;
+  if (elCreds) elCreds.textContent = creds.length;
+  if (elPontos) elPontos.textContent = pontos.length;
 }
 
 // ===================== SOLICITAÇÕES =====================
