@@ -1475,13 +1475,7 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
   font-size: 0.86rem; font-weight: 700;
   margin-bottom: 14px;
 }
-.pt-container {
-  max-width: 960px;
-  margin: 0 auto;
-}
-@media (max-width: 768px) {
-  .pt-container { max-width: 100%; }
-}
+
 
 .ev-prof-item {
   display: flex;
@@ -3675,7 +3669,7 @@ Coordenação de RH
   </div>
 
   <!-- Sub-painel: Cargos -->
-  <div id="pt-sub-cargos" class="pt-container">
+  <div id="pt-sub-cargos">
     <div class="ev-grid">
       <div class="ev-card">
         <h3>✍️ <span id="cargo-form-title">Novo Cargo</span></h3>
@@ -3697,59 +3691,61 @@ Coordenação de RH
   </div>
 
   <!-- Sub-painel: Credenciados -->
-  <div id="pt-sub-credenciados" class="pt-container" style="display:none">
-    <div class="ev-card" style="max-width:600px;margin:0 auto 16px">
-      <h3>✍️ <span id="cred-form-title">Novo Credenciado</span></h3>
-      <input type="hidden" id="cred-id">
-      <div class="form-row cols-2">
-        <div class="field"><label>Nome Completo *</label><input id="cred-nome" placeholder="Nome completo"></div>
-        <div class="field"><label>CPF *</label><input id="cred-cpf" placeholder="000.000.000-00"></div>
-      </div>
-      <div class="form-row cols-2">
-        <div class="field"><label>PIS/NIS</label><input id="cred-pis" placeholder="PIS/NIS"></div>
-        <div class="field"><label>Telefone</label><input id="cred-tel" placeholder="(99) 99999-9999"></div>
-      </div>
-      <div class="form-row cols-2">
-        <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
-        <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
-      </div>
-      <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
-      <div class="form-row cols-2">
-        <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>
-        <div class="field"><label>Forma de Pagamento *</label><select id="cred-pgto" onchange="toggleDadosBancarios()"><option value="">Selecione...</option><option value="pix">💳 PIX</option><option value="ted">🏦 TED</option><option value="dinheiro">💵 Dinheiro</option><option value="cheque">📄 Cheque</option></select></div>
-      </div>
+  <div id="pt-sub-credenciados" style="display:none">
+    <div class="ev-grid">
+      <div class="ev-card">
+        <h3>✍️ <span id="cred-form-title">Novo Credenciado</span></h3>
+        <input type="hidden" id="cred-id">
+        <div class="form-row cols-2">
+          <div class="field"><label>Nome Completo *</label><input id="cred-nome" placeholder="Nome completo"></div>
+          <div class="field"><label>CPF *</label><input id="cred-cpf" placeholder="000.000.000-00"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>PIS/NIS</label><input id="cred-pis" placeholder="PIS/NIS"></div>
+          <div class="field"><label>Telefone</label><input id="cred-tel" placeholder="(99) 99999-9999"></div>
+        </div>
+        <div class="form-row cols-2">
+          <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
+          <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
+        </div>
+        <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
+        <div class="form-row cols-2">
+          <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>
+          <div class="field"><label>Forma de Pagamento *</label><select id="cred-pgto" onchange="toggleDadosBancarios()"><option value="">Selecione...</option><option value="pix">💳 PIX</option><option value="ted">🏦 TED</option><option value="dinheiro">💵 Dinheiro</option><option value="cheque">📄 Cheque</option></select></div>
+        </div>
 
-      <!-- Dados Bancários -->
-      <div id="cred-dados-bancarios" style="display:none;margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm)">
-        <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:10px">🏦 Dados Bancários</label>
-        <div id="cred-pix-field" style="display:none">
-          <div class="field"><label>Chave PIX</label><input id="cred-chave-pix" placeholder="CPF, e-mail, telefone ou chave aleatória"></div>
+        <!-- Dados Bancários -->
+        <div id="cred-dados-bancarios" style="display:none;margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm)">
+          <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:10px">🏦 Dados Bancários</label>
+          <div id="cred-pix-field" style="display:none">
+            <div class="field"><label>Chave PIX</label><input id="cred-chave-pix" placeholder="CPF, e-mail, telefone ou chave aleatória"></div>
+          </div>
+          <div id="cred-ted-field" style="display:none">
+            <div class="form-row cols-2">
+              <div class="field"><label>Banco</label><input id="cred-banco" placeholder="Ex: Banco do Brasil"></div>
+              <div class="field"><label>Agência</label><input id="cred-agencia" placeholder="Ex: 1234-5"></div>
+            </div>
+            <div class="form-row cols-2">
+              <div class="field"><label>Conta</label><input id="cred-conta" placeholder="Ex: 12345-6"></div>
+              <div class="field"><label>Tipo</label><select id="cred-tipo-conta"><option value="">Selecione...</option><option value="corrente">Corrente</option><option value="poupanca">Poupança</option></select></div>
+            </div>
+          </div>
         </div>
-        <div id="cred-ted-field" style="display:none">
-          <div class="form-row cols-2">
-            <div class="field"><label>Banco</label><input id="cred-banco" placeholder="Ex: Banco do Brasil"></div>
-            <div class="field"><label>Agência</label><input id="cred-agencia" placeholder="Ex: 1234-5"></div>
-          </div>
-          <div class="form-row cols-2">
-            <div class="field"><label>Conta</label><input id="cred-conta" placeholder="Ex: 12345-6"></div>
-            <div class="field"><label>Tipo</label><select id="cred-tipo-conta"><option value="">Selecione...</option><option value="corrente">Corrente</option><option value="poupanca">Poupança</option></select></div>
-          </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+          <button class="btn btn-primary" onclick="salvarCredenciado()">💾 Salvar</button>
+          <button class="btn btn-ghost" onclick="limparFormCredenciado()">🔄 Novo</button>
         </div>
       </div>
-      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-        <button class="btn btn-primary" onclick="salvarCredenciado()">💾 Salvar</button>
-        <button class="btn btn-ghost" onclick="limparFormCredenciado()">🔄 Novo</button>
+      <div class="ev-card">
+        <h3>📋 Credenciados Cadastrados</h3>
+        <input id="busca-credenciado" class="input-filtro" placeholder="Buscar credenciado..." oninput="renderCredenciados()">
+        <div id="tabela-credenciados" style="overflow-x:auto;margin-top:10px"></div>
       </div>
-    </div>
-    <div class="ev-card">
-      <h3>📋 Credenciados Cadastrados</h3>
-      <input id="busca-credenciado" class="input-filtro" placeholder="Buscar credenciado..." oninput="renderCredenciados()">
-      <div id="tabela-credenciados" style="overflow-x:auto;margin-top:10px"></div>
     </div>
   </div>
 
   <!-- Sub-painel: Fechamento Mensal -->
-  <div id="pt-sub-fechamento" class="pt-container" style="display:none">
+  <div id="pt-sub-fechamento" style="display:none">
     <div class="ev-grid">
       <div class="ev-card">
         <h3>📊 Registrar Fechamento Mensal</h3>
@@ -3779,7 +3775,7 @@ Coordenação de RH
   </div>
 
   <!-- Sub-painel: Relatórios -->
-  <div id="pt-sub-relatorio" class="pt-container" style="display:none">
+  <div id="pt-sub-relatorio" style="display:none">
     <div class="ev-card">
       <h3>🖨️ Imprimir Relatório de Ponto</h3>
       <div class="form-row cols-2">
