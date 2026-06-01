@@ -11400,10 +11400,11 @@ function editarVeiculo(id) {
   document.getElementById('panel-veiculos').scrollIntoView({ behavior: 'smooth' });
 }
 
-function excluirVeiculo(id) {
-  if (!confirm('Excluir este veículo?')) return;
+async function excluirVeiculo(id) {
+  if (!confirm('Excluir este veículo permanentemente?')) return;
   _veiculosData = _veiculosData.filter(v => v.id !== id);
   salvarVeiculosStorage();
+  await DB.deleteVeiculo(id);
   renderVeiculos();
   popularSelectVeiculos('ev-veiculo');
   if (document.getElementById('ev-sub-veiculos')?.style.display !== 'none') renderVeiculosSub();
@@ -11474,10 +11475,11 @@ function salvarVeiculoEv() {
   toastMsg('Veículo cadastrado!', 'success');
 }
 
-function excluirVeiculoSub(id) {
-  if (!confirm('Excluir este veículo?')) return;
+async function excluirVeiculoSub(id) {
+  if (!confirm('Excluir este veículo permanentemente?')) return;
   _veiculosData = _veiculosData.filter(v => v.id !== id);
   salvarVeiculosStorage();
+  await DB.deleteVeiculo(id);
   renderVeiculosSub();
   popularSelectVeiculos('ev-veiculo');
 }
@@ -11906,13 +11908,14 @@ function editarEvento(id) {
   document.getElementById('panel-eventos').scrollIntoView({ behavior: 'smooth' });
 }
 
-function excluirEvento(id) {
-  if (!confirm('Excluir este evento?')) return;
+async function excluirEvento(id) {
+  if (!confirm('Excluir este evento permanentemente?')) return;
   _eventosData = _eventosData.filter(e => e.id !== id);
   salvarEventosStorage();
+  await DB.deleteEvento(id);
   renderEventos();
   atualizarBadgeEventos();
-  toastMsg('Evento excluído.', 'info');
+  toastMsg('Evento excluído permanentemente.', 'info');
 }
 
 function limparFormEvento() {
