@@ -5466,8 +5466,8 @@ function showTab(tab) {
   if (tab === 'auditoria') renderAuditoria();
   if (tab === 'coberturas') renderCoberturas();
   if (tab === 'bancohoras') renderBancoHoras();
-  if (tab === 'eventos') { renderEventos(); popularSelectVeiculos('ev-veiculo'); }
-  if (tab === 'veiculos') renderVeiculos();
+  if (tab === 'eventos') { _eventosData = DB.eventos(); _veiculosData = DB.veiculos(); renderEventos(); popularSelectVeiculos('ev-veiculo'); }
+  if (tab === 'veiculos') { _veiculosData = DB.veiculos(); renderVeiculos(); }
   currentPage = 1;
 }
 
@@ -11957,10 +11957,15 @@ function imprimirEvento(id) {
   const veic = e.veiculoId ? _veiculosData.find(v => v.id === e.veiculoId) : null;
 
   const win = window.open('', '_blank');
+  const imgPrint = getImg('print');
+  const cfg = DB.config();
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
   win.document.write(`
     <html><head><title>Evento: ${esc(e.nome)}</title>
     <style>
       body { font-family: Arial, sans-serif; padding: 40px; color: #222; }
+      .logo-area { text-align: center; margin-bottom: 15px; }
+      .logo-area img { max-height: 85px; max-width: 100%; object-fit: contain; }
       h1 { font-size: 22px; margin-bottom: 5px; }
       .header { border-bottom: 2px solid #333; padding-bottom: 15px; margin-bottom: 20px; }
       .info { margin-bottom: 20px; }
@@ -11975,9 +11980,10 @@ function imprimirEvento(id) {
       .tag-warn { background:#fff3cd; color:#856404; }
       @media print { body { padding: 20px; } }
     </style></head><body>
+    ${imgPrint ? `<div class="logo-area"><img src="${imgPrint}"></div>` : ''}
     <div class="header">
       <h1>📅 ${esc(e.nome)}</h1>
-      <div style="color:#666;margin-top:4px">${e.data} | ${e.hrInicio} - ${e.hrTermino}${e.local ? ' | '+esc(e.local) : ''}</div>
+      <div style="color:#666;margin-top:4px">${orgNome} | ${e.data} | ${e.hrInicio} - ${e.hrFim || e.hrTermino}${e.local ? ' | '+esc(e.local) : ''}</div>
     </div>
     <table class="info">
       ${e.descricao ? `<tr><td>Descrição:</td><td>${esc(e.descricao)}</td></tr>` : ''}
@@ -11999,8 +12005,9 @@ function imprimirEvento(id) {
       </tbody>
     </table>
     <div class="footer">
-      Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão APS<br>
-      ${e.nome} - ${e.data}
+      ${esc(orgNome)}<br>
+      Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão<br>
+      ${esc(e.nome)} - ${e.data}
     </div>
     <script>window.onload=function(){window.print();}<\/script>
     </body></html>
