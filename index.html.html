@@ -3698,37 +3698,53 @@ Coordenação de RH
 
   <!-- Sub-painel: Credenciados -->
   <div id="pt-sub-credenciados" class="pt-container" style="display:none">
-    <div class="ev-grid">
-      <div class="ev-card">
-        <h3>✍️ <span id="cred-form-title">Novo Credenciado</span></h3>
-        <input type="hidden" id="cred-id">
-        <div class="form-row cols-2">
-          <div class="field"><label>Nome Completo *</label><input id="cred-nome" placeholder="Nome completo"></div>
-          <div class="field"><label>CPF *</label><input id="cred-cpf" placeholder="000.000.000-00"></div>
+    <div class="ev-card" style="max-width:600px;margin:0 auto 16px">
+      <h3>✍️ <span id="cred-form-title">Novo Credenciado</span></h3>
+      <input type="hidden" id="cred-id">
+      <div class="form-row cols-2">
+        <div class="field"><label>Nome Completo *</label><input id="cred-nome" placeholder="Nome completo"></div>
+        <div class="field"><label>CPF *</label><input id="cred-cpf" placeholder="000.000.000-00"></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="field"><label>PIS/NIS</label><input id="cred-pis" placeholder="PIS/NIS"></div>
+        <div class="field"><label>Telefone</label><input id="cred-tel" placeholder="(99) 99999-9999"></div>
+      </div>
+      <div class="form-row cols-2">
+        <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
+        <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
+      </div>
+      <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
+      <div class="form-row cols-2">
+        <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>
+        <div class="field"><label>Forma de Pagamento *</label><select id="cred-pgto" onchange="toggleDadosBancarios()"><option value="">Selecione...</option><option value="pix">💳 PIX</option><option value="ted">🏦 TED</option><option value="dinheiro">💵 Dinheiro</option><option value="cheque">📄 Cheque</option></select></div>
+      </div>
+
+      <!-- Dados Bancários -->
+      <div id="cred-dados-bancarios" style="display:none;margin-top:14px;padding:14px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-sm)">
+        <label style="font-size:.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;display:block;margin-bottom:10px">🏦 Dados Bancários</label>
+        <div id="cred-pix-field" style="display:none">
+          <div class="field"><label>Chave PIX</label><input id="cred-chave-pix" placeholder="CPF, e-mail, telefone ou chave aleatória"></div>
         </div>
-        <div class="form-row cols-2">
-          <div class="field"><label>PIS/NIS</label><input id="cred-pis" placeholder="PIS/NIS"></div>
-          <div class="field"><label>Telefone</label><input id="cred-tel" placeholder="(99) 99999-9999"></div>
-        </div>
-        <div class="form-row cols-2">
-          <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
-          <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
-        </div>
-        <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
-        <div class="form-row cols-2">
-          <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>
-          <div class="field"><label>Forma de Pagamento *</label><select id="cred-pgto"><option value="">Selecione...</option><option value="pix">💳 PIX</option><option value="ted">🏦 TED</option><option value="dinheiro">💵 Dinheiro</option><option value="cheque">📄 Cheque</option></select></div>
-        </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
-          <button class="btn btn-primary" onclick="salvarCredenciado()">💾 Salvar</button>
-          <button class="btn btn-ghost" onclick="limparFormCredenciado()">🔄 Novo</button>
+        <div id="cred-ted-field" style="display:none">
+          <div class="form-row cols-2">
+            <div class="field"><label>Banco</label><input id="cred-banco" placeholder="Ex: Banco do Brasil"></div>
+            <div class="field"><label>Agência</label><input id="cred-agencia" placeholder="Ex: 1234-5"></div>
+          </div>
+          <div class="form-row cols-2">
+            <div class="field"><label>Conta</label><input id="cred-conta" placeholder="Ex: 12345-6"></div>
+            <div class="field"><label>Tipo</label><select id="cred-tipo-conta"><option value="">Selecione...</option><option value="corrente">Corrente</option><option value="poupanca">Poupança</option></select></div>
+          </div>
         </div>
       </div>
-      <div class="ev-card">
-        <h3>📋 Credenciados Cadastrados</h3>
-        <input id="busca-credenciado" class="input-filtro" placeholder="Buscar credenciado..." oninput="renderCredenciados()">
-        <div id="tabela-credenciados" style="overflow-x:auto;margin-top:10px"></div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:12px">
+        <button class="btn btn-primary" onclick="salvarCredenciado()">💾 Salvar</button>
+        <button class="btn btn-ghost" onclick="limparFormCredenciado()">🔄 Novo</button>
       </div>
+    </div>
+    <div class="ev-card">
+      <h3>📋 Credenciados Cadastrados</h3>
+      <input id="busca-credenciado" class="input-filtro" placeholder="Buscar credenciado..." oninput="renderCredenciados()">
+      <div id="tabela-credenciados" style="overflow-x:auto;margin-top:10px"></div>
     </div>
   </div>
 
@@ -5826,6 +5842,11 @@ function salvarCredenciado() {
   const endereco = document.getElementById('cred-endereco').value.trim();
   const cargoId = document.getElementById('cred-cargo').value;
   const formaPagamento = document.getElementById('cred-pgto').value;
+  const chavePix = document.getElementById('cred-chave-pix').value.trim();
+  const banco = document.getElementById('cred-banco').value.trim();
+  const agencia = document.getElementById('cred-agencia').value.trim();
+  const conta = document.getElementById('cred-conta').value.trim();
+  const tipoConta = document.getElementById('cred-tipo-conta').value;
   if (!nome) { toastMsg('Informe o nome do credenciado.', 'warning'); return; }
   if (!cpf) { toastMsg('Informe o CPF.', 'warning'); return; }
   if (!cargoId) { toastMsg('Selecione o cargo.', 'warning'); return; }
@@ -5833,9 +5854,9 @@ function salvarCredenciado() {
   const dados = DB.credenciados();
   if (id) {
     const idx = dados.findIndex(c => c.id === id);
-    if (idx >= 0) { dados[idx] = { ...dados[idx], nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento }; }
+    if (idx >= 0) { dados[idx] = { ...dados[idx], nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta }; }
   } else {
-    dados.push({ id: uid(), nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento });
+    dados.push({ id: uid(), nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta });
   }
   DB.saveCredenciados(dados);
   limparFormCredenciado();
@@ -5857,15 +5878,37 @@ function editarCredenciado(id) {
   document.getElementById('cred-endereco').value = c.endereco || '';
   document.getElementById('cred-cargo').value = c.cargoId || '';
   document.getElementById('cred-pgto').value = c.formaPagamento || '';
+  document.getElementById('cred-chave-pix').value = c.chavePix || '';
+  document.getElementById('cred-banco').value = c.banco || '';
+  document.getElementById('cred-agencia').value = c.agencia || '';
+  document.getElementById('cred-conta').value = c.conta || '';
+  document.getElementById('cred-tipo-conta').value = c.tipoConta || '';
   document.getElementById('cred-form-title').textContent = 'Editar Credenciado';
+  toggleDadosBancarios();
   document.querySelector('#pt-sub-credenciados .ev-grid').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function limparFormCredenciado() {
-  ['cred-id','cred-nome','cred-cpf','cred-pis','cred-tel','cred-email','cred-lotacao','cred-endereco'].forEach(id => document.getElementById(id).value = '');
+  ['cred-id','cred-nome','cred-cpf','cred-pis','cred-tel','cred-email','cred-lotacao','cred-endereco','cred-chave-pix','cred-banco','cred-agencia','cred-conta'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cred-cargo').value = '';
   document.getElementById('cred-pgto').value = '';
+  document.getElementById('cred-tipo-conta').value = '';
+  document.getElementById('cred-dados-bancarios').style.display = 'none';
   document.getElementById('cred-form-title').textContent = 'Novo Credenciado';
+}
+
+function toggleDadosBancarios() {
+  const pgto = document.getElementById('cred-pgto').value;
+  const container = document.getElementById('cred-dados-bancarios');
+  const pixField = document.getElementById('cred-pix-field');
+  const tedField = document.getElementById('cred-ted-field');
+  if (pgto === 'pix' || pgto === 'ted') {
+    container.style.display = 'block';
+    pixField.style.display = pgto === 'pix' ? 'block' : 'none';
+    tedField.style.display = pgto === 'ted' ? 'block' : 'none';
+  } else {
+    container.style.display = 'none';
+  }
 }
 
 async function excluirCredenciado(id) {
@@ -6073,6 +6116,8 @@ function imprimirRelPontoIndividual(credId) {
       <div class="info-item"><label>Valor da Hora</label><span>R$ ${(cargo ? parseFloat(cargo.valorHora) : 0).toFixed(2)}</span></div>
       <div class="info-item"><label>Lotação</label><span>${esc(cred.lotacao || '-')}</span></div>
       <div class="info-item"><label>Forma de Pagamento</label><span>${esc(cred.formaPagamento || '-')}</span></div>
+      ${cred.formaPagamento === 'pix' && cred.chavePix ? '<div class="info-item"><label>Chave PIX</label><span>' + esc(cred.chavePix) + '</span></div>' : ''}
+      ${cred.formaPagamento === 'ted' ? '<div class="info-item"><label>Banco</label><span>' + esc(cred.banco || '-') + '</span></div><div class="info-item"><label>Agência/Conta</label><span>' + esc(cred.agencia || '-') + ' / ' + esc(cred.conta || '-') + '</span></div>' : ''}
     </div>`;
 
   if (credPontos.length) {
