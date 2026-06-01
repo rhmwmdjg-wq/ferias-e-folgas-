@@ -5587,29 +5587,28 @@ const DB = {
   saveEventos: async (d) => {
     _remoteData.eventos = d;
     localStorage.setItem('srv_eventos', JSON.stringify(d));
-    let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.rpc('salvar_evento', { p_dados: d[i] });
+        const { error } = await supabaseClient.from('eventos').upsert(d[i], { onConflict: 'id' });
         if (error) {
           if (isQuotaError(error)) { saveToSyncQueue('eventos', d[i]); }
-          else { console.error("Erro Supabase (eventos):", error); todosOk = false; }
+          else {
+            const { error: err2 } = await supabaseClient.rpc('salvar_evento', { p_dados: d[i] });
+            if (err2) { if (isQuotaError(err2)) saveToSyncQueue('eventos', d[i]); else console.error("Erro ao salvar evento:", err2); }
+          }
         }
       } catch (e) {
         if (isQuotaError(e)) { saveToSyncQueue('eventos', d[i]); }
-        else { console.error("Erro ao salvar evento:", e); todosOk = false; }
+        else { console.error("Erro ao salvar evento:", e); }
       }
-    }
-    if (!todosOk) {
-      toastMsg("Alguns eventos não puderam ser sincronizados com a nuvem. Dados salvos localmente.", "warning");
     }
   },
   deleteEvento: async (id) => {
     try {
-      const { error } = await supabaseClient.rpc('deletar_evento', { p_id: id });
-      if (error) { console.error("Erro Supabase ao deletar evento (RPC):", error); }
-      const { error: err2 } = await supabaseClient.from('eventos').delete().eq('id', id);
-      if (err2 && err2.code !== 'PGRST116') console.error("Erro Supabase ao deletar evento (direto):", err2);
+      const { error } = await supabaseClient.from('eventos').delete().eq('id', id);
+      if (error && error.code !== 'PGRST116') {
+        await supabaseClient.rpc('deletar_evento', { p_id: id }).catch(() => {});
+      }
     } catch (e) { console.error("Erro ao deletar evento:", e); }
   },
 
@@ -5617,35 +5616,28 @@ const DB = {
   saveVeiculos: async (d) => {
     _remoteData.veiculos = d;
     localStorage.setItem('srv_veiculos', JSON.stringify(d));
-    let todosOk = true;
     for (let i = 0; i < d.length; i++) {
       try {
-        const { error } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
-        if (error && !isQuotaError(error)) {
-          console.error("Erro Supabase (veiculos):", error);
-          todosOk = false;
-        } else if (error) {
-          saveToSyncQueue('veiculos', d[i]);
+        const { error } = await supabaseClient.from('veiculos').upsert(d[i], { onConflict: 'id' });
+        if (error) {
+          if (isQuotaError(error)) { saveToSyncQueue('veiculos', d[i]); }
+          else {
+            const { error: err2 } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
+            if (err2) { if (isQuotaError(err2)) saveToSyncQueue('veiculos', d[i]); else console.error("Erro ao salvar veículo:", err2); }
+          }
         }
       } catch (e) {
-        if (isQuotaError(e)) {
-          saveToSyncQueue('veiculos', d[i]);
-        } else {
-          console.error("Erro ao salvar veículo:", e);
-          todosOk = false;
-        }
+        if (isQuotaError(e)) { saveToSyncQueue('veiculos', d[i]); }
+        else { console.error("Erro ao salvar veículo:", e); }
       }
-    }
-    if (!todosOk) {
-      toastMsg("Alguns veículos não puderam ser sincronizados com a nuvem. Dados salvos localmente.", "warning");
     }
   },
   deleteVeiculo: async (id) => {
     try {
-      const { error } = await supabaseClient.rpc('deletar_veiculo', { p_id: id });
-      if (error) { console.error("Erro Supabase ao deletar veículo (RPC):", error); }
-      const { error: err2 } = await supabaseClient.from('veiculos').delete().eq('id', id);
-      if (err2 && err2.code !== 'PGRST116') console.error("Erro Supabase ao deletar veículo (direto):", err2);
+      const { error } = await supabaseClient.from('veiculos').delete().eq('id', id);
+      if (error && error.code !== 'PGRST116') {
+        await supabaseClient.rpc('deletar_veiculo', { p_id: id }).catch(() => {});
+      }
     } catch (e) { console.error("Erro ao deletar veículo:", e); }
   },
 
@@ -12811,6 +12803,10 @@ function imprimirEvento(id) {
       .tag { display:inline-block; padding:2px 8px; border-radius:4px; font-size:11px; font-weight:700; margin:1px; }
       .tag-green { background:#d4edda; color:#155724; }
       .tag-warn { background:#fff3cd; color:#856404; }
+      .sig-area { text-align: center; margin-top: 60px; }
+      .sig-line { width: 300px; border-top: 1.5px solid #000; margin: 0 auto 8px; }
+      .sig-nome { font-weight: 700; font-size: 14px; }
+      .sig-cargo { font-size: 11px; color: #555; }
       @media print { body { padding: 20px; } }
     </style></head><body>
     ${imgPrint ? `<div class="logo-area"><img src="${imgPrint}"></div>` : ''}
@@ -12825,18 +12821,20 @@ function imprimirEvento(id) {
     </table>
     <h3 style="margin-top:25px">👥 Profissionais Escalados</h3>
     <table>
-      <thead><tr><th>Profissional</th><th>Categoria</th><th>Pagamento</th></tr></thead>
+      <thead><tr><th>Profissional</th><th>Categoria</th></tr></thead>
       <tbody>
         ${(e.profissionais || []).map(p => {
           const srv = srvMap[p.srvId];
           const nome = srv ? srv.nome : '?';
-          const pagto = p.tipoPagamento === 'dinheiro'
-            ? `<span class="tag tag-warn">💰 ${p.valorHE}h extras</span>`
-            : `<span class="tag tag-green">🌴 ${p.diasFolga} dias de folga</span>`;
-          return `<tr><td>${esc(nome)}</td><td>${esc(p.categoria)}</td><td>${pagto}</td></tr>`;
+          return `<tr><td>${esc(nome)}</td><td>${esc(p.categoria)}</td></tr>`;
         }).join('')}
       </tbody>
     </table>
+    <div class="sig-area">
+      <div class="sig-line"></div>
+      <div class="sig-nome">RUAN PABLO FERREIRA DOS SANTOS</div>
+      <div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div>
+    </div>
     <div class="footer">
       ${esc(orgNome)}<br>
       Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão<br>
