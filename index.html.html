@@ -2701,6 +2701,30 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
     <span style="margin-left:auto;font-size:.75rem;color:var(--muted)" id="ma-total-info">Carregando...</span>
   </div>
 
+  <!-- Impressão por Setor -->
+  <div class="card" style="margin-bottom:16px;padding:14px 18px">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <span style="font-size:.8rem;font-weight:700;color:var(--text)">🖨️ Imprimir Mapa por Setor</span>
+      <div class="field" style="margin:0"><label style="font-size:.65rem">Período Início</label><input id="ma-print-inicio" type="date" style="padding:6px 10px;font-size:.78rem"></div>
+      <div class="field" style="margin:0"><label style="font-size:.65rem">Período Fim</label><input id="ma-print-fim" type="date" style="padding:6px 10px;font-size:.78rem"></div>
+      <div class="field" style="margin:0"><label style="font-size:.65rem">Setor</label>
+        <select id="ma-print-setor" style="padding:6px 10px;font-size:.78rem"><option value="">Todos os Setores</option></select>
+      </div>
+      <button class="btn btn-primary btn-sm" onclick="toggleMaGestores()" style="margin-top:12px">👤 Assinaturas</button>
+      <button class="btn btn-success btn-sm" onclick="imprimirMapaAusencias()" style="margin-top:12px">🖨️ Imprimir</button>
+    </div>
+    <div id="ma-gestores-area" style="display:none;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.07em">Gerentes para Assinar</label>
+      <div id="ma-gestores-lista"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <select id="ma-gestor-add-select" style="flex:1;padding:7px 10px;background:var(--card);border:1px solid var(--border-mid);border-radius:var(--r-sm);color:var(--text);font-family:var(--font);font-size:.82rem">
+          <option value="">Selecione um gestor...</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="adicionarGestorMapa()">➕ Adicionar</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Container do Grid -->
   <div class="card" style="padding:0;overflow:auto">
     <div id="ma-grid-container" style="min-width:400px;padding:16px">
@@ -11527,6 +11551,11 @@ function iniciarMapaAusencias() {
   const setores = getTodosSetores();
   sel.innerHTML = '<option value="">Todos os Setores</option>' +
     setores.map(s => `<option value="${s}">${s}</option>`).join('');
+  const selPrint = document.getElementById('ma-print-setor');
+  if (selPrint) {
+    selPrint.innerHTML = '<option value="">Todos os Setores</option>' +
+      setores.map(s => `<option value="${s}">${s}</option>`).join('');
+  }
   renderMapaAusencias();
 }
 
@@ -11843,6 +11872,184 @@ function anexarTooltipMapa() {
       abrirModalAusencias(cell);
     });
   });
+}
+
+// ===================== IMPRESSÃO MAPA DE AUSÊNCIAS =====================
+let _maGestoresList = [];
+
+function toggleMaGestores() {
+  const area = document.getElementById('ma-gestores-area');
+  area.style.display = area.style.display === 'none' ? 'block' : 'none';
+  if (area.style.display === 'block') {
+    renderMaGestores();
+    const sel = document.getElementById('ma-gestor-add-select');
+    if (sel) {
+      const gestores = DB.gestores();
+      sel.innerHTML = '<option value="">Selecione um gestor...</option>' +
+        gestores.filter(g => !_maGestoresList.find(x => x.id === g.id))
+          .map(g => `<option value="${g.id}">${esc(g.nome)}</option>`).join('');
+    }
+  }
+}
+
+function adicionarGestorMapa() {
+  const sel = document.getElementById('ma-gestor-add-select');
+  if (!sel || !sel.value) { toastMsg('Selecione um gestor.', 'warning'); return; }
+  const id = sel.value;
+  const gestores = DB.gestores();
+  const g = gestores.find(x => x.id === id);
+  if (!g) return;
+  if (_maGestoresList.find(x => x.id === id)) return;
+  _maGestoresList.push({ id: g.id, nome: g.nome, cargo: g.cargo || 'Gerente' });
+  sel.value = '';
+  renderMaGestores();
+  const gestoresDisp = gestores.filter(x => !_maGestoresList.find(y => y.id === x.id));
+  sel.innerHTML = '<option value="">Selecione um gestor...</option>' +
+    gestoresDisp.map(g => `<option value="${g.id}">${esc(g.nome)}</option>`).join('');
+}
+
+function removerGestorMapa(id) {
+  _maGestoresList = _maGestoresList.filter(x => x.id !== id);
+  renderMaGestores();
+  const sel = document.getElementById('ma-gestor-add-select');
+  if (sel) {
+    const gestores = DB.gestores();
+    const gestoresDisp = gestores.filter(x => !_maGestoresList.find(y => y.id === x.id));
+    sel.innerHTML = '<option value="">Selecione um gestor...</option>' +
+      gestoresDisp.map(g => `<option value="${g.id}">${esc(g.nome)}</option>`).join('');
+  }
+}
+
+function renderMaGestores() {
+  const container = document.getElementById('ma-gestores-lista');
+  if (!container) return;
+  if (!_maGestoresList.length) {
+    container.innerHTML = '<div style="font-size:.78rem;color:var(--muted);padding:6px 0">Nenhum gestor adicionado.</div>';
+    return;
+  }
+  container.innerHTML = _maGestoresList.map(g =>
+    `<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);margin-bottom:4px">
+      <span style="flex:1;font-size:.82rem;font-weight:600">👤 ${esc(g.nome)}</span>
+      <button class="btn btn-danger btn-sm" onclick="removerGestorMapa('${g.id}')" style="padding:3px 8px;font-size:.7rem">✕</button>
+    </div>`
+  ).join('');
+}
+
+function imprimirMapaAusencias() {
+  const dataInicio = document.getElementById('ma-print-inicio').value;
+  const dataFim = document.getElementById('ma-print-fim').value;
+  const setor = document.getElementById('ma-print-setor').value;
+  if (!dataInicio || !dataFim) { toastMsg('Selecione o período.', 'warning'); return; }
+
+  const servidores = getServidoresAcessiveis();
+  const programacoes = getProgramacoesAcessiveis();
+  const folgas = getFolgasAcessiveis();
+  const imgPrint = getImg('print');
+  const cfg = DB.config();
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+
+  let inicio = new Date(dataInicio + 'T00:00:00');
+  let fim = new Date(dataFim + 'T00:00:00');
+  const dias = [];
+  for (let d = new Date(inicio); d <= fim; d.setDate(d.getDate() + 1)) {
+    dias.push(new Date(d));
+  }
+
+  const servidoresSetor = setor ? servidores.filter(s => s.setor === setor) : servidores;
+  const setoresLista = setor ? [setor] : [...new Set(servidores.map(s => s.setor).filter(Boolean))].sort();
+
+  let html = `
+  <html><head><title>Mapa de Ausências - ${setor || 'Geral'}</title>
+  <style>
+    @page { margin: 10mm 8mm; size: landscape; }
+    body { font-family: Arial, sans-serif; color: #222; font-size: 9px; }
+    .logo-area { text-align: center; margin-bottom: 6px; }
+    .logo-area img { max-height: 55px; object-fit: contain; }
+    h1 { text-align: center; font-size: 14px; margin-bottom: 2px; }
+    .subtitle { text-align: center; color: #555; font-size: 10px; margin-bottom: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 8px; }
+    th { background: #1a3a5c; color: #fff; padding: 4px 3px; text-align: center; font-size: 7px; text-transform: uppercase; }
+    td { padding: 3px; border: 1px solid #ccc; text-align: center; font-size: 7px; }
+    .setor-label { text-align: left; font-weight: 700; background: #f5f5f5; font-size: 8px; white-space: nowrap; }
+    .weekend { background: #fafafa; }
+    .cell-ferias { background: rgba(77,123,255,0.3); }
+    .cell-folga { background: rgba(15,212,136,0.3); }
+    .cell-ferias-folga { background: linear-gradient(135deg, rgba(77,123,255,0.3) 50%, rgba(15,212,136,0.3) 50%); }
+    .total-row td { font-weight: 700; border-top: 2px solid #333; background: #f0f0f0; }
+    .sig-area { text-align: center; margin-top: 30px; }
+    .sig-item { display: inline-block; margin: 0 30px; text-align: center; }
+    .sig-line { width: 200px; border-top: 1.5px solid #000; margin: 0 auto 5px; }
+    .sig-nome { font-weight: 700; font-size: 10px; }
+    .sig-cargo { font-size: 8px; color: #555; }
+    .footer { text-align: center; margin-top: 15px; font-size: 7px; color: #888; border-top: 1px solid #ccc; padding-top: 6px; }
+    .legenda { margin: 8px 0; font-size: 7px; display: flex; gap: 10px; justify-content: center; }
+    .leg-item { display: inline-flex; align-items: center; gap: 3px; }
+    .leg-cor { width: 10px; height: 10px; border: 1px solid #ccc; display: inline-block; }
+    @media print { body { padding: 0; } }
+  </style></head><body>
+    ${imgPrint ? `<div class="logo-area"><img src="${imgPrint}"></div>` : ''}
+    <h1>Mapa de Ausências</h1>
+    <div class="subtitle">${esc(orgNome)} — ${setor ? 'Setor: '+esc(setor) : 'Todos os Setores'} — ${dias[0].toLocaleDateString('pt-BR')} a ${dias[dias.length-1].toLocaleDateString('pt-BR')}</div>
+
+    <div class="legenda">
+      <span class="leg-item"><span class="leg-cor" style="background:rgba(77,123,255,0.4)"></span> Férias</span>
+      <span class="leg-item"><span class="leg-cor" style="background:rgba(15,212,136,0.4)"></span> Folgas</span>
+    </div>
+
+    <table>
+      <thead><tr><th style="text-align:left;min-width:100px">Setor</th>${dias.map(d => `<th${d.getDay()===0||d.getDay()===6?' class="weekend"':''}>${d.getDate()}/${d.getMonth()+1}</th>`).join('')}</tr></thead>
+      <tbody>`;
+
+  setoresLista.forEach(s => {
+    html += '<tr>';
+    html += `<td class="setor-label">${esc(s)}</td>`;
+    dias.forEach(dia => {
+      const diaISO = dia.toISOString().split('T')[0];
+      const { ferias, folga } = contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, s, '');
+      let corClass = '';
+      if (ferias > 0 && folga > 0) corClass = 'cell-ferias-folga';
+      else if (ferias > 0) corClass = 'cell-ferias';
+      else if (folga > 0) corClass = 'cell-folga';
+      const total = ferias + folga;
+      const diaSem = dia.getDay();
+      html += `<td class="${corClass}${diaSem===0||diaSem===6?' weekend':''}">${total || '-'}</td>`;
+    });
+    html += '</tr>';
+  });
+
+  // Total row
+  html += '<tr class="total-row"><td class="setor-label">Total</td>';
+  dias.forEach(dia => {
+    const diaISO = dia.toISOString().split('T')[0];
+    let totalDia = 0;
+    setoresLista.forEach(s => {
+      totalDia += contarAusencias(dia, diaISO, servidores, programacoes, folgas, s, '');
+    });
+    html += `<td>${totalDia || '-'}</td>`;
+  });
+  html += '</tr>';
+
+  html += '</tbody></table>';
+
+  // Signatures
+  if (_maGestoresList.length) {
+    html += '<div class="sig-area">';
+    _maGestoresList.forEach(g => {
+      html += `<div class="sig-item"><div class="sig-line"></div><div class="sig-nome">${esc(g.nome)}</div><div class="sig-cargo">${esc(g.cargo)}</div></div>`;
+    });
+    html += '</div>';
+  }
+
+  html += `
+    <div class="footer">
+      ${esc(orgNome)} — Documento gerado em ${new Date().toLocaleString('pt-BR')}
+    </div>
+    <script>window.onload=function(){window.print();}<\/script>
+  </body></html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
 }
 
 function exportarRelatorioMensalPDF() {
