@@ -492,7 +492,7 @@ header {
 /* ================================================================
    FORMS
 ================================================================ */
-.form-row { display:grid; gap:12px; margin-bottom:12px; }
+.grid-4 { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:14px; }
 .form-row.cols-2 { grid-template-columns:1fr 1fr; }
 .form-row.cols-3 { grid-template-columns:repeat(3,1fr); }
 
@@ -2207,6 +2207,10 @@ tr:hover td { background:rgba(77,123,255,0.03); color:var(--text); }
        <div class="lbl">Em Gozo HOJE</div>
     </div>
     <div class="stat"><div class="val" id="stat-total">0</div><div class="lbl">Total Servidores</div></div>
+    <div class="stat" style="background:var(--primary-dim);border:1px solid rgba(77,123,255,0.25)">
+      <div class="val" id="stat-autorizacoes" style="font-size:1.6rem">0</div>
+      <div class="lbl">📜 Autorizações Assinadas</div>
+    </div>
   </div>
 
   <!-- Gráficos -->
@@ -4465,7 +4469,7 @@ async function migrarFotosLegado() {
 // Cache local para manter compatibilidade com funções síncronas do sistema
 /* ===================== SKELETON LOADERS ===================== */
 function mostrarSkeletonsDashboard() {
-  const stats = ['stat-count-anual', 'stat-count-premium', 'stat-total'];
+  const stats = ['stat-count-anual', 'stat-count-premium', 'stat-total', 'stat-autorizacoes'];
   stats.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.innerHTML = '<div class="skeleton skeleton-text" style="height:32px; width:60px; margin:0 auto"></div>';
@@ -4667,6 +4671,14 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('programacoes', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_programacoes') || '[]');
+    data.forEach(d => {
+      const local = locais.find(l => l.id === d.id);
+      if (local) {
+        if (local.autorizado) d.autorizado = true;
+        if (local.autorizadoEm) d.autorizadoEm = local.autorizadoEm;
+        if (local.autorizadoPor) d.autorizadoPor = local.autorizadoPor;
+      }
+    });
     const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
     const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
     
@@ -4725,8 +4737,12 @@ async function syncComSupabase(silencioso = false) {
   });
 
   await syncTabela('autorizacoes', '*', (data) => {
-    _remoteData.autorizacoes = data;
-    if (data.length > 0) localStorage.setItem('srv_autorizacoes', JSON.stringify(data));
+    const locais = JSON.parse(localStorage.getItem('srv_autorizacoes') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const unificados = [...data, ...pendentes];
+    _remoteData.autorizacoes = unificados;
+    localStorage.setItem('srv_autorizacoes', JSON.stringify(unificados));
   });
 
   await syncTabela('eventos', '*', (data) => {
@@ -5291,7 +5307,7 @@ const DB = {
           toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
         } else {
           console.error("Erro Supabase (programacoes):", error);
-          toastMsg("Erro ao sincronizar programações: " + error.message, "error");
+          saveToSyncQueue('programacoes', d);
         }
       }
     } catch (e) {
@@ -5299,7 +5315,8 @@ const DB = {
         saveToSyncQueue('programacoes', d);
         toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
       } else {
-        throw e;
+        console.warn("Rede indisponível para sync de programações. Dados salvos localmente.", e);
+        saveToSyncQueue('programacoes', d);
       }
     }
   },
@@ -6862,7 +6879,7 @@ function renderProgramacoes() {
     const diff = diffDays(p.inicio);
     const sit = diff < 0 ? 'Concluída' : diff === 0 ? 'Iniciando HOJE' : diff <= 10 ? 'Urgente' : diff <= 35 ? 'Próxima' : 'Agendada';
     const cls = diff < 0 ? 'tag-green' : diff === 0 ? 'tag-red' : diff <= 10 ? 'tag-red' : diff <= 35 ? 'tag-warn' : 'tag-blue';
-    return '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><strong>' + esc(srv?.nome || 'Servidor removido') + '</strong><div style="font-size:.78rem;color:var(--muted)">' + (p.tipo === 'anual' ? '🌴 Férias Anuais' : '🏆 Férias Prêmio') + ' · ' + fmtDate(p.inicio) + ' → ' + fmtDate(p.fim || p.inicio) + ' · Retorno: ' + fmtDate(p.retorno || addDays(p.fim || p.inicio, 1)) + '</div><div style="font-size:.75rem;color:var(--muted)">Período: ' + (p.periodo || '-') + '</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tag ' + cls + '">' + sit + '</span><button class="btn btn-danger btn-sm" onclick="excluirProgRel(\'' + p.id + '\')">🗑️</button></div></div>';
+    return '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><strong>' + esc(srv?.nome || 'Servidor removido') + (p.autorizado ? ' <span class="tag tag-green" style="font-size:.65rem">✅ Autorizado</span>' : '') + '</strong><div style="font-size:.78rem;color:var(--muted)">' + (p.tipo === 'anual' ? '🌴 Férias Anuais' : '🏆 Férias Prêmio') + ' · ' + fmtDate(p.inicio) + ' → ' + fmtDate(p.fim || p.inicio) + ' · Retorno: ' + fmtDate(p.retorno || addDays(p.fim || p.inicio, 1)) + '</div><div style="font-size:.75rem;color:var(--muted)">Período: ' + (p.periodo || '-') + '</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tag ' + cls + '">' + sit + '</span>' + (p.autorizado ? '' : '<button class="btn btn-primary btn-sm" onclick="abrirModalAutorizacao(\'' + p.srvId + '\',\'' + p.inicio + '\',\'' + (p.fim || '') + '\',\'' + p.tipo + '\',\'' + (p.periodo || '') + '\')">📄 Autorizar</button>') + '<button class="btn btn-danger btn-sm" onclick="excluirProgRel(\'' + p.id + '\')">🗑️</button></div></div>';
   }).join('');
 }
 
@@ -6935,11 +6952,11 @@ function renderAlertas() {
     if (!srv) return;
 
     // Verificar se está em gozo HOJE
-    if (!p.concluido && p.inicio <= hojeIso && (p.fim >= hojeIso)) {
+    if (!p.concluido && !p.autorizado && p.inicio <= hojeIso && (p.fim >= hojeIso)) {
        emGozoHoje.push({ ...p, srv });
     }
 
-    if (p.concluido) return;
+    if (p.concluido || p.autorizado) return;
     const diff = diffDays(p.inicio);
     const limite = p.tipo === 'anual' ? 35 : 65;
     if (diff >= 0 && diff <= limite) {
@@ -6970,6 +6987,10 @@ function renderAlertas() {
   renderListaAlertas('lista-alertas-anual', anuais, 'anual');
   renderListaAlertas('lista-alertas-premium', premium, 'premium');
   document.getElementById('badge-alertas').textContent = anuais.length + premium.length;
+
+  // Autorizações assinadas
+  const autorizacoes = DB.autorizacoes();
+  document.getElementById('stat-autorizacoes').textContent = autorizacoes.length;
 }
 
 function renderListaGozoHoje(lista) {
@@ -7253,9 +7274,31 @@ function renderListaAlertas(containerId, lista, tipo) {
           ? `<button class="btn btn-success btn-sm" onclick="prepararWhatsApp('${item.srv.id}','${item.id}')" title="Enviar lembrete via WhatsApp">💬 WhatsApp</button>`
           : `<button class="btn btn-ghost btn-sm" title="Cadastre o telefone do servidor" disabled>📵 Sem Tel.</button>`}
         <button class="btn btn-primary btn-sm" onclick="avancarStatusProg('${item.id}')" title="Marcar como concluído/entregue">✅ Dar Baixa</button>
+        <button class="btn btn-ghost btn-sm" onclick="ocultarAlerta('${item.id}')" title="Remover do dashboard" style="font-size:1rem;padding:4px 8px;opacity:.5">✕</button>
       </div>
     </div>`;
   }).join('');
+}
+
+function avancarStatusProg(id) {
+  const programacoes = DB.programacoes();
+  const prog = programacoes.find(p => p.id === id);
+  if (!prog) return toastMsg('Programação não encontrada.', 'error');
+  prog.concluido = true;
+  DB.saveProgramacoes(programacoes);
+  renderDashboard();
+  toastMsg('✅ Programação marcada como concluída!');
+}
+
+function ocultarAlerta(id) {
+  const programacoes = DB.programacoes();
+  const prog = programacoes.find(p => p.id === id);
+  if (!prog) return toastMsg('Programação não encontrada.', 'error');
+  prog.autorizado = true;
+  prog.autorizadoEm = new Date().toISOString();
+  prog.autorizadoPor = 'Manual';
+  DB.saveProgramacoes(programacoes);
+  renderDashboard();
 }
 
 function atualizarBadge() {
@@ -10865,7 +10908,7 @@ function imprimirRelatorioBancoHorasGeral() {
 // ===================== AUTORIZAÇÃO DE CONCESSÃO DE FÉRIAS =====================
 let autTipoPeriodo = 0;
 
-function abrirModalAutorizacao() {
+function abrirModalAutorizacao(srvId, inicio, fim, tipo, periodo) {
   autTipoPeriodo = 0;
   const srvs = DB.servidores();
   const sel = document.getElementById('aut-servidor');
@@ -10881,6 +10924,22 @@ function abrirModalAutorizacao() {
   document.getElementById('aut-terco-mes').value = '';
   document.querySelectorAll('.periodo-option').forEach(o => o.classList.remove('selected'));
   document.getElementById('modal-autorizacao').classList.add('open');
+  if (srvId) {
+    sel.value = srvId;
+    atualizarDadosAutorizacao();
+  }
+  if (inicio && fim) {
+    document.getElementById('aut-tipo-ferias').value = tipo === 'premio' ? 'premio' : 'regulamentar';
+    if (periodo) document.getElementById('aut-periodo-ref').value = periodo;
+    toggleTercoSection();
+    selecionarTipoPeriodo(1);
+    document.getElementById('aut-inicio-1').value = inicio;
+    document.getElementById('aut-fim-1').value = fim;
+    const retorno = addDays(inicio, 30);
+    const retEl = document.getElementById('aut-retorno-1');
+    retEl.style.display = 'block';
+    retEl.textContent = '↩️ Retorno: ' + fmtDate(retorno);
+  }
 }
 
 function atualizarDadosAutorizacao() {
@@ -10971,7 +11030,7 @@ async function salvarTextoAutorizacao() {
   toastMsg('Texto da autorização salvo!');
 }
 
-function gerarAutorizacaoFerias() {
+async function gerarAutorizacaoFerias() {
   const srvId = document.getElementById('aut-servidor').value;
   if (!srvId) return toastMsg('Selecione o servidor!', 'error');
   const tipoFerias = document.getElementById('aut-tipo-ferias').value;
@@ -11025,8 +11084,26 @@ function gerarAutorizacaoFerias() {
     dataEmissao: new Date().toISOString()
   });
 
+  // Marcar programações como autorizadas
+  const programacoes = DB.programacoes();
+  let alterou = false;
+  programacoes.forEach(p => {
+    if (p.srvId === srv.id && !p.concluido && !p.autorizado) {
+      periodos.forEach(per => {
+        if (p.inicio === per.inicio && p.fim === per.fim) {
+          p.autorizado = true;
+          p.autorizadoEm = new Date().toISOString();
+          p.autorizadoPor = cfg.coordenadorAPS || 'Coordenador';
+          alterou = true;
+        }
+      });
+    }
+  });
+  if (alterou) await DB.saveProgramacoes(programacoes);
+
   fecharModal('modal-autorizacao');
-  toastMsg('Autorização salva no histórico!');
+  toastMsg('Autorização salva no histórico! Férias marcadas como autorizadas no sistema.');
+  renderDashboard();
   DB.saveLog('Documento', `Gerou Autorização de Férias para ${srv.nome} (${tipoFerias === 'premio' ? 'Prêmio' : 'Regulamentar'})`, 'servidores', srv.id);
 }
 
