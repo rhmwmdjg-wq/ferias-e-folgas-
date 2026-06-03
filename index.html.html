@@ -4294,6 +4294,9 @@ function renderAposSync(tabelaAlterada) {
     case 'panel-ponto':
       if (typeof renderCargos === 'function') { renderCargos(); renderCredenciados(); renderFechamentos(); }
       break;
+    case 'panel-autorizacoes':
+      renderAutorizacoes();
+      break;
     case 'panel-alertas':
       // Dashboard já foi re-renderizado acima
       break;
@@ -4740,6 +4743,7 @@ async function syncComSupabase(silencioso = false) {
     const locais = JSON.parse(localStorage.getItem('srv_autorizacoes') || '[]');
     const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
     const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('autorizacoes', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.autorizacoes = unificados;
     localStorage.setItem('srv_autorizacoes', JSON.stringify(unificados));
@@ -5615,9 +5619,9 @@ const DB = {
     localStorage.setItem('srv_autorizacoes', JSON.stringify(_remoteData.autorizacoes));
     try {
       const { error } = await supabaseClient.from('autorizacoes').upsert(obj);
-      if (error && isQuotaError(error)) saveToSyncQueue('autorizacoes', obj);
+      if (error) saveToSyncQueue('autorizacoes', obj);
     } catch (e) {
-      if (isQuotaError(e)) saveToSyncQueue('autorizacoes', obj);
+      saveToSyncQueue('autorizacoes', obj);
     }
   },
   deleteAutorizacao: async (id) => {
@@ -11065,7 +11069,7 @@ async function gerarAutorizacaoFerias() {
 
   // Salvar no histórico de autorizações
   const tipoParc = periodos.length === 1 ? 'Integral (30 dias)' : periodos.length === 2 ? '2 períodos de 15 dias' : '3 períodos de 10 dias';
-  DB.saveAutorizacao({
+  await DB.saveAutorizacao({
     id: uid(),
     srvId: srv.id,
     srvNome: srv.nome,
@@ -11104,6 +11108,8 @@ async function gerarAutorizacaoFerias() {
   fecharModal('modal-autorizacao');
   toastMsg('Autorização salva no histórico! Férias marcadas como autorizadas no sistema.');
   renderDashboard();
+  const panelAtivo = document.querySelector('.tab-panel.active');
+  if (panelAtivo && panelAtivo.id === 'panel-autorizacoes') renderAutorizacoes();
   DB.saveLog('Documento', `Gerou Autorização de Férias para ${srv.nome} (${tipoFerias === 'premio' ? 'Prêmio' : 'Regulamentar'})`, 'servidores', srv.id);
 }
 
