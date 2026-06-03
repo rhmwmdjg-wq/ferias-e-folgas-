@@ -5782,6 +5782,16 @@ function getImg(lado) {
   return localStorage.getItem('srv_img_' + lado);
 }
 
+function getAssinaturaCoordenador() {
+  const cfg = DB.config();
+  const nome = cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos';
+  return '<div style="margin-top:50px;page-break-inside:avoid;text-align:center">' +
+    '<div style="border-top:1.5px solid #000;width:300px;margin:0 auto 8px"></div>' +
+    '<div style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">' + esc(nome) + '</div>' +
+    '<div style="font-size:9px;color:#444;font-weight:600">Coordenador da Atenção Primária à Saúde</div>' +
+  '</div>';
+}
+
 // ===================== PONTO CREDENCIADOS =====================
 function togglePtSubtab(subtab, btn) {
   document.querySelectorAll('#pt-subtabs .ev-tab').forEach(b => b.classList.remove('active'));
@@ -6218,7 +6228,7 @@ function imprimirRelPontoIndividual(credId, filtroMes, filtroAno) {
   }
 
   html += '<div class="footer">Relatório gerado em ' + new Date().toLocaleString('pt-BR') + '</div>';
-  html += '</body></html>';
+  html += getAssinaturaCoordenador() + '</body></html>';
 
   const win = window.open('', '_blank');
   win.document.write(html);
@@ -6280,7 +6290,7 @@ function imprimirRelPontoMes(mes, ano) {
   }
 
   html += '<div class="footer">Relatório gerado em ' + new Date().toLocaleString('pt-BR') + '</div>';
-  html += '</body></html>';
+  html += getAssinaturaCoordenador() + '</body></html>';
 
   const win = window.open('', '_blank');
   win.document.write(html);
@@ -8661,6 +8671,7 @@ function imprimirRelatorio(tipo) {
       <span>© ${hoje.getFullYear()} — ${DB.config().nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde'}</span>
       <span>Emitido em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
     </div>
+    ${getAssinaturaCoordenador()}
   </body></html>`);
   win.document.close();
 }
@@ -8770,7 +8781,7 @@ function imprimirRelatorioIndividual(srvId, tipo) {
       </div>
       <div class="sig-area">
         <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div class="sig-sub">Servidor(a) - Mat. ${srv.matricula}</div></div>
-        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Coordenador (a) APS</div><div class="sig-sub">Carimbo e Assinatura</div></div>
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(DB.config().coordenadorAPS || 'Ruan Pablo Ferreira dos Santos')}</div><div class="sig-sub">Coordenador da Atenção Primária à Saúde</div></div>
       </div>
       <div class="footer-print">
         <span>© ${hoje.getFullYear()} - COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE</span>
@@ -8871,6 +8882,7 @@ function imprimirComprovanteFolga(folgaId) {
           Documento emitido eletronicamente em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR')}
         </div>
       </div>
+      ${getAssinaturaCoordenador()}
     </body>
     </html>
   `;
@@ -9219,6 +9231,10 @@ function initApp() {
   popularSelectsFolgas();
   atualizarPreview();
   const cfg = DB.config();
+  if (!cfg.coordenadorAPS) {
+    cfg.coordenadorAPS = 'Ruan Pablo Ferreira dos Santos';
+    DB.saveConfig(cfg);
+  }
   if (cfg.decreto) {
     document.getElementById('cfg-decreto').value = cfg.decreto;
   }
@@ -10800,6 +10816,7 @@ function imprimirRelatorioBancoHoras() {
         <span>© ${hoje.getFullYear()} - ${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</span>
         <span>Página 1 de 1</span>
       </div>
+      ${getAssinaturaCoordenador()}
     </body>
     </html>
   `;
@@ -10924,6 +10941,7 @@ function imprimirRelatorioBancoHorasGeral() {
         <span>© ${hoje.getFullYear()} - ${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</span>
         <span>Página 1 de 1</span>
       </div>
+      ${getAssinaturaCoordenador()}
     </body>
     </html>
   `;
@@ -12128,6 +12146,8 @@ function imprimirMapaAusencias() {
     html += '</div>';
   }
 
+  html += getAssinaturaCoordenador();
+
   html += `
     <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
@@ -12388,6 +12408,7 @@ function exportarRelatorioMensalPDF() {
       <span>© ${hoje.getFullYear()} — ${DB.config().nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde'}</span>
       <span>Emitido em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}</span>
     </div>
+    ${getAssinaturaCoordenador()}
   </body></html>`);
   win.document.close();
 }
@@ -13136,6 +13157,7 @@ function imprimirEvento(id) {
       Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão<br>
       ${esc(e.nome)} - ${e.data}
     </div>
+    ${getAssinaturaCoordenador()}
     <script>window.onload=function(){window.print();}<\/script>
     </body></html>
   `);
@@ -13219,6 +13241,7 @@ function imprimirEventosMes() {
       ${esc(orgNome)}<br>
       Relatório gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão
     </div>
+    ${getAssinaturaCoordenador()}
     <script>window.onload=function(){window.print();}<\/script>
   </body></html>`;
 
