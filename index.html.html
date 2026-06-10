@@ -8875,14 +8875,13 @@ function imprimirComprovanteFolga(folgaId) {
 
         <div class="sig-area">
           <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div style="font-size: 9px;">Assinatura do Servidor</div></div>
-          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Coordenador (a) APS</div><div style="font-size: 9px;">Carimbo e Assinatura</div></div>
+          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(DB.config().coordenadorAPS || 'Ruan Pablo Ferreira dos Santos')}</div><div style="font-size: 9px;">Coordenador da Atenção Primária à Saúde</div></div>
         </div>
         
         <div style="text-align: center; margin-top: 50px; font-size: 9px; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
           Documento emitido eletronicamente em ${hoje.toLocaleDateString('pt-BR')} às ${hoje.toLocaleTimeString('pt-BR')}
         </div>
       </div>
-      ${getAssinaturaCoordenador()}
     </body>
     </html>
   `;
@@ -8971,7 +8970,7 @@ function renderComprovanteOnline(folgaId) {
         </div>
         <div class="sig-area">
           <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div style="font-size: 9px;">Assinatura do Servidor</div></div>
-          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Coordenador (a) APS</div><div style="font-size: 9px;">Carimbo e Assinatura</div></div>
+          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(DB.config().coordenadorAPS || 'Ruan Pablo Ferreira dos Santos')}</div><div style="font-size: 9px;">Coordenador da Atenção Primária à Saúde</div></div>
         </div>
         <div style="text-align: center; margin-top: 50px; font-size: 9px; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
           Documento emitido eletronicamente em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}
@@ -10790,7 +10789,7 @@ function imprimirRelatorioBancoHoras() {
         <div style="display:flex;justify-content:space-between;gap:40px">
           <div style="flex:1;text-align:center">
             <div style="border-top:1.2px solid #000;margin-bottom:8px;"></div>
-            <div style="font-weight:700;font-size:10px;text-transform:uppercase">Responsável pelo Controle</div>
+            <div style="font-weight:700;font-size:10px;text-transform:uppercase">${DB.config().coordenadorAPS || 'Responsável pelo Controle'}</div>
             <div style="font-size:9px;color:#444;font-weight:600">Coordenador(a) da APS</div>
           </div>
           <div style="flex:1;text-align:center">
@@ -10929,7 +10928,7 @@ function imprimirRelatorioBancoHorasGeral() {
         <strong>DECLARAÇÃO:</strong> Declaro que as informações acima são extratos fiéis dos registros constantes no sistema de gestão de banco de horas.
       </div>
       <div class="sig-area">
-        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">Responsável pelo Controle</div><div class="sig-sub">Coordenador(a) da APS</div></div>
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${DB.config().coordenadorAPS || 'Responsável pelo Controle'}</div><div class="sig-sub">Coordenador(a) da APS</div></div>
         <div class="sig-box">
           <div class="sig-line"></div>
           <div class="sig-label">Entregue ao RH em</div>
@@ -11308,11 +11307,6 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
             <div class="sig-line"></div>
             <div class="sig-label" style="text-transform: uppercase;">${srv.nome}</div>
             <div class="sig-sub">Servidor(a) — Mat. ${srv.matricula}</div>
-          </div>
-          <div class="sig-box">
-            <div class="sig-line"></div>
-            <div class="sig-label">Chefia Imediata</div>
-            <div class="sig-sub">Carimbo e Assinatura</div>
           </div>
           ${coordNome ? `
           <div class="sig-box">
@@ -13151,11 +13145,6 @@ function imprimirEvento(id) {
         }).join('')}
       </tbody>
     </table>
-    <div class="sig-area">
-      <div class="sig-line"></div>
-      <div class="sig-nome">RUAN PABLO FERREIRA DOS SANTOS</div>
-      <div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div>
-    </div>
     <div class="footer">
       ${esc(orgNome)}<br>
       Documento gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão<br>
@@ -13236,11 +13225,6 @@ function imprimirEventosMes() {
   }
 
   html += `
-    <div class="sig-area">
-      <div class="sig-line"></div>
-      <div class="sig-nome">RUAN PABLO FERREIRA DOS SANTOS</div>
-      <div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div>
-    </div>
     <div class="footer">
       ${esc(orgNome)}<br>
       Relatório gerado em ${new Date().toLocaleString('pt-BR')} pelo Sistema de Gestão
