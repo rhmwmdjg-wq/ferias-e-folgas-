@@ -219,6 +219,24 @@ function mudarEstiloBase(id, el) {
   const cfg = DB.config();
   cfg.estiloBase = id;
   DB.saveConfig(cfg);
+  atualizarIconeTema(id);
+}
+
+function toggleTema() {
+  const cfg = DB.config();
+  const isDark = !cfg.estiloBase || cfg.estiloBase === 'midnight' || cfg.estiloBase === 'ocean' || cfg.estiloBase === 'forest';
+  const novo = isDark ? 'clean' : 'midnight';
+  mudarEstiloBase(novo);
+  atualizarIconeTema(novo);
+}
+
+function atualizarIconeTema(estilo) {
+  const icon = document.getElementById('theme-icon');
+  const label = document.getElementById('theme-label');
+  if (!icon || !label) return;
+  const isDark = estilo !== 'clean';
+  icon.textContent = isDark ? '🌙' : '☀️';
+  label.textContent = isDark ? 'Modo Escuro' : 'Modo Claro';
 }
 
 function mudarCorTema(cor, el) {
