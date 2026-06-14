@@ -1922,6 +1922,9 @@ function imprimirPlanilhaProgramacao() {
     servidores = servidores.filter(function(s) { return (s.feriasPrem || 0) > 0; });
   }
 
+  // Apenas efetivos
+  servidores = servidores.filter(function(s) { return !s.vinculo || s.vinculo === 'efetivo'; });
+
   // Ordenar por nome
   servidores.sort(function(a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
 
