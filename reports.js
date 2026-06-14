@@ -1905,118 +1905,90 @@ function imprimirFormularioFeriasEmBranco() {
 
 function imprimirPlanilhaProgramacao() {
   var tipoFiltro = document.getElementById('fp-planilha-tipo')?.value || '';
-  var programacoes = getProgramacoesAcessiveis();
-  var servidores = DB.servidores();
+  var servidores = getServidoresAcessiveis();
   var cfg = DB.config();
   var imgPrint = getImg('print') || getImg('esq');
   var orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
   var hoje = new Date().toLocaleDateString('pt-BR');
 
-  if (tipoFiltro) {
-    programacoes = programacoes.filter(function(p) { return p.tipo === tipoFiltro; });
+  // Filtrar por tipo se necessário
+  if (tipoFiltro === 'premio') {
+    servidores = servidores.filter(function(s) { return (s.feriasPrem || 0) > 0; });
   }
 
-  // Agrupar por servidor
-  var grupos = {};
-  programacoes.forEach(function(p) {
-    if (!grupos[p.srvId]) grupos[p.srvId] = [];
-    grupos[p.srvId].push(p);
-  });
+  // Ordenar por nome
+  servidores.sort(function(a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
 
-  var tipoLabel = tipoFiltro === 'anual' ? 'Regulamentares' : tipoFiltro === 'premio' ? 'Prêmio' : 'Todas';
+  var tipoLabel = tipoFiltro === 'anual' ? 'REGULAMENTARES' : tipoFiltro === 'premio' ? 'PRÊMIO' : 'REGULAMENTARES / PRÊMIO';
+  var blankDate = '___/___/______';
 
   var html = '<html><head><title>Planilha de Programação de Férias</title>' +
     '<style>' +
-    '@page { margin: 10mm; size: landscape; }' +
-    'body { font-family: Arial, sans-serif; color: #222; font-size: 9px; }' +
+    '@page { margin: 8mm; size: landscape; }' +
+    'body { font-family: Arial, sans-serif; color: #222; font-size: 10px; }' +
     '.header { text-align: center; margin-bottom: 10px; border-bottom: 1.5px solid #000; padding-bottom: 8px; }' +
     '.header img { max-height: 45px; }' +
-    '.header h1 { font-size: 13px; margin: 2px 0; }' +
+    '.header h1 { font-size: 14px; margin: 2px 0; }' +
     '.header .sub { font-size: 9px; color: #555; }' +
-    'table { width: 100%; border-collapse: collapse; font-size: 8.5px; }' +
-    'th { background: #1a3a5c; color: #fff; padding: 5px 4px; text-align: center; font-size: 7.5px; text-transform: uppercase; }' +
-    'td { padding: 4px 5px; border: 1px solid #ccc; text-align: center; }' +
-    '.nome-col { text-align: left; font-weight: 700; white-space: nowrap; }' +
-    '.setor-col { text-align: left; font-size: 7.5px; color: #555; }' +
-    'tr:nth-child(even) td { background: #f9f9f9; }' +
-    '.sem-prog { color: #999; font-style: italic; }' +
+    'table { width: 100%; border-collapse: collapse; font-size: 9px; }' +
+    'th { background: #1a3a5c; color: #fff; padding: 6px 4px; text-align: center; font-size: 8px; text-transform: uppercase; }' +
+    'td { padding: 5px 4px; border: 1px solid #ccc; text-align: center; }' +
+    '.nome-col { text-align: left; font-weight: 700; font-size: 9px; }' +
+    '.setor-col { text-align: left; font-size: 8px; }' +
+    '.blank-cell { color: #bbb; font-size: 8px; }' +
+    '.setor-header { font-weight: 800; background: #f0f0f0; text-align: left; padding: 6px 4px; font-size: 8.5px; }' +
     '.sig-area { margin-top: 25px; text-align: center; }' +
     '.sig-line { width: 250px; border-top: 1.5px solid #000; margin: 0 auto 6px; }' +
     '.sig-nome { font-weight: 700; font-size: 10px; }' +
     '.sig-cargo { font-size: 8px; color: #555; }' +
+    '.col-periodo { background: #e8edf2; font-weight: 700; }' +
     '@media print { body { padding: 0; } }' +
     '</style></head><body>' +
     (imgPrint ? '<div class="header"><img src="' + imgPrint + '"></div>' : '') +
     '<div class="header">' +
     '<h1>PLANILHA DE PROGRAMAÇÃO DE FÉRIAS — ' + tipoLabel + '</h1>' +
     '<div class="sub">' + esc(orgNome) + ' — Emitido em: ' + hoje + '</div>' +
+    '<div class="sub" style="font-style:italic">Preencher as datas nos campos abaixo e devolver à Coordenação</div>' +
     '</div>' +
     '<table><thead><tr>' +
-    '<th style="text-align:left">Servidor</th>' +
-    '<th>Setor</th>' +
-    '<th>Matrícula</th>' +
-    '<th>Tipo</th>' +
-    '<th>Período Ref.</th>' +
-    '<th>1º Início</th>' +
-    '<th>1º Término</th>' +
-    '<th>1º Retorno</th>' +
-    '<th>2º Início</th>' +
-    '<th>2º Término</th>' +
-    '<th>2º Retorno</th>' +
-    '<th>3º Início</th>' +
-    '<th>3º Término</th>' +
-    '<th>3º Retorno</th>' +
-    '<th>Status</th>' +
+    '<th rowspan="2" style="text-align:left;width:18%">Servidor</th>' +
+    '<th rowspan="2" style="width:7%">Matrícula</th>' +
+    '<th class="col-periodo" colspan="3">1º Período</th>' +
+    '<th class="col-periodo" colspan="3">2º Período</th>' +
+    '<th class="col-periodo" colspan="3">3º Período</th>' +
+    '</tr><tr>' +
+    '<th>Início</th><th>Término</th><th>Retorno</th>' +
+    '<th>Início</th><th>Término</th><th>Retorno</th>' +
+    '<th>Início</th><th>Término</th><th>Retorno</th>' +
     '</tr></thead><tbody>';
 
-  // Ordenar servidores: primeiro os com programação, depois sem
-  var srvIds = Object.keys(grupos);
-  srvIds.sort(function(a, b) {
-    var srvA = servidores.find(function(s) { return s.id === a; });
-    var srvB = servidores.find(function(s) { return s.id === b; });
-    return (srvA ? srvA.nome : '').localeCompare(srvB ? srvB.nome : '');
+  // Agrupar por setor
+  var setores = {};
+  servidores.forEach(function(s) {
+    var setor = s.setor || 'Sem Setor';
+    if (!setores[setor]) setores[setor] = [];
+    setores[setor].push(s);
   });
 
-  // Servidores com programação
-  srvIds.forEach(function(srvId) {
-    var srv = servidores.find(function(s) { return s.id === srvId; });
-    if (!srv) return;
-    var periodos = grupos[srvId].sort(function(a, b) { return a.inicio.localeCompare(b.inicio); });
-    var p0 = periodos[0];
-    var p1 = periodos[1] || {};
-    var p2 = periodos[2] || {};
-    var autorizado = periodos.some(function(p) { return p.autorizado; });
-    var statusLabel = autorizado ? 'Autorizada' : 'Pendente';
+  var setoresOrdenados = Object.keys(setores).sort();
 
-    html += '<tr>' +
-      '<td class="nome-col">' + esc(srv.nome) + '</td>' +
-      '<td class="setor-col">' + esc(srv.setor || '-') + '</td>' +
-      '<td>' + esc(srv.matricula) + '</td>' +
-      '<td>' + (p0.tipo === 'anual' ? 'Anual' : 'Prêmio') + '</td>' +
-      '<td>' + esc(p0.periodo || '-') + '</td>' +
-      '<td>' + fmtDate(p0.inicio) + '</td>' +
-      '<td>' + fmtDate(p0.fim) + '</td>' +
-      '<td>' + fmtDate(p0.retorno || addDays(p0.fim, 1)) + '</td>' +
-      '<td>' + fmtDate(p1.inicio) + '</td>' +
-      '<td>' + fmtDate(p1.fim) + '</td>' +
-      '<td>' + fmtDate(p1.retorno || (p1.fim ? addDays(p1.fim, 1) : '')) + '</td>' +
-      '<td>' + fmtDate(p2.inicio) + '</td>' +
-      '<td>' + fmtDate(p2.fim) + '</td>' +
-      '<td>' + fmtDate(p2.retorno || (p2.fim ? addDays(p2.fim, 1) : '')) + '</td>' +
-      '<td>' + statusLabel + '</td>' +
-      '</tr>';
-  });
-
-  // Servidores SEM programação
-  var comProgIds = new Set(Object.keys(grupos));
-  servidores.forEach(function(srv) {
-    if (comProgIds.has(srv.id)) return;
-    html += '<tr>' +
-      '<td class="nome-col">' + esc(srv.nome) + '</td>' +
-      '<td class="setor-col">' + esc(srv.setor || '-') + '</td>' +
-      '<td>' + esc(srv.matricula) + '</td>' +
-      '<td class="sem-prog" colspan="12">Sem programação cadastrada</td>' +
-      '</tr>';
+  setoresOrdenados.forEach(function(setor) {
+    html += '<tr><td class="setor-header" colspan="11">📂 ' + esc(setor) + '</td></tr>';
+    setores[setor].forEach(function(s) {
+      html += '<tr>' +
+        '<td class="nome-col">' + esc(s.nome) + '</td>' +
+        '<td>' + esc(s.matricula) + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '<td class="blank-cell">' + blankDate + '</td>' +
+        '</tr>';
+    });
   });
 
   html += '</tbody></table>' +
