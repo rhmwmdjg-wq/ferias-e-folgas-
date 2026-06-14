@@ -108,12 +108,44 @@ function renderProgramacoes() {
     container.innerHTML = '<div class="empty"><div class="icon">📅</div><p>' + (busca ? 'Nenhuma programação encontrada.' : 'Nenhuma programação cadastrada.') + '</p></div>';
     return;
   }
-  container.innerHTML = filtradas.map(function(p) {
-    const srv = servidores.find(function(s) { return s.id === p.srvId; });
-    const diff = diffDays(p.inicio);
+
+  // Agrupar por servidor
+  const grupos = {};
+  filtradas.forEach(function(p) {
+    if (!grupos[p.srvId]) grupos[p.srvId] = [];
+    grupos[p.srvId].push(p);
+  });
+
+  container.innerHTML = Object.values(grupos).map(function(periodos) {
+    const p0 = periodos[0];
+    const srv = servidores.find(function(s) { return s.id === p0.srvId; });
+    const primeiro = periodos.reduce(function(a, b) { return (a.inicio < b.inicio) ? a : b; });
+    const diff = diffDays(primeiro.inicio);
     const sit = diff < 0 ? 'Concluída' : diff === 0 ? 'Iniciando HOJE' : diff <= 10 ? 'Urgente' : diff <= 35 ? 'Próxima' : 'Agendada';
     const cls = diff < 0 ? 'tag-green' : diff === 0 ? 'tag-red' : diff <= 10 ? 'tag-red' : diff <= 35 ? 'tag-warn' : 'tag-blue';
-    return '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><div><strong>' + esc(srv?.nome || 'Servidor removido') + (p.autorizado ? ' <span class="tag tag-green" style="font-size:.65rem">✅ Autorizado</span>' : '') + '</strong><div style="font-size:.78rem;color:var(--muted)">' + (p.tipo === 'anual' ? '🌴 Férias Anuais' : '🏆 Férias Prêmio') + ' · ' + fmtDate(p.inicio) + ' → ' + fmtDate(p.fim || p.inicio) + ' · Retorno: ' + fmtDate(p.retorno || addDays(p.fim || p.inicio, 1)) + '</div><div style="font-size:.75rem;color:var(--muted)">Período: ' + (p.periodo || '-') + '</div></div><div style="display:flex;gap:6px;align-items:center"><span class="tag ' + cls + '">' + sit + '</span>' + (p.autorizado ? '' : '<button class="btn btn-primary btn-sm" onclick="abrirModalAutorizacao(\'' + p.srvId + '\',\'' + p.inicio + '\',\'' + (p.fim || '') + '\',\'' + p.tipo + '\',\'' + (p.periodo || '') + '\')">📄 Autorizar</button>') + '<button class="btn btn-danger btn-sm" onclick="excluirProgRel(\'' + p.id + '\')">🗑️</button></div></div>';
+    const tipoLabel = p0.tipo === 'anual' ? '🌴 Férias Anuais' : '🏆 Férias Prêmio';
+    const autorizado = p0.autorizado;
+    const periodoRef = p0.periodo || '-';
+
+    var periodosHtml = periodos.map(function(p, i) {
+      return '<div style="font-size:.78rem;color:var(--muted);padding:2px 0">' +
+        (periodos.length > 1 ? (i + 1) + 'º Período: ' : '') +
+        fmtDate(p.inicio) + ' → ' + fmtDate(p.fim || p.inicio) +
+        ' · Retorno: ' + fmtDate(p.retorno || addDays(p.fim || p.inicio, 1)) +
+        ' <button class="btn btn-danger btn-sm" onclick="excluirProgRel(\'' + p.id + '\')" style="padding:1px 5px;font-size:.6rem;margin-left:6px" title="Excluir este período">🗑️</button>' +
+        '</div>';
+    }).join('');
+
+    return '<div style="padding:14px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">' +
+      '<div style="flex:1;min-width:200px"><strong>' + esc(srv?.nome || 'Servidor removido') +
+      (autorizado ? ' <span class="tag tag-green" style="font-size:.65rem">✅ Autorizado</span>' : '') +
+      '</strong><div style="margin-top:4px"><span style="font-size:.82rem;font-weight:600;color:var(--text-mid)">' + tipoLabel +
+      '</span><span style="font-size:.75rem;color:var(--muted);margin-left:8px">Período: ' + esc(periodoRef) + '</span></div>' +
+      '<div style="margin-top:4px">' + periodosHtml + '</div></div>' +
+      '<div style="display:flex;gap:6px;align-items:center;flex-shrink:0">' +
+      '<span class="tag ' + cls + '">' + sit + '</span>' +
+      (autorizado ? '' : '<button class="btn btn-primary btn-sm" onclick="abrirModalAutorizacao(\'' + p0.srvId + '\',\'' + primeiro.inicio + '\',\'' + (primeiro.fim || '') + '\',\'' + p0.tipo + '\',\'' + (p0.periodo || '') + '\')">📄 Autorizar</button>') +
+      '</div></div>';
   }).join('');
 }
 

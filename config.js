@@ -239,8 +239,8 @@ function atualizarIconeTema(estilo) {
   label.textContent = isDark ? 'Modo Escuro' : 'Modo Claro';
 }
 
-function mudarCorTema(cor, el) {
-  const accent = hexToShade(cor, 10); // Gera uma cor de sotaque próxima
+async function mudarCorTema(cor, el) {
+  const accent = hexToShade(cor, 10);
   document.documentElement.style.setProperty('--primary', cor);
   document.documentElement.style.setProperty('--primary-dark', hexToShade(cor, -15));
   document.documentElement.style.setProperty('--accent', accent);
@@ -253,7 +253,7 @@ function mudarCorTema(cor, el) {
 
   const cfg = DB.config();
   cfg.tema = cor;
-  DB.saveConfig(cfg);
+  await DB.saveConfig(cfg);
 }
 
 function hexToRgb(hex) {
