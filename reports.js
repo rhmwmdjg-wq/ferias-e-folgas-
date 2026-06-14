@@ -1817,3 +1817,88 @@ function imprimirEventosMes() {
   win.document.write(html);
   win.document.close();
 }
+
+function imprimirFormularioFeriasEmBranco() {
+  const imgPrint = getImg('print') || getImg('esq');
+  const cfg = DB.config();
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const hoje = new Date().toLocaleDateString('pt-BR');
+
+  var periodosHtml = '';
+  for (var p = 1; p <= 3; p++) {
+    var dias = p === 1 ? 30 : p === 2 ? 15 : 10;
+    periodosHtml += '<div style="border:1px solid #ccc;padding:10px;margin-bottom:8px;border-radius:4px">' +
+      '<strong>' + p + 'º Período — ' + dias + ' dias corridos</strong>' +
+      '<div style="display:flex;gap:20px;margin-top:6px;flex-wrap:wrap">' +
+      '<span>Início: ___/___/______</span>' +
+      '<span>Término: ___/___/______</span>' +
+      '<span>Retorno: ___/___/______</span>' +
+      '</div></div>';
+  }
+
+  var html = '<html><head><title>Formulário de Programação de Férias</title>' +
+    '<style>' +
+    '@page { margin: 15mm; }' +
+    'body { font-family: Arial, sans-serif; color: #222; font-size: 13px; line-height: 1.8; }' +
+    '.header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 15px; }' +
+    '.header img { max-height: 60px; margin-bottom: 10px; }' +
+    '.header h1 { font-size: 16px; margin: 4px 0; }' +
+    '.header .sub { font-size: 11px; color: #555; }' +
+    '.field { margin-bottom: 10px; display: flex; align-items: baseline; }' +
+    '.field .label { font-weight: 700; min-width: 140px; font-size: 12px; }' +
+    '.field .line { border-bottom: 1px solid #000; flex: 1; min-width: 100px; margin-left: 8px; padding: 2px 4px; font-size: 12px; }' +
+    '.checkbox-group { display: flex; gap: 30px; margin: 10px 0; }' +
+    '.checkbox-group label { font-size: 13px; }' +
+    '.section { margin-top: 20px; }' +
+    '.section h3 { font-size: 13px; border-bottom: 1px solid #ccc; padding-bottom: 4px; margin-bottom: 10px; }' +
+    '.sig-area { margin-top: 50px; display: flex; justify-content: space-between; gap: 40px; }' +
+    '.sig-box { text-align: center; flex: 1; }' +
+    '.sig-line { border-top: 1.5px solid #000; margin-bottom: 8px; }' +
+    '.sig-nome { font-weight: 700; font-size: 12px; }' +
+    '.sig-cargo { font-size: 10px; color: #555; }' +
+    '@media print { body { padding: 0; } }' +
+    '</style></head><body>' +
+    (imgPrint ? '<div class="header"><img src="' + imgPrint + '"></div>' : '') +
+    '<div class="header">' +
+    '<h1>FORMULÁRIO DE PROGRAMAÇÃO DE FÉRIAS</h1>' +
+    '<div class="sub">' + esc(orgNome) + '</div>' +
+    '<div class="sub">Emitido em: ' + hoje + '</div>' +
+    '</div>' +
+
+    '<div class="section"><h3>DADOS DO SERVIDOR</h3>' +
+    '<div class="field"><span class="label">Nome:</span><span class="line">&nbsp;</span></div>' +
+    '<div class="field"><span class="label">Matrícula:</span><span class="line">&nbsp;</span></div>' +
+    '<div class="field"><span class="label">Setor:</span><span class="line">&nbsp;</span></div>' +
+    '<div class="field"><span class="label">Cargo:</span><span class="line">&nbsp;</span></div>' +
+    '<div class="field"><span class="label">Tipo de Férias:</span>' +
+    '<span class="checkbox-group"><label>☐ Anuais</label> <label>☐ Prêmio</label></span></div>' +
+    '<div class="field"><span class="label">Período Aquisitivo:</span><span class="line">&nbsp;</span></div>' +
+    '</div>' +
+
+    '<div class="section"><h3>PARCELAMENTO</h3>' +
+    '<div class="checkbox-group" style="margin-bottom:10px">' +
+    '<label>☐ 30 dias (integral)</label>' +
+    '<label>☐ 15 + 15 dias</label>' +
+    '<label>☐ 10 + 10 + 10 dias</label>' +
+    '</div></div>' +
+
+    '<div class="section"><h3>PERÍODOS</h3>' + periodosHtml +
+    '<div class="field" style="margin-top:10px"><span class="label">1/3 de Férias (mês):</span><span class="line">&nbsp;</span></div>' +
+    '</div>' +
+
+    '<div class="section"><h3>OBSERVAÇÕES</h3>' +
+    '<div style="border:1px solid #ccc;min-height:60px;padding:8px;border-radius:4px">&nbsp;</div>' +
+    '</div>' +
+
+    '<div class="sig-area">' +
+    '<div class="sig-box"><div class="sig-line"></div><div class="sig-nome">Assinatura do Servidor</div><div class="sig-cargo">Data: ___/___/______</div></div>' +
+    '<div class="sig-box"><div class="sig-line"></div><div class="sig-nome">' + esc(cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos') + '</div><div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div></div>' +
+    '</div>' +
+
+    '<script>window.onload=function(){window.print();}<\/script>' +
+    '</body></html>';
+
+  var win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
