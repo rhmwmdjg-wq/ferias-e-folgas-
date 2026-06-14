@@ -2479,12 +2479,15 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; flex-wrap:wrap; gap:10px">
         <h3 style="margin:0"><span class="icon">📋</span> Programações</h3>
+        <select id="fp-planilha-setor" style="padding:4px 8px;font-size:.72rem;background:var(--card);border:1px solid var(--border-mid);border-radius:6px;color:var(--text)">
+          <option value="">Todos os Setores</option>
+        </select>
         <select id="fp-planilha-tipo" style="padding:4px 8px;font-size:.72rem;background:var(--card);border:1px solid var(--border-mid);border-radius:6px;color:var(--text)">
           <option value="">Todas</option>
           <option value="anual">Regulamentares</option>
           <option value="premio">Prêmio</option>
         </select>
-        <button class="btn btn-ghost btn-sm" onclick="imprimirPlanilhaProgramacao()" title="Imprimir planilha com todos os servidores">📊 Planilha</button>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirPlanilhaProgramacao()" title="Imprimir planilha em branco com todos os servidores">📊 Planilha</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirFormularioFeriasEmBranco()" title="Imprimir formulário em branco para preenchimento manual">📄 Em Branco</button>
         <div class="input-wrap" style="flex:1; min-width:180px; max-width:280px">
           <input type="text" id="fp-busca-nome" placeholder="🔍 Pesquisar servidor..." oninput="renderProgramacoes()" style="padding:8px 12px 8px 35px; font-size:0.82rem">

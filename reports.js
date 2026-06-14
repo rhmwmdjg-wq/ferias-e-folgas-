@@ -1905,11 +1905,17 @@ function imprimirFormularioFeriasEmBranco() {
 
 function imprimirPlanilhaProgramacao() {
   var tipoFiltro = document.getElementById('fp-planilha-tipo')?.value || '';
+  var setorFiltro = document.getElementById('fp-planilha-setor')?.value || '';
   var servidores = getServidoresAcessiveis();
   var cfg = DB.config();
   var imgPrint = getImg('print') || getImg('esq');
   var orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
   var hoje = new Date().toLocaleDateString('pt-BR');
+
+  // Filtrar por setor
+  if (setorFiltro) {
+    servidores = servidores.filter(function(s) { return s.setor === setorFiltro; });
+  }
 
   // Filtrar por tipo se necessário
   if (tipoFiltro === 'premio') {
@@ -1919,7 +1925,13 @@ function imprimirPlanilhaProgramacao() {
   // Ordenar por nome
   servidores.sort(function(a, b) { return (a.nome || '').localeCompare(b.nome || ''); });
 
+  if (!servidores.length) {
+    toastMsg('Nenhum servidor encontrado com esses filtros.', 'warning');
+    return;
+  }
+
   var tipoLabel = tipoFiltro === 'anual' ? 'REGULAMENTARES' : tipoFiltro === 'premio' ? 'PRÊMIO' : 'REGULAMENTARES / PRÊMIO';
+  var setorLabel = setorFiltro ? ' — Setor: ' + setorFiltro : '';
   var blankDate = '___/___/______';
 
   var html = '<html><head><title>Planilha de Programação de Férias</title>' +
@@ -1946,7 +1958,7 @@ function imprimirPlanilhaProgramacao() {
     '</style></head><body>' +
     (imgPrint ? '<div class="header"><img src="' + imgPrint + '"></div>' : '') +
     '<div class="header">' +
-    '<h1>PLANILHA DE PROGRAMAÇÃO DE FÉRIAS — ' + tipoLabel + '</h1>' +
+    '<h1>PLANILHA DE PROGRAMAÇÃO DE FÉRIAS — ' + tipoLabel + setorLabel + '</h1>' +
     '<div class="sub">' + esc(orgNome) + ' — Emitido em: ' + hoje + '</div>' +
     '<div class="sub" style="font-style:italic">Preencher as datas nos campos abaixo e devolver à Coordenação</div>' +
     '</div>' +
