@@ -4768,7 +4768,6 @@ function aplicarConfiguracoesSalvas() {
   if (!cfg) return;
 
   // 1. Aplicar Cores e Estilo
-  if (cfg.tema) mudarCorTema(cfg.tema);
   if (cfg.estiloBase) {
     const estilo = ESTILOS_BASE[cfg.estiloBase];
     if (estilo) {
@@ -4778,6 +4777,7 @@ function aplicarConfiguracoesSalvas() {
     }
     if (typeof atualizarIconeTema === 'function') atualizarIconeTema(cfg.estiloBase);
   }
+  if (cfg.tema) mudarCorTema(cfg.tema);
 
   // 2. Aplicar Logos (do localStorage, NÃO do Supabase para economizar egress)
   const logos = ['esq', 'dir', 'side', 'login', 'print'];

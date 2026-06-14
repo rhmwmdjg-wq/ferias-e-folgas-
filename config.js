@@ -227,7 +227,7 @@ function toggleTema() {
   const isDark = !cfg.estiloBase || cfg.estiloBase === 'midnight' || cfg.estiloBase === 'ocean' || cfg.estiloBase === 'forest';
   const novo = isDark ? 'clean' : 'midnight';
   mudarEstiloBase(novo);
-  atualizarIconeTema(novo);
+  if (cfg.tema) mudarCorTema(cfg.tema);
 }
 
 function atualizarIconeTema(estilo) {
