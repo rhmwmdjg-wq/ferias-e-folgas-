@@ -482,8 +482,14 @@ function imprimirProtocolo(id) {
         <div class="sig-area">
           <div class="sig-box">
             <div class="sig-line"></div>
-            <div class="sig-label">${esc(config.coordenadorAPS || 'Coordenador(a) do RH')}</div>
-            <div class="sig-sub">Coordenador(a) de Recursos Humanos</div>
+            <div class="sig-label">${esc(config.coordenadorAPS || 'Coordenador(a) da Atenção Primária')}</div>
+            <div class="sig-sub">Coordenador(a) da Atenção Primária à Saúde</div>
+            <div class="sig-sub" style="margin-top:4px;font-size:8px;color:#999">Assinatura e Carimbo</div>
+          </div>
+          <div class="sig-box">
+            <div class="sig-line"></div>
+            <div class="sig-label">Dianna Gomes Alexandre</div>
+            <div class="sig-sub">Coordenadora de Recursos Humanos</div>
             <div class="sig-sub" style="margin-top:4px;font-size:8px;color:#999">Assinatura e Carimbo</div>
           </div>
         </div>
