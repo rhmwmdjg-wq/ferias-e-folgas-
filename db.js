@@ -490,6 +490,54 @@ const DB = {
     } catch (e) { /* silent */ }
   },
 
+  // =================== PROTOCOLO DE ENTREGA ===================
+  protocolos: () => _remoteData.protocolos.length ? _remoteData.protocolos : JSON.parse(localStorage.getItem('srv_protocolos') || '[]'),
+  saveProtocolos: async (d) => {
+    _remoteData.protocolos = d;
+    localStorage.setItem('srv_protocolos', JSON.stringify(d));
+    try {
+      const { error } = await supabaseClient.from('protocolos_entrega').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) { saveToSyncQueue('protocolos_entrega', d); toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning"); }
+        else console.error("Erro Supabase (protocolos_entrega):", error);
+      }
+    } catch (e) {
+      if (isQuotaError(e)) { saveToSyncQueue('protocolos_entrega', d); toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning"); }
+      else throw e;
+    }
+  },
+  deleteProtocolo: async (id) => {
+    _remoteData.protocolos = _remoteData.protocolos.filter(p => p.id !== id);
+    localStorage.setItem('srv_protocolos', JSON.stringify(_remoteData.protocolos));
+    try {
+      const { error } = await supabaseClient.from('protocolos_entrega').delete().eq('id', id);
+      if (error && !isQuotaError(error)) console.error("Erro ao deletar protocolo:", error);
+    } catch (e) { /* silent */ }
+  },
+
+  itensProtocolo: () => _remoteData.itensProtocolo.length ? _remoteData.itensProtocolo : JSON.parse(localStorage.getItem('srv_itens_protocolo') || '[]'),
+  saveItensProtocolo: async (d) => {
+    _remoteData.itensProtocolo = d;
+    localStorage.setItem('srv_itens_protocolo', JSON.stringify(d));
+    try {
+      const { error } = await supabaseClient.from('itens_protocolo').upsert(d);
+      if (error) {
+        if (isQuotaError(error)) { saveToSyncQueue('itens_protocolo', d); toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning"); }
+        else console.error("Erro Supabase (itens_protocolo):", error);
+      }
+    } catch (e) {
+      if (isQuotaError(e)) { saveToSyncQueue('itens_protocolo', d); toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning"); }
+      else throw e;
+    }
+  },
+  deleteItemProtocolo: async (id) => {
+    _remoteData.itensProtocolo = _remoteData.itensProtocolo.filter(i => i.id !== id);
+    localStorage.setItem('srv_itens_protocolo', JSON.stringify(_remoteData.itensProtocolo));
+    try {
+      await supabaseClient.from('itens_protocolo').delete().eq('id', id);
+    } catch (e) { /* silent */ }
+  },
+
 };
 
 window.DB = DB;

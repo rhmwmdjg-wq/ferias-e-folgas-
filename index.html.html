@@ -1774,6 +1774,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <span class="badge" id="badge-ponto" style="background:var(--accent);display:none">0</span>
       </button>
 
+      <!-- ===== Protocolo ===== -->
+      <div class="sidebar-section-label">Protocolo</div>
+      <button class="tab-btn" onclick="showTab('protocolo')" id="tab-protocolo">
+        <i class="fa-solid fa-clipboard-check"></i>
+        <span class="tab-label">Protocolo de Entrega</span>
+      </button>
+
       <!-- ===== Relatórios ===== -->
       <div class="sidebar-section-label">Relatórios</div>
       <button class="tab-btn" onclick="showTab('relatorio')" id="tab-relatorio">
@@ -3476,6 +3483,10 @@ Coordenação de RH
       <i class="fa-solid fa-fire"></i>
       <span>Ausências</span>
     </button>
+    <button class="bnav-btn" onclick="showTab('protocolo')" id="bnav-protocolo">
+      <i class="fa-solid fa-clipboard-check"></i>
+      <span>Protocolo</span>
+    </button>
     <button class="bnav-btn" onclick="toggleSidebar()" id="bnav-mais">
       <i class="fa-solid fa-bars"></i>
       <span>Menu</span>
@@ -3896,6 +3907,127 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ======================= PANEL PROTOCOLO DE ENTREGA ======================= -->
+<div class="tab-panel" id="panel-protocolo">
+  <div class="section-title">📋 Protocolo de Entrega - Justificativas e Atestados</div>
+
+  <!-- Botões de ação -->
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:16px">
+    <button class="btn btn-primary" onclick="novoProtocolo()">📄 Novo Protocolo</button>
+  </div>
+
+  <!-- Lista de Protocolos -->
+  <div class="card" style="padding:16px">
+    <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:12px">
+      <h3 style="margin:0;flex:1">📋 Protocolos Registrados</h3>
+      <input id="pe-busca" type="text" placeholder="🔍 Buscar por número ou servidor..." oninput="renderProtocolos()" style="padding:6px 10px;border:1px solid var(--border-mid);border-radius:var(--r-sm);background:var(--card);color:var(--text);font-size:.8rem;max-width:260px">
+    </div>
+    <div id="tabela-protocolos" style="overflow-x:auto"></div>
+  </div>
+</div>
+
+<!-- ======================= MODAL NOVO PROTOCOLO ======================= -->
+<div class="modal-bg" id="modal-novo-protocolo">
+  <div class="modal" style="max-width:800px">
+    <h3 id="modal-protocolo-title">📄 Novo Protocolo de Entrega</h3>
+    <input type="hidden" id="pe-protocolo-id">
+    <input type="hidden" id="pe-protocolo-numero">
+
+    <!-- Seletor de tipo de item -->
+    <div class="form-row cols-2" style="margin-bottom:12px">
+      <div class="field">
+        <label>Tipo de Item</label>
+        <select id="pe-tipo-item" onchange="togglePeTipoItem()">
+          <option value="">Selecione...</option>
+          <option value="justificativa">📝 Justificativa de Ponto</option>
+          <option value="atestado">🩺 Atestado Médico</option>
+        </select>
+      </div>
+      <div class="field" id="pe-srv-field" style="display:none">
+        <label>Servidor *</label>
+        <select id="pe-srv"><option value="">Selecione...</option></select>
+      </div>
+    </div>
+
+    <!-- Campos específicos para Justificativa -->
+    <div id="pe-campos-justificativa" style="display:none">
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Motivo *</label>
+          <select id="pe-motivo" onchange="togglePeOutroMotivo()">
+            <option value="">Selecione...</option>
+            <option value="falta">Falta</option>
+            <option value="folga">Folga</option>
+            <option value="esquecimento_batida">Esquecimento da Batida do Ponto</option>
+            <option value="zona_rural">Zona Rural</option>
+            <option value="outros">Outros</option>
+          </select>
+        </div>
+        <div class="field" id="pe-outro-motivo-field" style="display:none">
+          <label>Qual motivo?</label>
+          <input id="pe-outro-motivo" placeholder="Descreva o motivo...">
+        </div>
+      </div>
+      <div class="form-row cols-3" style="align-items:end">
+        <div class="field">
+          <label>Data *</label>
+          <input id="pe-data" type="date">
+        </div>
+        <div class="field">
+          <label>Período *</label>
+          <select id="pe-periodo">
+            <option value="">Selecione...</option>
+            <option value="manha">Manhã</option>
+            <option value="tarde">Tarde</option>
+            <option value="integral">Integral</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;padding-bottom:4px">
+          <button class="btn btn-success btn-sm" onclick="adicionarDataJustificativa()">➕ Adicionar Data</button>
+        </div>
+      </div>
+      <div id="pe-datas-justificativa" style="margin-top:8px">
+        <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">📅 Datas Selecionadas:</div>
+        <div id="pe-lista-datas" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+    </div>
+
+    <!-- Campos específicos para Atestado -->
+    <div id="pe-campos-atestado" style="display:none">
+      <div class="form-row cols-2" style="align-items:end">
+        <div class="field">
+          <label>Data do Atestado *</label>
+          <input id="pe-data-atestado" type="date">
+        </div>
+        <div style="display:flex;gap:6px;padding-bottom:4px">
+          <button class="btn btn-success btn-sm" onclick="adicionarDataAtestado()">➕ Adicionar Data</button>
+        </div>
+      </div>
+      <div id="pe-datas-atestado" style="margin-top:8px">
+        <div style="font-size:.75rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px">📅 Datas Selecionadas:</div>
+        <div id="pe-lista-datas-atestado" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+      </div>
+    </div>
+
+    <!-- Botão adicionar item -->
+    <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="adicionarItemProtocolo()">📥 Adicionar ao Protocolo</button>
+    </div>
+
+    <!-- Itens adicionados -->
+    <div id="pe-itens-container" style="margin-top:20px;display:none">
+      <h4 style="margin-bottom:8px">📋 Itens deste Protocolo</h4>
+      <div id="pe-lista-itens" style="overflow-x:auto"></div>
+    </div>
+
+    <!-- Botões finais -->
+    <div class="modal-footer" style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-success" onclick="salvarProtocolo()">💾 Salvar Protocolo</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-novo-protocolo')">✕ Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 // ===================== CONSTANTES DE ESTILO =====================
@@ -4238,7 +4370,7 @@ function setupRealtime() {
     _realtimeChannel = null;
   }
 
-  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes', 'eventos', 'veiculos', 'cargos', 'credenciados', 'ponto_mensal'];
+  const TABELAS = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes', 'gestores', 'configuracoes', 'eventos', 'veiculos', 'cargos', 'credenciados', 'ponto_mensal', 'protocolos_entrega', 'itens_protocolo'];
 
   _realtimeChannel = supabaseClient.channel('sync-global');
 
@@ -4335,6 +4467,9 @@ function renderAposSync(tabelaAlterada) {
       break;
     case 'panel-ponto':
       if (typeof renderCargos === 'function') { renderCargos(); renderCredenciados(); renderFechamentos(); }
+      break;
+    case 'panel-protocolo':
+      if (typeof renderProtocolos === 'function') renderProtocolos();
       break;
     case 'panel-autorizacoes':
       renderAutorizacoes();
@@ -4520,6 +4655,8 @@ let _remoteData = {
   cargos: [],
   credenciados: [],
   pontoMensal: [],
+  protocolos: [],
+  itensProtocolo: [],
   config: {}
 };
 
@@ -4704,6 +4841,26 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.pontoMensal = unificados;
     localStorage.setItem('srv_ponto_mensal', JSON.stringify(unificados));
+  });
+
+  await syncTabela('protocolos_entrega', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_protocolos') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('protocolos_entrega', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.protocolos = unificados;
+    localStorage.setItem('srv_protocolos', JSON.stringify(unificados));
+  });
+
+  await syncTabela('itens_protocolo', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_itens_protocolo') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('itens_protocolo', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.itensProtocolo = unificados;
+    localStorage.setItem('srv_itens_protocolo', JSON.stringify(unificados));
   });
 
   await syncTabela('configuracoes', 'chave,valor', (data) => {
@@ -6118,6 +6275,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="mapa-ausencias.js"></script>
 <script src="eventos.js"></script>
 <script src="reports.js"></script>
+<script src="protocolo-entrega.js"></script>
 <script>atualizarBadgeEventos();</script>
 
 <!-- TOAST CONTAINER -->

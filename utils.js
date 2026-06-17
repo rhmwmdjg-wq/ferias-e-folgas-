@@ -32,6 +32,7 @@ function showTab(tab) {
   if (tab === 'eventos') { _eventosData = DB.eventos(); _veiculosData = DB.veiculos(); renderEventos(); popularSelectVeiculos('ev-veiculo'); }
   if (tab === 'veiculos') { _veiculosData = DB.veiculos(); renderVeiculos(); }
   if (tab === 'ponto') { renderPtSubtab('cargos'); renderCredenciados(); renderFechamentos(); }
+  if (tab === 'protocolo') { renderProtocolos(); }
   currentPage = 1;
 }
 
