@@ -138,22 +138,49 @@ function atualizarSaldoDisplay() {
   el.innerHTML = `<div class="saldo-box ${cls}"><span class="saldo-num">${saldo > 0 ? '+' : ''}${saldo}</span><div><strong>Saldo atual de folgas</strong><br><small style="color:var(--muted)">${icone} ${saldo === 0 ? 'Sem saldo' : saldo > 0 ? 'Dias disponíveis' : 'Saldo negativo'}</small></div></div>`;
 }
 
+function saldoRestanteCredito(creditoId, srvId) {
+  const credito = DB.folgas().find(f => f.id === creditoId && f.tipo === 'credito');
+  if (!credito) return 0;
+  const consumido = DB.folgas()
+    .filter(f => f.srvId === srvId && f.tipo === 'debito' && f.refId)
+    .reduce((acc, f) => {
+      const refs = Array.isArray(f.refId) ? f.refId : [f.refId];
+      return acc + (refs.includes(creditoId) ? f.qtd : 0);
+    }, 0);
+  return Math.max(0, credito.qtd - consumido);
+}
+
 function carregarFolgasDisp() {
   const srvId = document.getElementById('fg-srv-deb')?.value;
-  const sel = document.getElementById('fg-ref-deb');
-  if (!sel) return;
+  const container = document.getElementById('fg-ref-deb-container');
   const negBox = document.getElementById('fg-neg-box');
   const cobSel = document.getElementById('fg-cobertura-deb');
+  if (!container) return;
   if (!srvId) {
-    sel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
+    container.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:10px;text-align:center">Selecione o servidor primeiro.</div>';
     if (cobSel) cobSel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
     if (negBox) negBox.style.display = 'none';
     return;
   }
   const creditos = DB.folgas().filter(f => f.srvId === srvId && f.tipo === 'credito');
   const saldo = saldoFolgas(srvId);
-  sel.innerHTML = '<option value="">— Folga não vinculada a crédito específico —</option>' +
-    creditos.map(c => `<option value="${c.id}">${fmtDate(c.data)} · ${c.qtd}d · ${c.motivo.substring(0,50)}${c.motivo.length>50?'...':''}</option>`).join('');
+
+  const creditosComSaldo = creditos.map(c => ({
+    ...c,
+    restante: saldoRestanteCredito(c.id, srvId)
+  })).filter(c => c.restante > 0);
+
+  if (creditosComSaldo.length === 0) {
+    container.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:8px;text-align:center">Nenhum crédito disponível no banco.</div>';
+  } else {
+    container.innerHTML = creditosComSaldo.map(c =>
+      `<label style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:6px;background:var(--card);border:1px solid var(--border);cursor:pointer;font-size:.8rem">
+        <input type="checkbox" class="fg-ref-checkbox" value="${c.id}" style="accent-color:var(--primary);width:16px;height:16px;cursor:pointer">
+        <span style="flex:1">${fmtDate(c.data)} · ${c.qtd}d · ${c.motivo.substring(0,45)}${c.motivo.length>45?'...':''}</span>
+        <span style="font-weight:700;color:var(--success);font-size:.75rem;white-space:nowrap">restam ${c.restante}d</span>
+      </label>`
+    ).join('');
+  }
 
   if (cobSel) {
     const outrosServidores = getServidoresAcessiveis().filter(s => s.id !== srvId);
@@ -216,7 +243,8 @@ async function adicionarFolga() {
 
 async function registrarUsufrutoFolga() {
   const srvId = document.getElementById('fg-srv-deb').value;
-  const refId = document.getElementById('fg-ref-deb').value;
+  const refCheckboxes = document.querySelectorAll('.fg-ref-checkbox:checked');
+  const refId = Array.from(refCheckboxes).map(cb => cb.value);
   const obs = document.getElementById('fg-obs-deb').value.trim();
   const entries = Object.entries(currentGozoDates);
 
@@ -297,7 +325,7 @@ async function registrarUsufrutoFolga() {
   const saldo = saldoFolgas(srvId);
   const negativo = saldo - qtd < 0;
   const folgas = DB.folgas();
-  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId || null, obs: finalObs, criadoEm: new Date().toISOString() };
+  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId.length ? refId : null, obs: finalObs, criadoEm: new Date().toISOString() };
 
   if (saldo <= 0 || negativo) {
     const descPag = document.getElementById('fg-pag-desc').value.trim();
@@ -333,7 +361,8 @@ function limparFormUsufruto() {
   document.getElementById('fg-obs-deb').value = '';
   document.getElementById('fg-pag-desc').value = '';
   document.getElementById('fg-neg-box').style.display = 'none';
-  document.getElementById('fg-ref-deb').innerHTML = '<option value="">Selecionar folga do banco...</option>';
+  const refContainer = document.getElementById('fg-ref-deb-container');
+  if (refContainer) refContainer.innerHTML = '<div style="font-size:.8rem;color:var(--muted);padding:10px;text-align:center">Selecione o servidor primeiro.</div>';
   const cobSel = document.getElementById('fg-cobertura-deb');
   if (cobSel) cobSel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
 }

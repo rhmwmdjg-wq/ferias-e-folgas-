@@ -1933,7 +1933,8 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       </div>
       <div class="field" style="margin-bottom:12px">
         <label>Referente à Folga (selecione do banco)</label>
-        <select id="fg-ref-deb"><option value="">Selecionar folga do banco...</option></select>
+        <div style="font-size:.75rem;color:var(--muted);margin-bottom:6px">Marque os créditos que serão usados neste usufruto:</div>
+        <div id="fg-ref-deb-container" style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow-y:auto;padding:6px 8px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm)"></div>
       </div>
       <div class="field" style="margin-bottom:12px">
         <label>Quem cobrirá a ausência? (Cobertura)</label>

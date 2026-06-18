@@ -109,10 +109,7 @@ const DB = {
   saveFolgas: async (d, apenasNovos) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
-    const paraSubir = (apenasNovos || d).map(f => {
-      const { refId, ...resto } = f;
-      return resto;
-    });
+    const paraSubir = (apenasNovos || d);
     try {
       const { error } = await supabaseClient.from('folgas').upsert(paraSubir);
       if (error) {
