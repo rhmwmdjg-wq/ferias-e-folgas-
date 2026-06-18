@@ -141,13 +141,26 @@ function atualizarSaldoDisplay() {
 function saldoRestanteCredito(creditoId, srvId) {
   const credito = DB.folgas().find(f => f.id === creditoId && f.tipo === 'credito');
   if (!credito) return 0;
-  const consumido = DB.folgas()
-    .filter(f => f.srvId === srvId && f.tipo === 'debito' && f.refId)
+  const todasFolgas = DB.folgas().filter(f => f.srvId === srvId);
+  const creditos = todasFolgas.filter(f => f.tipo === 'credito');
+  const totalCreditos = creditos.reduce((acc, c) => acc + c.qtd, 0);
+  if (totalCreditos === 0) return 0;
+
+  const consumidoVinculado = todasFolgas
+    .filter(f => f.tipo === 'debito' && f.refId)
     .reduce((acc, f) => {
       const refs = Array.isArray(f.refId) ? f.refId : [f.refId];
       return acc + (refs.includes(creditoId) ? f.qtd : 0);
     }, 0);
-  return Math.max(0, credito.qtd - consumido);
+
+  const totalNaoVinculado = todasFolgas
+    .filter(f => f.tipo === 'debito' && !f.refId)
+    .reduce((acc, f) => acc + f.qtd, 0);
+
+  const proporcao = credito.qtd / totalCreditos;
+  const consumidoNaoVinculado = totalNaoVinculado * proporcao;
+
+  return Math.max(0, Math.round((credito.qtd - consumidoVinculado - consumidoNaoVinculado) * 10) / 10);
 }
 
 function carregarFolgasDisp() {

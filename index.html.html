@@ -4740,6 +4740,11 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('folgas', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_folgas') || '[]');
+    // Preservar refId dos registros locais que já existem na nuvem
+    data.forEach(d => {
+      const local = locais.find(l => l.id === d.id);
+      if (local && local.refId) d.refId = local.refId;
+    });
     const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
     const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
     
