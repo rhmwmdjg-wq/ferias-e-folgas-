@@ -85,7 +85,7 @@ function selecionarTipoPeriodo(tipo) {
         <label>${num}º Período — ${dias} dias corridos</label>
         <div class="form-row cols-2" style="margin:0">
           <div class="field" style="margin:0">
-            <label style="font-size:.72rem;color:var(--muted)">Data de Início *</label>
+            <label style="font-size:.72rem;color:var(--muted)">Data de Início</label>
             <input id="aut-inicio-${num}" type="date" oninput="calcularFimPeriodo(${num}, ${dias})">
           </div>
           <div class="field" style="margin:0">
@@ -127,13 +127,8 @@ async function salvarTextoAutorizacao() {
 
 async function gerarAutorizacaoFerias() {
   const srvId = document.getElementById('aut-servidor').value;
-  if (!srvId) return toastMsg('Selecione o servidor!', 'error');
   const tipoFerias = document.getElementById('aut-tipo-ferias').value;
-  if (!tipoFerias) return toastMsg('Selecione o tipo de férias (Regulamentar ou Prêmio)!', 'error');
-  if (!autTipoPeriodo) return toastMsg('Selecione o tipo de parcelamento!', 'error');
-
   const srv = DB.servidores().find(s => s.id === srvId);
-  if (!srv) return;
 
   const diasPorPeriodo = autTipoPeriodo === 1 ? [30] : autTipoPeriodo === 2 ? [15, 15] : [10, 10, 10];
   const periodos = [];
@@ -142,14 +137,10 @@ async function gerarAutorizacaoFerias() {
     const num = i + 1;
     const inicio = document.getElementById('aut-inicio-' + num)?.value;
     const fim = document.getElementById('aut-fim-' + num)?.value;
-    if (!inicio) return toastMsg(`Informe a data de início do ${num}º período!`, 'error');
-    periodos.push({ num, dias: diasPorPeriodo[i], inicio, fim, retorno: addDays(inicio, diasPorPeriodo[i]) });
+    periodos.push({ num, dias: diasPorPeriodo[i], inicio, fim, retorno: inicio ? addDays(inicio, diasPorPeriodo[i]) : '' });
   }
 
   const tercoMes = document.getElementById('aut-terco-mes').value;
-  if (tipoFerias === 'regulamentar' && !tercoMes) {
-    return toastMsg('Selecione o mês para recebimento do 1/3 de férias!', 'error');
-  }
 
   const periodoRef = document.getElementById('aut-periodo-ref').value.trim();
   const obs = document.getElementById('aut-obs').value.trim();
