@@ -1791,6 +1791,10 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <i class="fa-solid fa-fire"></i>
         <span class="tab-label">Mapa de Ausências</span>
       </button>
+      <button class="tab-btn" onclick="showTab('presenca')" id="tab-presenca" style="margin-bottom:4px">
+        <i class="fa-solid fa-clipboard-user"></i>
+        <span class="tab-label">Lista de Presença</span>
+      </button>
 
       <!-- ===== Administração ===== -->
       <div class="sidebar-section-label" id="label-admin-section" style="display:none">Administração</div>
@@ -2573,6 +2577,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('ferias')">🖨️ Imprimir Férias</button>
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('sem_ferias')">🖨️ Sem Férias</button>
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('folgas')">🖨️ Imprimir Folgas</button>
+      <button class="btn btn-ghost btn-sm" onclick="showTab('presenca')">📝 Lista de Presença</button>
       <div style="width:1px;background:var(--border);margin:0 2px"></div>
       <button class="btn btn-ghost btn-sm" style="color:var(--success);border-color:rgba(16,185,129,0.3)" onclick="exportarCSV('servidores')" title="Exportar lista de servidores para Excel">💾 Servidores.csv</button>
       <button class="btn btn-ghost btn-sm" style="color:var(--success);border-color:rgba(16,185,129,0.3)" onclick="exportarCSV('ferias')" title="Exportar programações de férias para Excel">💾 Férias.csv</button>
@@ -2674,6 +2679,34 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     </table>
   </div>
   <div id="paginacao-relatorio" class="pagination"></div>
+</div>
+
+<!-- ======================= ABA LISTA DE PRESENÇA ======================= -->
+<div class="tab-panel" id="panel-presenca">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
+    <div>
+      <div class="section-title" style="margin:0">📝 Lista de Presença</div>
+      <p style="font-size:.82rem;color:var(--muted);margin-top:6px">Imprime listas por setor com nome, assinatura e justificativa de ausência.</p>
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="imprimirListaPresenca()">🖨️ Imprimir Lista</button>
+  </div>
+
+  <div class="card">
+    <h3><span class="icon">📋</span> Dados para impressão</h3>
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end">
+      <div class="field" style="margin:0">
+        <label>Nome do Evento <span style="color:var(--danger)">*</span></label>
+        <input id="presenca-evento" type="text" placeholder="Ex.: Reunião de alinhamento da APS">
+      </div>
+      <div class="field" style="margin:0">
+        <label>Setor</label>
+        <select id="presenca-setor">
+          <option value="">Todos os Setores</option>
+        </select>
+      </div>
+    </div>
+    <p style="font-size:.78rem;color:var(--muted);margin-top:12px">Ao selecionar todos os setores, será gerada uma lista separada para cada setor.</p>
+  </div>
 </div>
 
 <!-- ======================= ABA ANIVERSARIANTES ======================= -->

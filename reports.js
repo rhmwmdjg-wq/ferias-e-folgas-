@@ -13,6 +13,114 @@ function popularSelectCredRelatorio() {
   if (val) sel.value = val;
 }
 
+function imprimirListaPresenca() {
+  const evento = (document.getElementById('presenca-evento')?.value || '').trim();
+  const setorFiltro = document.getElementById('presenca-setor')?.value || '';
+  if (!evento) {
+    toastMsg('Informe o nome do evento antes de imprimir.', 'warning');
+    document.getElementById('presenca-evento')?.focus();
+    return;
+  }
+
+  const servidores = getServidoresAcessiveis()
+    .filter(s => !setorFiltro || s.setor === setorFiltro)
+    .slice()
+    .sort((a, b) => (a.setor || 'Sem setor').localeCompare(b.setor || 'Sem setor') || (a.nome || '').localeCompare(b.nome || ''));
+
+  if (!servidores.length) {
+    toastMsg('Nenhum servidor encontrado para o setor selecionado.', 'warning');
+    return;
+  }
+
+  const porSetor = {};
+  servidores.forEach(s => {
+    const setor = s.setor || 'Sem setor informado';
+    if (!porSetor[setor]) porSetor[setor] = [];
+    porSetor[setor].push(s);
+  });
+
+  const cfg = DB.config();
+  const imgPrint = getImg('print') || getImg('esq');
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const coordenador = cfg.coordenadorAPS || 'Coordenador(a) da Atenção Primária';
+  const dataEmissao = new Date().toLocaleDateString('pt-BR');
+  const setoresHtml = Object.keys(porSetor).sort((a, b) => a.localeCompare(b)).map((setor, idx) => {
+    const linhas = porSetor[setor].map((srv, i) => `
+      <tr>
+        <td class="num">${i + 1}</td>
+        <td>${esc(srv.nome || '')}</td>
+        <td class="assinatura"></td>
+        <td class="justificativa"></td>
+      </tr>
+    `).join('');
+
+    return `
+      <section class="lista ${idx > 0 ? 'page-break' : ''}">
+        <div class="header">
+          ${imgPrint ? '<img src="' + imgPrint + '" alt="Logo">' : ''}
+          <div>
+            <div class="org">${esc(orgNome)}</div>
+            <h1>Lista de Presença</h1>
+            <p><strong>Evento:</strong> ${esc(evento)}</p>
+            <p><strong>Setor:</strong> ${esc(setor)} &nbsp; | &nbsp; <strong>Data:</strong> ____/____/________</p>
+          </div>
+        </div>
+        <table>
+          <thead>
+            <tr><th style="width:34px">Nº</th><th>Nome do Servidor</th><th style="width:31%">Assinatura</th><th style="width:28%">Justificativa de Ausência</th></tr>
+          </thead>
+          <tbody>${linhas}</tbody>
+        </table>
+        <div class="signatures">
+          <div class="sig"><div class="line"></div><div class="label">Gerente da Unidade</div></div>
+          <div class="sig"><div class="line"></div><div class="label">${esc(coordenador)}</div><div class="role">Coordenador da Atenção Primária</div></div>
+        </div>
+      </section>
+    `;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="UTF-8">
+      <title>Lista de Presença - ${esc(evento)}</title>
+      <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        * { box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; color: #111; margin: 0; font-size: 11px; }
+        .lista { page-break-inside: avoid; }
+        .page-break { page-break-before: always; }
+        .header { display: flex; align-items: center; gap: 14px; border-bottom: 2px solid #111; padding-bottom: 10px; margin-bottom: 12px; }
+        .header img { max-width: 95px; max-height: 70px; object-fit: contain; }
+        .org { font-size: 11px; font-weight: 700; text-transform: uppercase; color: #333; }
+        h1 { font-size: 20px; margin: 2px 0 6px; text-transform: uppercase; }
+        p { margin: 2px 0; }
+        table { width: 100%; border-collapse: collapse; }
+        th { background: #efefef; border: 1px solid #333; padding: 7px 6px; text-align: left; text-transform: uppercase; font-size: 10px; }
+        td { border: 1px solid #333; padding: 6px; height: 34px; vertical-align: middle; }
+        .num { text-align: center; font-weight: 700; }
+        .assinatura, .justificativa { height: 34px; }
+        .signatures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 40px; margin-top: 54px; page-break-inside: avoid; }
+        .sig { text-align: center; min-height: 52px; }
+        .line { border-top: 1.5px solid #111; margin-bottom: 7px; }
+        .label { font-weight: 700; text-transform: uppercase; font-size: 10px; }
+        .role { font-size: 9px; margin-top: 2px; }
+        .footer { margin-top: 18px; text-align: right; color: #555; font-size: 9px; }
+        @media print { body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+      </style>
+    </head>
+    <body>
+      ${setoresHtml}
+      <div class="footer">Documento gerado em ${dataEmissao}</div>
+      <script>window.onload = function(){ window.print(); }<\/script>
+    </body>
+    </html>
+  `);
+  win.document.close();
+}
+
 function togglePtRelTipo() {
   const tipo = document.getElementById('pt-rel-tipo').value;
   document.getElementById('pt-rel-mes-field').style.display = tipo === 'mes' || tipo === 'individual' ? 'block' : 'none';

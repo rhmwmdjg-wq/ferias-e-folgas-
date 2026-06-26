@@ -21,6 +21,7 @@ function showTab(tab) {
   if (tab === 'ferias') renderProgramacoes(), popularSelectServidor();
   if (tab === 'calendario') iniciarCalendario();
   if (tab === 'relatorio') renderRelatorio(), popularSelectRelatorio();
+  if (tab === 'presenca') atualizarSelectsSetores();
   if (tab === 'aniversariantes') renderAniversariantes();
   if (tab === 'mapaausencias') iniciarMapaAusencias();
   if (tab === 'folgas') { renderFolgas(); if (!fpGozo) initFlatpickrFolga(); }
@@ -138,7 +139,7 @@ function atualizarSelectsSetores() {
     }
   }
   
-  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor', 'bh-ajuste-setor', 'fp-planilha-setor'];
+  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor', 'bh-ajuste-setor', 'fp-planilha-setor', 'presenca-setor'];
   
   selectIds.forEach(id => {
     const el = document.getElementById(id);
