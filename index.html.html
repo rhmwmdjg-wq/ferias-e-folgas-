@@ -2256,6 +2256,10 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <div class="val" id="stat-autorizacoes" style="font-size:1.6rem">0</div>
       <div class="lbl">📜 Autorizações Assinadas</div>
     </div>
+    <div class="stat" style="background:rgba(245,181,46,0.08);border:1px solid rgba(245,181,46,0.2)">
+      <div class="val" id="stat-credenciados-vencendo" style="color:var(--warning)">0</div>
+      <div class="lbl">⏳ Credenciados a Vencer</div>
+    </div>
   </div>
 
   <!-- Gráficos -->
@@ -2304,6 +2308,9 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
 
   <div class="section-title">🏆 Detalhamento de Alertas (Prêmio)</div>
   <div id="lista-alertas-premium"><div class="empty"><div class="icon">✅</div><p>Nenhum alerta de férias prêmio no momento.</p></div></div>
+
+  <div class="section-title" style="color:var(--warning)">📋 Credenciamentos Próximos do Vencimento</div>
+  <div id="lista-credenciados-vencendo" style="margin-bottom:20px"><div class="empty"><div class="icon">✅</div><p>Nenhum credenciamento próximo do vencimento.</p></div></div>
 </div>
 
 <!-- ======================= ABA SERVIDORES ======================= -->
@@ -3850,8 +3857,9 @@ Coordenação de RH
         </div>
         <div class="form-row cols-2">
           <div class="field"><label>E-mail</label><input id="cred-email" type="email" placeholder="email@exemplo.com"></div>
-          <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
+          <div class="field"><label>Data de Admissão</label><input id="cred-admissao" type="date"></div>
         </div>
+        <div class="field"><label>Lotação</label><input id="cred-lotacao" placeholder="Secretaria / Departamento"></div>
         <div class="field"><label>Endereço</label><input id="cred-endereco" placeholder="Rua, nº, bairro, cidade"></div>
         <div class="form-row cols-2">
           <div class="field"><label>Cargo *</label><select id="cred-cargo"><option value="">Selecione...</option></select></div>

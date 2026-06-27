@@ -102,12 +102,12 @@ function renderCredenciados() {
   const cargos = DB.cargos();
   const busca = (document.getElementById('busca-credenciado').value || '').toLowerCase();
   const filtrados = busca ? dados.filter(c => c.nome.toLowerCase().includes(busca) || (c.cpf || '').includes(busca)) : dados;
-  let html = '<table><thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Lotação</th><th>Forma Pgto</th><th>Ações</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>Nome</th><th>CPF</th><th>Cargo</th><th>Lotação</th><th>Admissão</th><th>Forma Pgto</th><th>Ações</th></tr></thead><tbody>';
   for (let i = 0; i < filtrados.length; i++) {
     const c = filtrados[i];
     const cargoNome = cargos.find(cg => cg.id === c.cargoId);
     html += '<tr><td>' + esc(c.nome) + '</td><td>' + esc(c.cpf || '-') + '</td><td>' + esc(cargoNome ? cargoNome.nome : '-') + '</td>'
-      + '<td>' + esc(c.lotacao || '-') + '</td><td>' + esc(c.formaPagamento || '-') + '</td>'
+      + '<td>' + esc(c.lotacao || '-') + '</td><td>' + fmtDate(c.admissao) + '</td><td>' + esc(c.formaPagamento || '-') + '</td>'
       + '<td class="actions">'
       + '<button class="btn btn-sm btn-ghost" onclick="editarCredenciado(\'' + c.id + '\')">✏️</button> '
       + '<button class="btn btn-sm btn-ghost" onclick="excluirCredenciado(\'' + c.id + '\')">🗑️</button>'
@@ -125,6 +125,7 @@ function salvarCredenciado() {
   const pis = document.getElementById('cred-pis').value.trim();
   const tel = document.getElementById('cred-tel').value.trim();
   const email = document.getElementById('cred-email').value.trim();
+  const admissao = document.getElementById('cred-admissao').value.trim();
   const lotacao = document.getElementById('cred-lotacao').value.trim();
   const endereco = document.getElementById('cred-endereco').value.trim();
   const cargoId = document.getElementById('cred-cargo').value;
@@ -141,9 +142,9 @@ function salvarCredenciado() {
   const dados = DB.credenciados();
   if (id) {
     const idx = dados.findIndex(c => c.id === id);
-    if (idx >= 0) { dados[idx] = { ...dados[idx], nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta }; }
+    if (idx >= 0) { dados[idx] = { ...dados[idx], nome, cpf, pis, tel, email, admissao, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta }; }
   } else {
-    dados.push({ id: uid(), nome, cpf, pis, tel, email, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta });
+    dados.push({ id: uid(), nome, cpf, pis, tel, email, admissao, lotacao, endereco, cargoId, formaPagamento, chavePix, banco, agencia, conta, tipoConta });
   }
   DB.saveCredenciados(dados);
   limparFormCredenciado();
@@ -161,6 +162,7 @@ function editarCredenciado(id) {
   document.getElementById('cred-pis').value = c.pis || '';
   document.getElementById('cred-tel').value = c.tel || '';
   document.getElementById('cred-email').value = c.email || '';
+  document.getElementById('cred-admissao').value = c.admissao || '';
   document.getElementById('cred-lotacao').value = c.lotacao || '';
   document.getElementById('cred-endereco').value = c.endereco || '';
   document.getElementById('cred-cargo').value = c.cargoId || '';
@@ -176,7 +178,7 @@ function editarCredenciado(id) {
 }
 
 function limparFormCredenciado() {
-  ['cred-id','cred-nome','cred-cpf','cred-pis','cred-tel','cred-email','cred-lotacao','cred-endereco','cred-chave-pix','cred-banco','cred-agencia','cred-conta'].forEach(id => document.getElementById(id).value = '');
+  ['cred-id','cred-nome','cred-cpf','cred-pis','cred-tel','cred-email','cred-admissao','cred-lotacao','cred-endereco','cred-chave-pix','cred-banco','cred-agencia','cred-conta'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('cred-cargo').value = '';
   document.getElementById('cred-pgto').value = '';
   document.getElementById('cred-tipo-conta').value = '';

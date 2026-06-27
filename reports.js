@@ -193,6 +193,7 @@ function imprimirRelPontoIndividual(credId, filtroMes, filtroAno) {
       <div class="info-item"><label>E-mail</label><span>${esc(cred.email || '-')}</span></div>
       <div class="info-item"><label>Endereço</label><span>${esc(cred.endereco || '-')}</span></div>
       <div class="info-item"><label>Lotação</label><span>${esc(cred.lotacao || '-')}</span></div>
+      <div class="info-item"><label>Data de Admissão</label><span>${fmtDate(cred.admissao) || '-'}</span></div>
       <div class="info-item"><label>Cargo</label><span>${esc(cargo ? cargo.nome : '-')}</span></div>
       <div class="info-item"><label>Valor da Hora</label><span>R$ ${(cargo ? parseFloat(cargo.valorHora) : 0).toFixed(2)}</span></div>
       <div class="info-item"><label>Forma de Pagamento</label><span>${esc(cred.formaPagamento || '-')}</span></div>

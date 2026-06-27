@@ -3,6 +3,7 @@
 
 function renderDashboard() {
   renderAlertas();
+  renderAlertasCredenciados();
   renderCharts();
 }
 
@@ -138,31 +139,48 @@ function renderResumoAlertas() {
   const cont = document.getElementById('dashboard-alertas-resumo');
   if (!cont) return;
   
+  // Férias próximas
   const programacoes = getProgramacoesAcessiveis();
-  const alertas = programacoes.filter(p => {
+  const alertasFerias = programacoes.filter(p => {
     if (p.concluido) return false;
     const diff = diffDays(p.inicio);
     return diff >= 0 && diff <= 15;
-  }).sort((a,b) => diffDays(a.inicio) - diffDays(b.inicio)).slice(0, 8);
+  }).sort((a,b) => diffDays(a.inicio) - diffDays(b.inicio)).slice(0, 6);
   
-  if (!alertas.length) {
+  // Credenciados vencendo
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const creds = DB.credenciados().filter(c => c.admissao);
+  const alertasCred = [];
+  creds.forEach(c => {
+    const admissao = new Date(c.admissao + 'T00:00:00');
+    if (isNaN(admissao.getTime())) return;
+    const vencimento = new Date(admissao);
+    vencimento.setMonth(vencimento.getMonth() + 2);
+    const diff = Math.ceil((vencimento - hoje) / 86400000);
+    if (diff <= 15) alertasCred.push({ ...c, diff, vencimento });
+  });
+  alertasCred.sort((a, b) => a.diff - b.diff);
+  
+  const todos = [
+    ...alertasFerias.map(p => ({ tipo: 'ferias', nome: (DB.servidores().find(s => s.id === p.srvId)?.nome || 'Servidor'), diff: diffDays(p.inicio), label: p.tipo === 'anual' ? '🌴 Anual' : '🏆 Prêmio', icon: p.tipo === 'anual' ? '🌴' : '🏆' })),
+    ...alertasCred.map(c => ({ tipo: 'credenciado', nome: c.nome, diff: c.diff, label: '📋 Credenciamento', icon: '📋' }))
+  ].sort((a, b) => a.diff - b.diff).slice(0, 10);
+  
+  if (!todos.length) {
     cont.innerHTML = '<div class="empty" style="padding:40px 10px"><div class="icon" style="font-size:24px">✅</div><p style="font-size:0.75rem">Tudo em dia por aqui.</p></div>';
     return;
   }
   
-  cont.innerHTML = alertas.map(p => {
-    const srv = DB.servidores().find(s => s.id === p.srvId);
-    const diff = diffDays(p.inicio);
-    const cor = diff <= 5 ? 'var(--danger)' : diff <= 15 ? 'var(--warning)' : 'var(--primary)';
+  cont.innerHTML = todos.map(item => {
+    const cor = item.diff <= 5 ? 'var(--danger)' : item.diff <= 15 ? 'var(--warning)' : 'var(--primary)';
+    const texto = item.diff <= 0 ? 'VENCIDO' : item.diff === 0 ? 'HOJE' : `${item.diff} dias`;
     return `
       <div style="padding:10px 12px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; background:rgba(255,255,255,0.01)">
         <div style="min-width:0; flex:1">
-          <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)">${esc(srv?.nome || 'Servidor')}</div>
-          <div style="font-size:0.68rem; color:var(--muted)">${p.tipo === 'anual' ? '🌴 Anual' : '🏆 Prêmio'} • ${fmtDate(p.inicio)}</div>
+          <div style="font-weight:700; font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text)">${esc(item.nome)}</div>
+          <div style="font-size:0.68rem; color:var(--muted)">${item.label}</div>
         </div>
-        <span class="tag" style="background:${cor}22; color:${cor}; border:1px solid ${cor}33; font-size:0.65rem">
-          ${diff === 0 ? 'HOJE' : `${diff} dias`}
-        </span>
+        <span class="tag" style="background:${cor}22; color:${cor}; border:1px solid ${cor}33; font-size:0.65rem">${texto}</span>
       </div>
     `;
   }).join('');
@@ -220,6 +238,59 @@ function renderAlertas() {
   // Autorizações assinadas
   const autorizacoes = DB.autorizacoes();
   document.getElementById('stat-autorizacoes').textContent = autorizacoes.length;
+}
+
+function renderAlertasCredenciados() {
+  const el = document.getElementById('lista-credenciados-vencendo');
+  const statEl = document.getElementById('stat-credenciados-vencendo');
+  if (!el) return;
+  
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const creds = DB.credenciados().filter(c => c.admissao);
+  const cargos = DB.cargos();
+  
+  const alertas = [];
+  creds.forEach(c => {
+    const admissao = new Date(c.admissao + 'T00:00:00');
+    if (isNaN(admissao.getTime())) return;
+    const vencimento = new Date(admissao);
+    vencimento.setMonth(vencimento.getMonth() + 2);
+    const diff = Math.ceil((vencimento - hoje) / 86400000);
+    if (diff <= 30) {
+      const cargo = cargos.find(cg => cg.id === c.cargoId);
+      alertas.push({ ...c, diff, vencimento, cargoNome: cargo ? cargo.nome : '-' });
+    }
+  });
+  
+  alertas.sort((a, b) => a.diff - b.diff);
+  
+  if (statEl) {
+    statEl.textContent = alertas.length;
+    statEl.style.color = alertas.filter(a => a.diff <= 0).length > 0 ? 'var(--danger)' : 'var(--warning)';
+  }
+  
+  if (!alertas.length) {
+    el.innerHTML = '<div class="empty"><div class="icon">✅</div><p>Nenhum credenciamento próximo do vencimento.</p></div>';
+    return;
+  }
+  
+  el.innerHTML = alertas.map(c => {
+    const vencido = c.diff <= 0;
+    const cor = vencido ? '#ff4560' : c.diff <= 7 ? '#f5b52e' : '#4d8bff';
+    const icone = vencido ? '🚨' : c.diff <= 7 ? '⚠️' : '📋';
+    const texto = vencido
+      ? `VENCIDO há ${Math.abs(c.diff)} dia(s)`
+      : c.diff === 0 ? 'Vence HOJE' : `Vence em ${c.diff} dia(s)`;
+    return `<div class="alert-card" style="border-left: 4px solid ${cor}">
+      <div class="alert-icon" style="background:${cor}22; color:${cor}">${icone}</div>
+      <div class="alert-info">
+        <h4>${esc(c.nome)} <span style="font-weight:400;color:var(--muted);font-size:.85rem">(CPF: ${esc(c.cpf || '-')})</span></h4>
+        <p>📂 Cargo: <strong>${esc(c.cargoNome)}</strong> | 📍 Lotação: ${esc(c.lotacao || '-')}</p>
+        <p>📅 Admissão: <strong>${fmtDate(c.admissao)}</strong> | Vencimento: <strong>${fmtDate(c.vencimento.toISOString().split('T')[0])}</strong></p>
+        <span class="days-badge ${vencido ? 'tag-red' : c.diff <= 7 ? 'tag-warn' : 'tag-blue'}">${texto}</span>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderListaGozoHoje(lista) {
