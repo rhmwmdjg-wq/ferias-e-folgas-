@@ -1823,7 +1823,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <div id="sync-status-bar" style="display:flex;align-items:center;gap:6px;padding:6px 10px;margin-bottom:6px;border-radius:var(--r-sm);font-size:.7rem;font-weight:600">
         <span id="sync-status-icon" style="font-size:.8rem">☁️</span>
         <span id="sync-status-text" style="flex:1">Sincronizado</span>
-        <button id="sync-force-btn" class="btn btn-ghost btn-sm" onclick="forcarSyncCompleto()" style="padding:2px 8px;font-size:.65rem;display:none" title="Forçar envio de todos os dados locais para a nuvem">🔄 Sincronizar</button>
+        <button id="sync-force-btn" class="btn btn-ghost btn-sm" onclick="forcarSyncCompleto()" style="padding:2px 8px;font-size:.65rem" title="Forçar envio de todos os dados locais para a nuvem">🔄 Sincronizar</button>
       </div>
       <div class="sidebar-user">
         <i class="fa-solid fa-circle-user"></i>
@@ -4304,13 +4304,11 @@ function atualizarBadgeSync() {
       syncBar.style.border = '1px solid rgba(245,158,11,0.25)';
       syncIcon.textContent = '⚠️';
       syncText.textContent = `${_syncQueue.length} item(ns) pendente(s)`;
-      if (syncBtn) syncBtn.style.display = 'inline-flex';
     } else {
       syncBar.style.background = 'transparent';
       syncBar.style.border = 'none';
-      syncIcon.textContent = '✅';
+      syncIcon.textContent = '☁️';
       syncText.textContent = 'Sincronizado';
-      if (syncBtn) syncBtn.style.display = 'none';
     }
   }
 }
