@@ -4371,6 +4371,13 @@ async function forcarSyncCompleto() {
     { nome: 'banco_horas', dados: JSON.parse(localStorage.getItem('srv_banco_horas') || '[]') },
     { nome: 'solicitacoes', dados: JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]') },
     { nome: 'gestores', dados: JSON.parse(localStorage.getItem('srv_gestores') || '[]') },
+    { nome: 'cargos', dados: JSON.parse(localStorage.getItem('srv_cargos') || '[]') },
+    { nome: 'credenciados', dados: JSON.parse(localStorage.getItem('srv_credenciados') || '[]') },
+    { nome: 'ponto_mensal', dados: JSON.parse(localStorage.getItem('srv_ponto_mensal') || '[]') },
+    { nome: 'eventos', dados: JSON.parse(localStorage.getItem('srv_eventos') || '[]') },
+    { nome: 'veiculos', dados: JSON.parse(localStorage.getItem('srv_veiculos') || '[]') },
+    { nome: 'protocolos_entrega', dados: JSON.parse(localStorage.getItem('srv_protocolos') || '[]') },
+    { nome: 'itens_protocolo', dados: JSON.parse(localStorage.getItem('srv_itens_protocolo') || '[]') },
   ];
 
   for (const t of tabelas) {

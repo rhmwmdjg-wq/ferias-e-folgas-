@@ -431,11 +431,10 @@ const DB = {
     for (let i = 0; i < d.length; i++) {
       try {
         const { error } = await supabaseClient.from('cargos').upsert(d[i], { onConflict: 'id' });
-        if (error && !isQuotaError(error)) console.error("Erro Supabase (cargos):", error);
-        else if (error) saveToSyncQueue('cargos', d[i]);
+        if (error) { saveToSyncQueue('cargos', d[i]); console.error("Erro Supabase (cargos):", error); }
       } catch (e) {
-        if (isQuotaError(e)) saveToSyncQueue('cargos', d[i]);
-        else console.error("Erro ao salvar cargo:", e);
+        saveToSyncQueue('cargos', d[i]);
+        console.error("Erro ao salvar cargo:", e);
       }
     }
   },
@@ -452,11 +451,10 @@ const DB = {
     for (let i = 0; i < d.length; i++) {
       try {
         const { error } = await supabaseClient.from('credenciados').upsert(d[i], { onConflict: 'id' });
-        if (error && !isQuotaError(error)) console.error("Erro Supabase (credenciados):", error);
-        else if (error) saveToSyncQueue('credenciados', d[i]);
+        if (error) { saveToSyncQueue('credenciados', d[i]); console.error("Erro Supabase (credenciados):", error); }
       } catch (e) {
-        if (isQuotaError(e)) saveToSyncQueue('credenciados', d[i]);
-        else console.error("Erro ao salvar credenciado:", e);
+        saveToSyncQueue('credenciados', d[i]);
+        console.error("Erro ao salvar credenciado:", e);
       }
     }
   },
@@ -473,11 +471,10 @@ const DB = {
     for (let i = 0; i < d.length; i++) {
       try {
         const { error } = await supabaseClient.from('ponto_mensal').upsert(d[i], { onConflict: 'id' });
-        if (error && !isQuotaError(error)) console.error("Erro Supabase (ponto_mensal):", error);
-        else if (error) saveToSyncQueue('ponto_mensal', d[i]);
+        if (error) { saveToSyncQueue('ponto_mensal', d[i]); console.error("Erro Supabase (ponto_mensal):", error); }
       } catch (e) {
-        if (isQuotaError(e)) saveToSyncQueue('ponto_mensal', d[i]);
-        else console.error("Erro ao salvar ponto_mensal:", e);
+        saveToSyncQueue('ponto_mensal', d[i]);
+        console.error("Erro ao salvar ponto_mensal:", e);
       }
     }
   },
