@@ -139,7 +139,7 @@ function atualizarSelectsSetores() {
     }
   }
   
-  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor', 'bh-ajuste-setor', 'fp-planilha-setor', 'presenca-setor'];
+  const selectIds = ['f-setor', 'edit-setor', 'filtro-setor', 'filtro-setor-rel', 'rel-srv-setor', 'fp-filtro-setor', 'fg-filtro-setor-cred', 'fg-filtro-setor-deb', 'cb-setor', 'bh-filtro-setor', 'bh-saldo-setor', 'bh-ajuste-setor', 'bh-rel-setor', 'fp-planilha-setor', 'presenca-setor', 'folgas-rel-setor'];
   
   selectIds.forEach(id => {
     const el = document.getElementById(id);

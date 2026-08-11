@@ -546,6 +546,35 @@ function parseFolgaObs(str) {
   return result;
 }
 
+function descreverDatasFolga(folga) {
+  if (!folga) return '-';
+  if (folga.dataItems && folga.dataItems.length) {
+    return folga.dataItems.map(di => {
+      const rotulo = di.peso === 1 ? 'Integral' : (di.turno ? 'Meio Período - ' + di.turno : 'Meio Período');
+      return `${fmtDate(di.data)} (${rotulo})`;
+    }).join(', ');
+  }
+  return fmtDate(folga.data);
+}
+
+function folgaNoPeriodo(folga, mes, ano) {
+  if (mes === '' && ano === '') return true;
+  const mesNum = mes === '' ? null : parseInt(mes);
+  const anoNum = ano === '' ? null : parseInt(ano);
+  let datas = [];
+  if (folga.dataItems && folga.dataItems.length) {
+    datas = folga.dataItems.map(di => di.data);
+  } else if (folga.data) {
+    datas = String(folga.data).split(',').map(d => d.trim()).filter(Boolean);
+  }
+  if (!datas.length) return true;
+  return datas.some(d => {
+    const dt = new Date(d + 'T12:00:00');
+    if (isNaN(dt.getTime())) return false;
+    return (mesNum === null || dt.getMonth() === mesNum) && (anoNum === null || dt.getFullYear() === anoNum);
+  });
+}
+
 function temAusenciaNoPeriodo(srvId, inicio, fim) {
   const programacoes = getProgramacoesAcessiveis().filter(function(p) { return p.srvId === srvId; });
   for (let i = 0; i < programacoes.length; i++) {

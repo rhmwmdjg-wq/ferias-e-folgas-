@@ -771,9 +771,28 @@ function imprimirRelatorio(tipo) {
       </div>
     `;
   } else if (tipo === 'folgas') {
-    titulo = 'Relatório de Bancos de Folgas';
-    htmlTabela = servidores.filter(s => folgas.some(f => f.srvId === s.id)).map(s => {
-      const srvFolgas = folgas.filter(f => f.srvId === s.id).sort((a,b) => new Date(b.data) - new Date(a.data));
+    const MESES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+    const fgSetor = document.getElementById('folgas-rel-setor')?.value || '';
+    const fgMes = document.getElementById('folgas-rel-mes')?.value || '';
+    const fgAno = document.getElementById('folgas-rel-ano')?.value || '';
+
+    const folgasFiltradas = folgas.filter(f => {
+      const srvF = servidores.find(s => s.id === f.srvId);
+      if (!srvF) return false;
+      if (fgSetor && srvF.setor !== fgSetor) return false;
+      return folgaNoPeriodo(f, fgMes, fgAno);
+    });
+
+    const periodoLabel = (fgMes !== '' || fgAno !== '')
+      ? ' | Período: ' + (fgMes !== '' ? MESES[parseInt(fgMes)] : '') + (fgMes !== '' && fgAno !== '' ? '/' : '') + (fgAno || '')
+      : '';
+
+    titulo = 'Relatório de Bancos de Folgas' + (fgSetor ? ' | Setor: ' + fgSetor : '') + periodoLabel;
+
+    const servidoresFolgas = servidores.filter(s => folgasFiltradas.some(f => f.srvId === s.id));
+
+    htmlTabela = servidoresFolgas.length ? servidoresFolgas.map(s => {
+      const srvFolgas = folgasFiltradas.filter(f => f.srvId === s.id).sort((a,b) => new Date(b.data) - new Date(a.data));
       const saldo = srvFolgas.reduce((acc, f) => acc + (f.tipo === 'credito' ? f.qtd : -f.qtd), 0);
       return `
         <div class="group-block">
@@ -783,21 +802,21 @@ function imprimirRelatorio(tipo) {
           </div>
           <table style="margin:0">
             <thead><tr>
-              <th style="width:80px">Data</th>
+              <th style="width:110px">Data</th>
               <th style="width:80px">Tipo</th>
               <th style="width:55px;text-align:center">Qtd.</th>
               <th>Justificativa</th>
             </tr></thead>
             <tbody>${srvFolgas.map(f => `<tr>
-              <td class="text-center">${fmtDate(f.data)}</td>
-              <td class="text-center">${f.tipo === 'credito' ? '<span class="badge-credito">CRÉDITO</span>' : '<span class="badge-gozo">GOZO</span>'}</td>
+              <td class="text-center">${descreverDatasFolga(f)}</td>
+              <td class="text-center">${f.tipo === 'credito' ? '<span class="badge-credito">CRÉDITO</span>' : '<span class="badge-gozo">USUFRUTO</span>'}</td>
               <td class="text-center bold">${f.tipo === 'credito' ? '+' : '-'}${f.qtd}</td>
               <td class="text-sm">${f.tipo === 'credito' ? f.motivo : f.obs || '-'}</td>
             </tr>`).join('')}</tbody>
           </table>
         </div>
       `;
-    }).join('');
+    }).join('') : '<div class="section-title-print" style="color:#b91c1c;">⚠️ Nenhum registro de folgas encontrado para os filtros selecionados.</div>';
   } else if (tipo === 'aniversariantes') {
     const mesAtual = parseInt(document.getElementById('mbtn-0').parentElement.querySelector('.active')?.id.replace('mbtn-','') || hoje.getMonth());
     const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
@@ -907,7 +926,7 @@ function imprimirRelatorioIndividual(srvId, tipo) {
       <tbody>
         ${folgas.map(f => `
           <tr>
-            <td style="text-align:center">${fmtDate(f.data)}</td>
+            <td style="text-align:center">${descreverDatasFolga(f)}</td>
             <td style="text-align:center">${f.tipo === 'credito' ? 'CRÉDITO' : 'USUFRUTO'}</td>
             <td style="font-weight: 700; text-align:center;">${f.tipo === 'credito' ? '+' : '-'}${f.qtd}</td>
             <td style="font-size: 10px;">
@@ -1079,11 +1098,20 @@ function imprimirRelatorioBancoHoras() {
   const imgPrint = getImg('print');
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
-  const registros = DB.bancoHoras().filter(r => r.srvId === srvId)
-    .sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  const filtMesBH = document.getElementById('bh-rel-mes')?.value || '';
+  const filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+
+  let registros = DB.bancoHoras().filter(r => r.srvId === srvId);
+  if (filtMesBH !== '') registros = registros.filter(r => String(r.mes) === filtMesBH);
+  if (filtAnoBH !== '') registros = registros.filter(r => String(r.ano) === filtAnoBH);
+  registros.sort((a, b) => a.ano - b.ano || a.mes - b.mes);
 
   let saldoAnterior = 0;
   let linhasTabela = '';
+
+  if (registros.length && (filtMesBH !== '' || filtAnoBH !== '')) {
+    saldoAnterior = calcularSaldoAnteriorBancoHoras(srvId, registros[0].mes, registros[0].ano);
+  }
 
   registros.forEach((r, i) => {
     const totalDisp = saldoAnterior + (r.horasGeradas || 0);
@@ -1101,9 +1129,11 @@ function imprimirRelatorioBancoHoras() {
     saldoAnterior = saldoRem;
   });
 
-  const saldoFinal = registros.length > 0
-    ? registros.reduce((acc, r) => acc + (r.horasGeradas || 0) - (r.horasPagas || 0), 0)
-    : 0;
+  const saldoFinal = registros.length > 0 ? saldoAnterior : 0;
+
+  const periodoBH = (filtMesBH !== '' || filtAnoBH !== '')
+    ? 'Período: ' + (filtMesBH !== '' ? meses[parseInt(filtMesBH)] : '') + (filtMesBH !== '' && filtAnoBH !== '' ? '/' : '') + (filtAnoBH || '')
+    : '';
 
   const headCSS = `
     <style>
@@ -1152,7 +1182,7 @@ function imprimirRelatorioBancoHoras() {
         </tr>
       </tbody>
     </table>
-  ` : '<p style="text-align: center; color: #666; margin: 20px 0; border: 1px solid #000; padding: 20px;">Nenhum registro de banco de horas encontrado para este servidor.</p>';
+  ` : `<p style="text-align: center; color: #666; margin: 20px 0; border: 1px solid #000; padding: 20px;">Nenhum registro de banco de horas encontrado${periodoBH ? ' para o período selecionado' : ' para este servidor'}.</p>`;
 
   const fullHTML = `
     <!DOCTYPE html>
@@ -1168,6 +1198,7 @@ function imprimirRelatorioBancoHoras() {
             <div style="font-size: 9px; margin-bottom: 3px; font-weight: 600; color: #444;">${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</div>
             <h2 style="margin:0; font-size:14px;">RELATÓRIO DE BANCO DE HORAS</h2>
             <p style="margin:3px 0 0; font-size:9px;">Controle de Horas Sem Pagas</p>
+            ${periodoBH ? `<p style="margin:3px 0 0; font-size:9px; font-weight:700;">${periodoBH}</p>` : ''}
             <p style="margin:3px 0 0; font-size:8px; font-weight:700; color:#c00;">* Horas já acrescidas de 50% (horas extras)</p>
           </td>
           <td style="width: 22%; font-size: 8.5px; line-height: 1.5; background: #fafafa;">
@@ -1226,13 +1257,25 @@ function imprimirRelatorioBancoHoras() {
 }
 
 function imprimirRelatorioBancoHorasGeral() {
+  const filtSetorBH = document.getElementById('bh-rel-setor')?.value || '';
+  const filtMesBH = document.getElementById('bh-rel-mes')?.value || '';
+  const filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+  const mesesBH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+  const periodoBH = (filtMesBH !== '' || filtAnoBH !== '')
+    ? 'Período: ' + (filtMesBH !== '' ? mesesBH[parseInt(filtMesBH)] : '') + (filtMesBH !== '' && filtAnoBH !== '' ? '/' : '') + (filtAnoBH || '')
+    : '';
+  const resumoFiltrosBH = [filtSetorBH ? 'Setor: ' + filtSetorBH : '', periodoBH].filter(Boolean).join(' | ');
+  const filtroRegistros = r => (filtMesBH === '' || String(r.mes) === filtMesBH) && (filtAnoBH === '' || String(r.ano) === filtAnoBH);
+
   const win = window.open('', '_blank');
   const hoje = new Date();
   const imgPrint = getImg('print');
-  const servidores = getServidoresAcessiveis().filter(s => s.id && DB.bancoHoras().some(b => b.srvId === s.id));
+  const servidores = getServidoresAcessiveis()
+    .filter(s => !filtSetorBH || s.setor === filtSetorBH)
+    .filter(s => s.id && DB.bancoHoras().some(b => b.srvId === s.id && filtroRegistros(b)));
 
   if (!servidores.length) {
-    return toastMsg('Nenhum servidor com registros de banco de horas encontrado!', 'error');
+    return toastMsg('Nenhum servidor com registros de banco de horas encontrado para os filtros selecionados!', 'error');
   }
 
   const headCSS = `
@@ -1261,7 +1304,7 @@ function imprimirRelatorioBancoHorasGeral() {
   servidores.sort((a, b) => (a.setor || '').localeCompare(b.setor || '') || a.nome.localeCompare(b.nome));
 
   servidores.forEach(srv => {
-    const registros = DB.bancoHoras().filter(r => r.srvId === srv.id);
+    const registros = DB.bancoHoras().filter(r => r.srvId === srv.id && filtroRegistros(r));
     let totalGeradas = 0, totalPagas = 0, saldo = 0;
     registros.forEach(r => {
       totalGeradas += r.horasGeradas || 0;
@@ -1279,7 +1322,7 @@ function imprimirRelatorioBancoHorasGeral() {
   });
 
   const totalGeral = servidores.reduce((acc, s) => {
-    const registros = DB.bancoHoras().filter(r => r.srvId === s.id);
+    const registros = DB.bancoHoras().filter(r => r.srvId === s.id && filtroRegistros(r));
     return acc + registros.reduce((a, r) => a + (r.horasGeradas || 0) - (r.horasPagas || 0), 0);
   }, 0);
 
@@ -1317,6 +1360,7 @@ function imprimirRelatorioBancoHorasGeral() {
             <div style="font-size: 9px; margin-bottom: 3px; font-weight: 600; color: #444;">${DB.config().nomeOrganizacao || 'COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE'}</div>
             <h2 style="margin:0; font-size:14px;">RELATÓRIO GERAL DE BANCO DE HORAS</h2>
             <p style="margin:3px 0 0; font-size:9px;">Consolidado de Horas Sem Pagas</p>
+            ${resumoFiltrosBH ? `<p style="margin:3px 0 0; font-size:9px; font-weight:700;">${resumoFiltrosBH}</p>` : ''}
             <p style="margin:3px 0 0; font-size:8px; font-weight:700; color:#c00;">* Horas já acrescidas de 50% (horas extras)</p>
           </td>
           <td style="width: 20%; font-size: 8.5px; line-height: 1.5; background: #fafafa;">
@@ -1395,13 +1439,21 @@ function exportarCSV(tipo) {
 
   } else if (tipo === 'folgas') {
     nomeArquivo = `Folgas_${dataStr}.csv`;
+    const fgSetor = document.getElementById('folgas-rel-setor')?.value || '';
+    const fgMes = document.getElementById('folgas-rel-mes')?.value || '';
+    const fgAno = document.getElementById('folgas-rel-ano')?.value || '';
     csv += 'Servidor;Matrícula;Setor;Data;Tipo;Quantidade;Motivo/Justificativa\n';
-    folgas.sort((a,b) => new Date(a.data) - new Date(b.data)).forEach(f => {
+    folgas.filter(f => {
+      const srv = servidores.find(s => s.id === f.srvId);
+      if (!srv) return false;
+      if (fgSetor && srv.setor !== fgSetor) return false;
+      return folgaNoPeriodo(f, fgMes, fgAno);
+    }).sort((a,b) => new Date(a.data) - new Date(b.data)).forEach(f => {
       const srv = servidores.find(s => s.id === f.srvId);
       csv += [
         srv?.nome || '', srv?.matricula || '', srv?.setor || '',
-        fmtDate(f.data),
-        f.tipo === 'credito' ? 'Crédito' : 'Gozo/Usufruto',
+        descreverDatasFolga(f),
+        f.tipo === 'credito' ? 'Crédito' : 'Usufruto',
         f.qtd,
         f.tipo === 'credito' ? (f.motivo || '') : (f.obs || '')
       ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(';') + '\n';
