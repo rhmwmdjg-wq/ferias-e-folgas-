@@ -5227,10 +5227,29 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('veiculos', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_veiculos') || '[]');
+    const localMap = new Map(locais.filter(x => x.id).map(x => [x.id, x]));
+    // Se a nuvem tiver um campo vazio que o registro local tem preenchido, recupera o valor local
+    const recuperados = [];
+    const merged = data.map(cloudRec => {
+      const local = localMap.get(cloudRec.id);
+      if (!local) return cloudRec;
+      const out = { ...cloudRec };
+      let alterou = false;
+      Object.keys(local).forEach(k => {
+        const cv = out[k];
+        const lv = local[k];
+        const cloudVazio = (cv === null || cv === undefined || cv === '');
+        const localCheio = (lv !== null && lv !== undefined && lv !== '');
+        if (cloudVazio && localCheio) { out[k] = lv; alterou = true; }
+      });
+      if (alterou) recuperados.push(out);
+      return out;
+    });
     const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
     const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('veiculos', pendentes);
-    const unificados = [...data, ...pendentes];
+    if (recuperados.length > 0) migrarDadosLocaisParaNuvem('veiculos', recuperados);
+    const unificados = [...merged, ...pendentes];
     _remoteData.veiculos = unificados;
     localStorage.setItem('srv_veiculos', JSON.stringify(unificados));
   });

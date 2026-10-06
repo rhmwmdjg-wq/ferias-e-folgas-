@@ -406,19 +406,27 @@ const DB = {
     _remoteData.veiculos = d;
     localStorage.setItem('srv_veiculos', JSON.stringify(d));
     if (!d || !d.length) return;
-    try {
-      const { error } = await supabaseClient.from('veiculos').upsert(d, { onConflict: 'id' });
-      if (error) {
+
+    // Tenta enviar removendo automaticamente colunas que ainda não existem na nuvem.
+    let payload = d;
+    for (let tentativa = 0; tentativa < 8; tentativa++) {
+      try {
+        const { error } = await supabaseClient.from('veiculos').upsert(payload, { onConflict: 'id' });
+        if (!error) return;
+        if (isQuotaError(error)) { saveToSyncQueue('veiculos', d); return; }
+
+        const faltante = /Could not find the '([^']+)' column/i.exec(error.message || '');
+        if (faltante && faltante[1]) {
+          const col = faltante[1];
+          console.warn(`Coluna '${col}' ausente em veiculos. Removendo e reenviando...`);
+          payload = payload.map(v => {
+            if (Object.prototype.hasOwnProperty.call(v, col)) { const c = { ...v }; delete c[col]; return c; }
+            return v;
+          });
+          continue;
+        }
+
         console.warn("⚠️ Erro upsert veiculos:", error.message);
-      if (isQuotaError(error)) {
-        saveToSyncQueue('veiculos', d);
-      } else if ((error.message || '').toLowerCase().includes('sucata')) {
-        // Coluna "sucata" ainda não existe na nuvem: salva sem ela
-        console.warn("Coluna 'sucata' ausente em veiculos. Salvando em modo compatível.");
-        const safe = d.map(v => { const c = { ...v }; delete c.sucata; return c; });
-        const { error: errSafe } = await supabaseClient.from('veiculos').upsert(safe, { onConflict: 'id' });
-        if (errSafe && !isQuotaError(errSafe)) console.warn("Aviso ao salvar veículos (modo compatível):", errSafe.message);
-      } else {
         for (const item of d) {
           try {
             const { error: errInd } = await supabaseClient.from('veiculos').upsert(item, { onConflict: 'id' });
@@ -427,13 +435,11 @@ const DB = {
             if (isQuotaError(eInd)) saveToSyncQueue('veiculos', item);
           }
         }
-      }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) {
-        saveToSyncQueue('veiculos', d);
-      } else {
+        return;
+      } catch (e) {
+        if (isQuotaError(e)) { saveToSyncQueue('veiculos', d); return; }
         console.error("Erro ao salvar veículos no Supabase:", e);
+        return;
       }
     }
   },

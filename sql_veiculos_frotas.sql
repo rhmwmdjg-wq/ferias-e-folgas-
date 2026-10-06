@@ -35,6 +35,16 @@ ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "valorCompra" NUMERIC DEFAULT 0;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "setorAtual" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "setorPertence" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS sucata BOOLEAN DEFAULT false;
+-- A coluna usada pelo sistema é "obs" (a antiga era "observacoes")
+ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS obs TEXT;
+
+-- Migra o texto das observações antigas para a coluna "obs" (se "observacoes" existir)
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'veiculos' AND column_name = 'observacoes') THEN
+    UPDATE veiculos SET obs = observacoes WHERE obs IS NULL AND observacoes IS NOT NULL;
+  END IF;
+END $$;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "pdfUrl" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "pdfNome" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "criadoEm" TEXT;
