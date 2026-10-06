@@ -11,6 +11,12 @@ async function verificarSessao() {
     return;
   }
   
+  // Link direto e público apenas para o Gerador de Ofícios (sem login)
+  if (oficioParams.get('modulo') === 'oficios') {
+    renderOficiosPublico();
+    return;
+  }
+
   const compParams = new URLSearchParams(window.location.search);
   const compToken = compParams.get('comp');
   if (compToken) {

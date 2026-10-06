@@ -4,6 +4,7 @@
 let _oficiosData = [];
 let _oficioEditingId = null;
 let _ofiDestinatarios = [];
+let _oficiosModoPublico = false;
 
 const OFICIO_HEADER = {
   titulo: 'SECRETARIA MUNICIPAL DE SAÚDE - ITACARAMBI',
@@ -509,8 +510,9 @@ function renderHistoricoOficios() {
         </div>
         <div class="ev-list-actions" style="display:flex; gap:6px;">
           <button class="btn btn-ghost btn-sm" onclick="copiarLinkOficio('${o.token}')" title="Copiar Link Público">🔗 Link</button>
+          ${_oficiosModoPublico ? '' : `
           <button class="btn btn-ghost btn-sm" onclick="carregarOficioParaEditar('${o.id}')" title="Editar Ofício">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="excluirOficio('${o.id}')" title="Excluir Ofício">🗑️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirOficio('${o.id}')" title="Excluir Ofício">🗑️</button>`}
         </div>
       </div>
     </div>
@@ -673,4 +675,50 @@ async function renderOficioPublico(token) {
       </div>
     </div>
   `;
+}
+
+// ===================== MODO PÚBLICO: APENAS GERADOR DE OFÍCIOS =====================
+// Acesso via ?modulo=oficios (sem login). Oculta os demais módulos e carrega os dados da nuvem.
+async function renderOficiosPublico() {
+  _oficiosModoPublico = true;
+  const appContainer = document.querySelector('.app-container');
+  const loginScreen = document.getElementById('login-screen');
+  if (appContainer) appContainer.style.display = 'flex';
+  if (loginScreen) loginScreen.style.display = 'none';
+
+  // Oculta navegação lateral, cabeçalho do sistema e navegação inferior
+  const sidebar = document.getElementById('main-sidebar');
+  if (sidebar) sidebar.style.display = 'none';
+  const backdrop = document.getElementById('sidebar-backdrop');
+  if (backdrop) backdrop.style.display = 'none';
+  const header = document.querySelector('.content-area > header');
+  if (header) header.style.display = 'none';
+  const bnav = document.getElementById('bottom-nav');
+  if (bnav) bnav.style.display = 'none';
+
+  // Exibe somente o painel de ofícios
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  const painel = document.getElementById('panel-oficios');
+  if (painel) painel.classList.add('active');
+
+  await carregarDadosOficiosPublico();
+
+  carregarNovoOficio();
+  renderHistoricoOficios();
+}
+
+async function carregarDadosOficiosPublico() {
+  if (typeof supabaseClient === 'undefined' || !supabaseClient) return;
+  try {
+    const { data: ofs } = await supabaseClient.from('oficios').select('*');
+    if (Array.isArray(ofs)) _remoteData.oficios = (typeof normalizarCamposObjeto === 'function' ? normalizarCamposObjeto(ofs) : ofs);
+  } catch (e) { console.warn('Modo público de ofícios: falha ao carregar ofícios.', e); }
+  try {
+    const { data: dest } = await supabaseClient.from('destinatarios').select('*');
+    if (Array.isArray(dest)) _remoteData.destinatarios = dest;
+  } catch (e) { console.warn('Modo público de ofícios: falha ao carregar destinatários.', e); }
+  try {
+    const { data: emi } = await supabaseClient.from('emissores').select('*');
+    if (Array.isArray(emi)) _remoteData.emissores = emi;
+  } catch (e) { console.warn('Modo público de ofícios: falha ao carregar emissores.', e); }
 }
