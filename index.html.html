@@ -3401,31 +3401,32 @@ Coordenação de RH
         </div>
       </div>
 
-      <div class="form-row cols-2">
-        <div class="field">
-          <label>Destinatário (Nome)</label>
-          <input id="ofi-destinatario" placeholder="Ex: À Sua Senhoria o Senhor..." oninput="atualizarPreviewOficio()">
+      <div class="field" style="margin-bottom:10px;">
+        <label>Destinatário(s) do Ofício</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="ofi-dest-select" style="flex:1; min-width:200px;"></select>
+          <button type="button" class="btn btn-primary btn-sm" onclick="adicionarDestinatarioOficio()">➕ Adicionar</button>
         </div>
-        <div class="field">
-          <label>Cargo do Destinatário</label>
-          <input id="ofi-cargo-destinatario" placeholder="Ex: Secretário Municipal de Saúde" oninput="atualizarPreviewOficio()">
-        </div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">Selecione destinatários cadastrados para preencher automaticamente. Você pode adicionar vários ao mesmo ofício.</div>
       </div>
 
-      <div class="form-row cols-2">
-        <div class="field">
-          <label>Órgão / Secretaria / Empresa</label>
-          <input id="ofi-orgao-destinatario" placeholder="Ex: Prefeitura Municipal de Luzilândia" oninput="atualizarPreviewOficio()">
-        </div>
-        <div class="field">
-          <label>Assunto / Ementa *</label>
-          <input id="ofi-assunto" placeholder="Ex: Solicitação de Manutenção de Veículo" oninput="atualizarPreviewOficio()">
-        </div>
+      <div id="ofi-dest-selecionados" style="margin-bottom:14px;"></div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Assunto / Ementa *</label>
+        <input id="ofi-assunto" placeholder="Ex: Solicitação de Manutenção de Veículo" oninput="atualizarPreviewOficio()">
       </div>
 
       <div class="field" style="margin-bottom:14px">
         <label>Texto do Corpo do Ofício * (Separe parágrafos com Enter)</label>
         <textarea id="ofi-texto" placeholder="Digite o conteúdo oficial do ofício..." style="min-height:160px; line-height:1.6;" oninput="atualizarPreviewOficio()"></textarea>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Emissor / Assinante Cadastrado</label>
+        <select id="ofi-emissor-select" onchange="selecionarEmissorOficio(this.value)">
+          <option value="">Selecione para preencher automaticamente...</option>
+        </select>
       </div>
 
       <div class="form-row cols-2" style="margin-bottom:16px;">
@@ -3461,6 +3462,48 @@ Coordenação de RH
       </div>
       <div id="ofi-preview-container">
         <!-- Live preview rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Cadastro de Destinatários e Emissores -->
+  <div class="ev-card" style="margin-top:20px;">
+    <h3 style="margin-bottom:4px;">🗂️ Cadastro de Destinatários e Emissores</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:16px">Cadastre uma vez e reutilize. Ao selecionar no ofício, o Nome, Cargo e Órgão são preenchidos automaticamente.</p>
+
+    <div class="ev-grid" style="grid-template-columns:1fr 1fr;gap:24px;">
+      <!-- Destinatários -->
+      <div>
+        <h4 style="margin-bottom:10px;">📌 Destinatários</h4>
+        <div class="field" style="margin-bottom:8px;">
+          <label>Nome *</label>
+          <input id="dest-cad-nome" placeholder="Ex: À Sua Senhoria o Senhor João Silva">
+        </div>
+        <div class="field" style="margin-bottom:8px;">
+          <label>Cargo</label>
+          <input id="dest-cad-cargo" placeholder="Ex: Secretário Municipal de Saúde">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Órgão / Secretaria / Empresa</label>
+          <input id="dest-cad-orgao" placeholder="Ex: Prefeitura Municipal de Luzilândia">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="salvarCadastroDestinatario()">💾 Salvar Destinatário</button>
+        <div id="lista-destinatarios-cadastro" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
+
+      <!-- Emissores -->
+      <div>
+        <h4 style="margin-bottom:10px;">✍️ Emissores / Assinantes</h4>
+        <div class="field" style="margin-bottom:8px;">
+          <label>Nome *</label>
+          <input id="emi-cad-nome" placeholder="Ex: Dra. Brenda Souza">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>Cargo</label>
+          <input id="emi-cad-cargo" placeholder="Ex: Coordenadora da Atenção Primária à Saúde">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="salvarCadastroEmissor()">💾 Salvar Emissor</button>
+        <div id="lista-emissores-cadastro" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
     </div>
   </div>
@@ -4995,6 +5038,8 @@ let _remoteData = {
   protocolos: [],
   itensProtocolo: [],
   oficios: [],
+  destinatarios: [],
+  emissores: [],
   config: {}
 };
 
@@ -5194,6 +5239,26 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.oficios = unificados;
     localStorage.setItem('srv_oficios', JSON.stringify(unificados));
+  });
+
+  await syncTabela('destinatarios', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_destinatarios') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('destinatarios', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.destinatarios = unificados;
+    localStorage.setItem('srv_destinatarios', JSON.stringify(unificados));
+  });
+
+  await syncTabela('emissores', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_emissores') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('emissores', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.emissores = unificados;
+    localStorage.setItem('srv_emissores', JSON.stringify(unificados));
   });
 
   await syncTabela('protocolos_entrega', '*', (data) => {

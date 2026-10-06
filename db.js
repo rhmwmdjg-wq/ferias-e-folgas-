@@ -542,7 +542,22 @@ const DB = {
     if (!d || !d.length) return;
     try {
       const { error } = await supabaseClient.from('oficios').upsert(d, { onConflict: 'id' });
-      if (error && !isQuotaError(error)) console.warn("Erro ao salvar ofícios no Supabase:", error.message);
+      if (error) {
+        if (isQuotaError(error)) {
+          saveToSyncQueue('oficios', d);
+        } else {
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('destinatarios')) {
+            // Coluna "destinatarios" ainda não existe na nuvem: salva sem ela
+            console.warn("Coluna 'destinatarios' ausente. Salvando ofício em modo compatível.");
+            const safe = d.map(o => { const c = { ...o }; delete c.destinatarios; return c; });
+            const { error: err2 } = await supabaseClient.from('oficios').upsert(safe, { onConflict: 'id' });
+            if (err2 && !isQuotaError(err2)) console.warn("Aviso ao salvar ofícios (modo compatível):", err2.message);
+          } else {
+            console.warn("Erro ao salvar ofícios no Supabase:", error.message);
+          }
+        }
+      }
     } catch (e) {
       if (isQuotaError(e)) saveToSyncQueue('oficios', d);
       else console.error("Erro ao salvar ofícios no Supabase:", e);
@@ -565,6 +580,58 @@ const DB = {
     if (!doAno.length) return baseInicial;
     const max = Math.max(baseInicial - 1, ...doAno.map(o => parseInt(o.numero) || 0));
     return max + 1;
+  },
+
+  // =================== CADASTRO DE DESTINATÁRIOS ===================
+  destinatarios: () => _remoteData.destinatarios.length ? _remoteData.destinatarios : JSON.parse(localStorage.getItem('srv_destinatarios') || '[]'),
+  saveDestinatarios: async (d) => {
+    _remoteData.destinatarios = d;
+    localStorage.setItem('srv_destinatarios', JSON.stringify(d));
+    if (!d || !d.length) return;
+    try {
+      const { error } = await supabaseClient.from('destinatarios').upsert(d, { onConflict: 'id' });
+      if (error) {
+        if (isQuotaError(error)) saveToSyncQueue('destinatarios', d);
+        else console.warn("Erro ao salvar destinatários no Supabase:", error.message);
+      }
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('destinatarios', d);
+      else console.error("Erro ao salvar destinatários no Supabase:", e);
+    }
+  },
+  deleteDestinatario: async (id) => {
+    _remoteData.destinatarios = _remoteData.destinatarios.filter(x => x.id !== id);
+    localStorage.setItem('srv_destinatarios', JSON.stringify(_remoteData.destinatarios));
+    try {
+      const { error } = await supabaseClient.from('destinatarios').delete().eq('id', id);
+      if (error && !isQuotaError(error)) console.warn("Aviso ao deletar destinatário:", error.message);
+    } catch (e) { console.error("Erro ao deletar destinatário:", e); }
+  },
+
+  // =================== CADASTRO DE EMISSORES ===================
+  emissores: () => _remoteData.emissores.length ? _remoteData.emissores : JSON.parse(localStorage.getItem('srv_emissores') || '[]'),
+  saveEmissores: async (d) => {
+    _remoteData.emissores = d;
+    localStorage.setItem('srv_emissores', JSON.stringify(d));
+    if (!d || !d.length) return;
+    try {
+      const { error } = await supabaseClient.from('emissores').upsert(d, { onConflict: 'id' });
+      if (error) {
+        if (isQuotaError(error)) saveToSyncQueue('emissores', d);
+        else console.warn("Erro ao salvar emissores no Supabase:", error.message);
+      }
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('emissores', d);
+      else console.error("Erro ao salvar emissores no Supabase:", e);
+    }
+  },
+  deleteEmissor: async (id) => {
+    _remoteData.emissores = _remoteData.emissores.filter(x => x.id !== id);
+    localStorage.setItem('srv_emissores', JSON.stringify(_remoteData.emissores));
+    try {
+      const { error } = await supabaseClient.from('emissores').delete().eq('id', id);
+      if (error && !isQuotaError(error)) console.warn("Aviso ao deletar emissor:", error.message);
+    } catch (e) { console.error("Erro ao deletar emissor:", e); }
   },
 
   deleteItemProtocolo: async (id) => {

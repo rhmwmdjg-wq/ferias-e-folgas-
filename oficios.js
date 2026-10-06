@@ -3,6 +3,7 @@
 
 let _oficiosData = [];
 let _oficioEditingId = null;
+let _ofiDestinatarios = [];
 
 function uidOficio(size = 10) {
   return 'ofi_' + Math.random().toString(36).substring(2, 2 + size) + Date.now().toString(36);
@@ -36,6 +37,7 @@ function atualizarNumeroOficioManual(val) {
 function carregarNovoOficio() {
   _oficiosData = DB.oficios();
   _oficioEditingId = null;
+  _ofiDestinatarios = [];
 
   const anoAtual = new Date().getFullYear();
   const proximoNum = DB.proximoNumeroOficio(anoAtual);
@@ -47,9 +49,6 @@ function carregarNovoOficio() {
   document.getElementById('ofi-numero').value = proximoNum;
   document.getElementById('ofi-codigo').value = codigoCompleto;
   document.getElementById('ofi-assunto').value = '';
-  document.getElementById('ofi-destinatario').value = '';
-  document.getElementById('ofi-cargo-destinatario').value = '';
-  document.getElementById('ofi-orgao-destinatario').value = '';
   document.getElementById('ofi-cidade-data').value = `Luzilândia - PI, ${obterDataExtenso()}`;
   document.getElementById('ofi-texto').value = '';
 
@@ -57,11 +56,174 @@ function carregarNovoOficio() {
   const cfg = DB.config();
   document.getElementById('ofi-emissor-nome').value = sessao.nome || cfg.coordenadorAPS || 'Coordenação APS';
   document.getElementById('ofi-emissor-cargo').value = sessao.role === 'admin' ? 'Administrador do Sistema' : (cfg.subtituloSidebar || 'Coordenação da Atenção Primária à Saúde');
+  const emissorSel = document.getElementById('ofi-emissor-select');
+  if (emissorSel) emissorSel.value = '';
 
   const titleEl = document.getElementById('ofi-form-title');
   if (titleEl) titleEl.textContent = 'Novo Ofício Oficial';
 
+  renderCadastrosOficio();
+  renderSelectDestinatariosOficio();
+  renderSelectEmissoresOficio();
+  renderDestinatariosSelecionadosOficio();
   atualizarPreviewOficio();
+}
+
+// ===================== CADASTRO DE DESTINATÁRIOS =====================
+async function salvarCadastroDestinatario() {
+  const nome = document.getElementById('dest-cad-nome').value.trim();
+  const cargo = document.getElementById('dest-cad-cargo').value.trim();
+  const orgao = document.getElementById('dest-cad-orgao').value.trim();
+  if (!nome) return toastMsg('Informe o nome do destinatário.', 'warning');
+
+  const lista = DB.destinatarios();
+  lista.push({ id: uidOficio(), nome, cargo, orgao });
+  await DB.saveDestinatarios(lista);
+
+  document.getElementById('dest-cad-nome').value = '';
+  document.getElementById('dest-cad-cargo').value = '';
+  document.getElementById('dest-cad-orgao').value = '';
+  renderCadastrosOficio();
+  renderSelectDestinatariosOficio();
+  toastMsg('Destinatário cadastrado com sucesso!', 'success');
+}
+
+async function excluirDestinatarioCadastro(id) {
+  const d = DB.destinatarios().find(x => x.id === id);
+  if (!confirm(`Excluir o destinatário "${d ? d.nome : ''}"?`)) return;
+  const lista = DB.destinatarios().filter(x => x.id !== id);
+  await DB.saveDestinatarios(lista);
+  renderCadastrosOficio();
+  renderSelectDestinatariosOficio();
+  toastMsg('Destinatário excluído.', 'info');
+}
+
+function renderSelectDestinatariosOficio() {
+  const sel = document.getElementById('ofi-dest-select');
+  if (!sel) return;
+  const lista = DB.destinatarios();
+  sel.innerHTML = '<option value="">Selecione um destinatário cadastrado...</option>' +
+    lista.map(d => `<option value="${esc(d.id)}">${esc(d.nome)}${d.cargo ? ' — ' + esc(d.cargo) : ''}</option>`).join('');
+}
+
+function adicionarDestinatarioOficio() {
+  const sel = document.getElementById('ofi-dest-select');
+  const id = sel?.value;
+  if (!id) return toastMsg('Selecione um destinatário cadastrado para adicionar.', 'warning');
+  const d = DB.destinatarios().find(x => x.id === id);
+  if (!d) return;
+  _ofiDestinatarios.push({ nome: d.nome || '', cargo: d.cargo || '', orgao: d.orgao || '' });
+  sel.value = '';
+  renderDestinatariosSelecionadosOficio();
+  atualizarPreviewOficio();
+}
+
+function removerDestinatarioOficio(idx) {
+  _ofiDestinatarios.splice(idx, 1);
+  renderDestinatariosSelecionadosOficio();
+  atualizarPreviewOficio();
+}
+
+function atualizarDestinatarioOficio(idx, campo, valor) {
+  if (!_ofiDestinatarios[idx]) return;
+  _ofiDestinatarios[idx][campo] = valor;
+  atualizarPreviewOficio();
+}
+
+function renderDestinatariosSelecionadosOficio() {
+  const cont = document.getElementById('ofi-dest-selecionados');
+  if (!cont) return;
+  if (!_ofiDestinatarios.length) {
+    cont.innerHTML = '<div style="font-size:0.72rem;color:var(--muted);padding:6px 0;">Nenhum destinatário adicionado. O ofício pode ser emitido sem destinatário.</div>';
+    return;
+  }
+  cont.innerHTML = _ofiDestinatarios.map((d, i) => `
+    <div style="border:1px solid var(--border); border-radius:var(--r-sm); padding:10px; margin-bottom:8px; background:var(--surface);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong style="font-size:.74rem; color:var(--primary);">Destinatário ${i + 1}</strong>
+        <button class="btn btn-danger btn-sm" onclick="removerDestinatarioOficio(${i})" title="Remover">🗑️</button>
+      </div>
+      <input value="${esc(d.nome)}" placeholder="Nome / Tratamento" oninput="atualizarDestinatarioOficio(${i}, 'nome', this.value)" style="margin-bottom:6px;">
+      <input value="${esc(d.cargo)}" placeholder="Cargo" oninput="atualizarDestinatarioOficio(${i}, 'cargo', this.value)" style="margin-bottom:6px;">
+      <input value="${esc(d.orgao)}" placeholder="Órgão / Secretaria / Empresa" oninput="atualizarDestinatarioOficio(${i}, 'orgao', this.value)">
+    </div>
+  `).join('');
+}
+
+// ===================== CADASTRO DE EMISSORES =====================
+async function salvarCadastroEmissor() {
+  const nome = document.getElementById('emi-cad-nome').value.trim();
+  const cargo = document.getElementById('emi-cad-cargo').value.trim();
+  if (!nome) return toastMsg('Informe o nome do emissor.', 'warning');
+
+  const lista = DB.emissores();
+  lista.push({ id: uidOficio(), nome, cargo });
+  await DB.saveEmissores(lista);
+
+  document.getElementById('emi-cad-nome').value = '';
+  document.getElementById('emi-cad-cargo').value = '';
+  renderCadastrosOficio();
+  renderSelectEmissoresOficio();
+  toastMsg('Emissor cadastrado com sucesso!', 'success');
+}
+
+async function excluirEmissorCadastro(id) {
+  const e = DB.emissores().find(x => x.id === id);
+  if (!confirm(`Excluir o emissor "${e ? e.nome : ''}"?`)) return;
+  const lista = DB.emissores().filter(x => x.id !== id);
+  await DB.saveEmissores(lista);
+  renderCadastrosOficio();
+  renderSelectEmissoresOficio();
+  toastMsg('Emissor excluído.', 'info');
+}
+
+function renderSelectEmissoresOficio() {
+  const sel = document.getElementById('ofi-emissor-select');
+  if (!sel) return;
+  const atual = sel.value;
+  const lista = DB.emissores();
+  sel.innerHTML = '<option value="">Selecione para preencher automaticamente...</option>' +
+    lista.map(e => `<option value="${esc(e.id)}">${esc(e.nome)}${e.cargo ? ' — ' + esc(e.cargo) : ''}</option>`).join('');
+  if (atual && lista.some(e => e.id === atual)) sel.value = atual;
+}
+
+function selecionarEmissorOficio(id) {
+  if (!id) return;
+  const e = DB.emissores().find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('ofi-emissor-nome').value = e.nome || '';
+  document.getElementById('ofi-emissor-cargo').value = e.cargo || '';
+  atualizarPreviewOficio();
+}
+
+function renderCadastrosOficio() {
+  const contDest = document.getElementById('lista-destinatarios-cadastro');
+  if (contDest) {
+    const lista = DB.destinatarios();
+    contDest.innerHTML = lista.length ? lista.map(d => `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm);">
+        <div style="min-width:0;">
+          <div style="font-size:.78rem; font-weight:600;">${esc(d.nome)}</div>
+          <div style="font-size:.68rem; color:var(--muted);">${esc([d.cargo, d.orgao].filter(Boolean).join(' · '))}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="excluirDestinatarioCadastro('${esc(d.id)}')" title="Excluir">🗑️</button>
+      </div>
+    `).join('') : '<div style="font-size:.74rem;color:var(--muted);">Nenhum destinatário cadastrado.</div>';
+  }
+
+  const contEmi = document.getElementById('lista-emissores-cadastro');
+  if (contEmi) {
+    const lista = DB.emissores();
+    contEmi.innerHTML = lista.length ? lista.map(e => `
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 10px; background:var(--surface); border:1px solid var(--border); border-radius:var(--r-sm);">
+        <div style="min-width:0;">
+          <div style="font-size:.78rem; font-weight:600;">${esc(e.nome)}</div>
+          <div style="font-size:.68rem; color:var(--muted);">${esc(e.cargo || '')}</div>
+        </div>
+        <button class="btn btn-danger btn-sm" onclick="excluirEmissorCadastro('${esc(e.id)}')" title="Excluir">🗑️</button>
+      </div>
+    `).join('') : '<div style="font-size:.74rem;color:var(--muted);">Nenhum emissor cadastrado.</div>';
+  }
 }
 
 function atualizarPreviewOficio() {
@@ -69,7 +231,8 @@ function atualizarPreviewOficio() {
   if (!container) return;
 
   const cfg = DB.config();
-  const logoEsq = (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoSide = (typeof getImg === 'function' ? getImg('side') : null) || localStorage.getItem('srv_img_side') || '';
+  const logoEsq = logoSide || (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
   const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
   const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
 
@@ -78,9 +241,6 @@ function atualizarPreviewOficio() {
 
   const codigo = document.getElementById('ofi-codigo')?.value || 'Ofício nº 001/2026 - APS';
   const cidadeData = document.getElementById('ofi-cidade-data')?.value || `Luzilândia - PI, ${obterDataExtenso()}`;
-  const destinatario = document.getElementById('ofi-destinatario')?.value || 'À Sua Senhoria o Senhor Destinatário';
-  const cargoDest = document.getElementById('ofi-cargo-destinatario')?.value || 'Cargo do Destinatário';
-  const orgaoDest = document.getElementById('ofi-orgao-destinatario')?.value || 'Órgão / Secretaria / Empresa';
   const assunto = document.getElementById('ofi-assunto')?.value || 'Assunto da correspondência';
   const texto = document.getElementById('ofi-texto')?.value || 'Digite aqui o texto oficial do seu ofício...';
   const emissorNome = document.getElementById('ofi-emissor-nome')?.value || 'Nome do Emissor';
@@ -90,6 +250,16 @@ function atualizarPreviewOficio() {
   const paragrafosHtml = texto.split('\n').filter(p => p.trim()).map(p =>
     `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:14px;">${esc(p)}</p>`
   ).join('');
+
+  // Blocos de destinatários (suporta vários)
+  const dests = (_ofiDestinatarios || []).filter(d => (d.nome || '').trim() || (d.cargo || '').trim() || (d.orgao || '').trim());
+  const destsHtml = dests.length ? dests.map(d => `
+    <div style="margin-bottom:12px;">
+      <div><strong>${esc(d.nome || '')}</strong></div>
+      ${d.cargo ? `<div>${esc(d.cargo)}</div>` : ''}
+      ${d.orgao ? `<div style="color:#475569;">${esc(d.orgao)}</div>` : ''}
+    </div>
+  `).join('') : '<div><strong>À Sua Senhoria o Senhor Destinatário</strong></div>';
 
   // Logos HTML
   const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:60px; max-width:140px; object-fit:contain;">` : '<div style="font-size:24px;">🏛️</div>';
@@ -114,11 +284,9 @@ function atualizarPreviewOficio() {
         <div style="font-size:13px; color:#334155; font-weight:500;">${esc(cidadeData)}</div>
       </div>
 
-      <!-- Destinatário -->
+      <!-- Destinatário(s) -->
       <div style="margin-bottom:24px; line-height:1.5; font-size:13.5px; color:#1e293b;">
-        <div><strong>${esc(destinatario)}</strong></div>
-        ${cargoDest ? `<div>${esc(cargoDest)}</div>` : ''}
-        ${orgaoDest ? `<div style="color:#475569;">${esc(orgaoDest)}</div>` : ''}
+        ${destsHtml}
       </div>
 
       <!-- Assunto -->
@@ -177,15 +345,21 @@ async function salvarOficio() {
       token = gerarTokenOficio();
     }
 
+    const dests = (_ofiDestinatarios || [])
+      .map(d => ({ nome: (d.nome || '').trim(), cargo: (d.cargo || '').trim(), orgao: (d.orgao || '').trim() }))
+      .filter(d => d.nome || d.cargo || d.orgao);
+    const primeiro = dests[0] || {};
+
     const dados = {
       id: id || uidOficio(),
       numero,
       ano,
       codigo: codigo || `Ofício nº ${String(numero).padStart(3, '0')}/${ano} - APS`,
       assunto,
-      destinatario: document.getElementById('ofi-destinatario').value.trim(),
-      cargoDestinatario: document.getElementById('ofi-cargo-destinatario').value.trim(),
-      orgaoDestinatario: document.getElementById('ofi-orgao-destinatario').value.trim(),
+      destinatarios: dests,
+      destinatario: primeiro.nome || '',
+      cargoDestinatario: primeiro.cargo || '',
+      orgaoDestinatario: primeiro.orgao || '',
       cidadeData: document.getElementById('ofi-cidade-data').value.trim() || `Luzilândia - PI, ${obterDataExtenso()}`,
       texto,
       emissorNome: document.getElementById('ofi-emissor-nome').value.trim(),
@@ -282,11 +456,15 @@ function renderHistoricoOficios() {
   const busca = (document.getElementById('ofi-busca')?.value || '').toLowerCase().trim();
   let lista = _oficiosData;
 
+  const destsNomes = (o) => (o.destinatarios && o.destinatarios.length
+    ? o.destinatarios.map(d => d.nome).filter(Boolean).join('; ')
+    : (o.destinatario || ''));
+
   if (busca) {
     lista = lista.filter(o =>
       (o.codigo || '').toLowerCase().includes(busca) ||
       (o.assunto || '').toLowerCase().includes(busca) ||
-      (o.destinatario || '').toLowerCase().includes(busca) ||
+      destsNomes(o).toLowerCase().includes(busca) ||
       (o.emissorNome || '').toLowerCase().includes(busca)
     );
   }
@@ -307,7 +485,7 @@ function renderHistoricoOficios() {
             <span class="tag tag-purple">${esc(o.assunto)}</span>
           </div>
           <div class="ev-list-meta" style="margin-top:4px; font-size:0.75rem;">
-            <span>👤 <strong>Destinatário:</strong> ${esc(o.destinatario || '-')}</span>
+            <span>👤 <strong>Destinatário:</strong> ${esc(destsNomes(o) || '-')}</span>
             <span>✍️ <strong>Emissor:</strong> ${esc(o.emissorNome || '-')}</span>
             <span>📅 ${o.criadoEm ? new Date(o.criadoEm).toLocaleDateString('pt-BR') : '-'}</span>
           </div>
@@ -331,17 +509,23 @@ function carregarOficioParaEditar(id) {
   document.getElementById('ofi-numero').value = o.numero || 1;
   document.getElementById('ofi-codigo').value = o.codigo || '';
   document.getElementById('ofi-assunto').value = o.assunto || '';
-  document.getElementById('ofi-destinatario').value = o.destinatario || '';
-  document.getElementById('ofi-cargo-destinatario').value = o.cargoDestinatario || '';
-  document.getElementById('ofi-orgao-destinatario').value = o.orgaoDestinatario || '';
   document.getElementById('ofi-cidade-data').value = o.cidadeData || '';
   document.getElementById('ofi-texto').value = o.texto || '';
   document.getElementById('ofi-emissor-nome').value = o.emissorNome || '';
   document.getElementById('ofi-emissor-cargo').value = o.emissorCargo || '';
 
+  if (Array.isArray(o.destinatarios) && o.destinatarios.length) {
+    _ofiDestinatarios = o.destinatarios.map(d => ({ nome: d.nome || '', cargo: d.cargo || '', orgao: d.orgao || '' }));
+  } else if (o.destinatario || o.cargoDestinatario || o.orgaoDestinatario) {
+    _ofiDestinatarios = [{ nome: o.destinatario || '', cargo: o.cargoDestinatario || '', orgao: o.orgaoDestinatario || '' }];
+  } else {
+    _ofiDestinatarios = [];
+  }
+
   const titleEl = document.getElementById('ofi-form-title');
   if (titleEl) titleEl.textContent = 'Editar Ofício - ' + o.codigo;
 
+  renderDestinatariosSelecionadosOficio();
   atualizarPreviewOficio();
   const cardForm = document.getElementById('card-form-oficio');
   if (cardForm) cardForm.scrollIntoView({ behavior: 'smooth' });
@@ -387,7 +571,8 @@ async function renderOficioPublico(token) {
   }
 
   const cfg = DB.config();
-  const logoEsq = (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoSide = (typeof getImg === 'function' ? getImg('side') : null) || localStorage.getItem('srv_img_side') || '';
+  const logoEsq = logoSide || (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
   const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
   const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
 
@@ -397,6 +582,17 @@ async function renderOficioPublico(token) {
   const paragrafosHtml = (oficio.texto || '').split('\n').filter(p => p.trim()).map(p =>
     `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:15px;">${esc(p)}</p>`
   ).join('');
+
+  const dests = (Array.isArray(oficio.destinatarios) && oficio.destinatarios.length)
+    ? oficio.destinatarios
+    : ((oficio.destinatario || oficio.cargoDestinatario || oficio.orgaoDestinatario) ? [{ nome: oficio.destinatario, cargo: oficio.cargoDestinatario, orgao: oficio.orgaoDestinatario }] : []);
+  const destsHtml = dests.length ? dests.map(d => `
+    <div style="margin-bottom:12px;">
+      <div><strong>${esc(d.nome || '')}</strong></div>
+      ${d.cargo ? `<div>${esc(d.cargo)}</div>` : ''}
+      ${d.orgao ? `<div style="color:#475569;">${esc(d.orgao)}</div>` : ''}
+    </div>
+  `).join('') : '';
 
   const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🏛️</div>';
   const logoDirHtml = logoDir ? `<img src="${logoDir}" style="max-height:65px; max-width:150px; object-fit:contain;">` : (logoPrint ? `<img src="${logoPrint}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🌴</div>');
@@ -434,9 +630,7 @@ async function renderOficioPublico(token) {
         </div>
 
         <div style="margin-bottom:28px; line-height:1.6; font-size:14px; color:#1e293b;">
-          <div><strong>${esc(oficio.destinatario || '')}</strong></div>
-          ${oficio.cargoDestinatario ? `<div>${esc(oficio.cargoDestinatario)}</div>` : ''}
-          ${oficio.orgaoDestinatario ? `<div style="color:#475569;">${esc(oficio.orgaoDestinatario)}</div>` : ''}
+          ${destsHtml}
         </div>
 
         <div style="margin-bottom:32px; background:#f1f5f9; padding:12px 16px; border-left:4px solid #2563eb; font-size:14px; border-radius:0 6px 6px 0;">
