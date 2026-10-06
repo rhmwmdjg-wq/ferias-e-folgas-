@@ -22,7 +22,7 @@ function esc(str) {
 function getImg(lado) {
   const cfg = DB.config();
   const val = cfg['img_' + lado];
-  if (val && val !== 'stored_locally') return val;
+  if (val && typeof val === 'string' && val.startsWith('http')) return val;
   return localStorage.getItem('srv_img_' + lado);
 }
 
