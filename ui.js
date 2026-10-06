@@ -32,10 +32,20 @@ function getAssinanteAtual() {
   const cfg = DB.config();
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
   const sessao = sessaoStr ? JSON.parse(sessaoStr) : {};
+
+  // Busca o cadastro atual do usuário logado (garante cargo/atualizado mesmo com sessão antiga)
+  let gestor = null;
+  try {
+    const lista = DB.gestores();
+    gestor = lista.find(g => (sessao.id && g.id === sessao.id) || (sessao.usuario && String(g.usuario).toLowerCase() === String(sessao.usuario).toLowerCase()));
+  } catch (e) { /* ignora */ }
+
   const genericos = ['Administrador', 'Usuário', 'Gestor', 'Servidor'];
-  const nomeSessao = (sessao.nome && !genericos.includes(sessao.nome)) ? sessao.nome : '';
+  const nomeSessao = (sessao.nome && !genericos.includes(sessao.nome))
+    ? sessao.nome
+    : (gestor && gestor.nome && !genericos.includes(gestor.nome) ? gestor.nome : '');
   const nome = nomeSessao || cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos';
-  const cargo = sessao.cargo || cfg.cargoCoordenador || 'Coordenador(a) da Atenção Primária à Saúde';
+  const cargo = (gestor && gestor.cargo) || sessao.cargo || cfg.cargoCoordenador || 'Coordenador(a) da Atenção Primária à Saúde';
   return { nome, cargo };
 }
 
