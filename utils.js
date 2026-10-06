@@ -34,6 +34,7 @@ function showTab(tab) {
   if (tab === 'veiculos') { _veiculosData = DB.veiculos(); renderVeiculos(); }
   if (tab === 'ponto') { renderPtSubtab('cargos'); renderCredenciados(); renderFechamentos(); }
   if (tab === 'protocolo') { renderProtocolos(); }
+  if (tab === 'oficios') { carregarNovoOficio(); renderHistoricoOficios(); }
   currentPage = 1;
 }
 

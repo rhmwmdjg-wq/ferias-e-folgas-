@@ -1,0 +1,466 @@
+// Módulo Gerador de Ofícios Profissional.
+// Emissão de correspondências oficiais, numeração sequencial automática, logos municipais, links públicos e Supabase.
+
+let _oficiosData = [];
+let _oficioEditingId = null;
+
+function uidOficio(size = 10) {
+  return 'ofi_' + Math.random().toString(36).substring(2, 2 + size) + Date.now().toString(36);
+}
+
+function gerarTokenOficio() {
+  return 'ofc_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+}
+
+function obterDataExtenso(dataInput) {
+  const dt = dataInput ? new Date(dataInput + 'T12:00:00') : new Date();
+  const meses = [
+    'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+  ];
+  const dia = String(dt.getDate()).padStart(2, '0');
+  const mes = meses[dt.getMonth()];
+  const ano = dt.getFullYear();
+  return `${dia} de ${mes} de ${ano}`;
+}
+
+function atualizarNumeroOficioManual(val) {
+  const num = parseInt(val) || 74;
+  const ano = parseInt(document.getElementById('ofi-ano')?.value) || new Date().getFullYear();
+  const numFmt = String(num).padStart(3, '0');
+  document.getElementById('ofi-numero').value = num;
+  document.getElementById('ofi-codigo').value = `Ofício nº ${numFmt}/${ano} - APS`;
+  atualizarPreviewOficio();
+}
+
+function carregarNovoOficio() {
+  _oficiosData = DB.oficios();
+  _oficioEditingId = null;
+
+  const anoAtual = new Date().getFullYear();
+  const proximoNum = DB.proximoNumeroOficio(anoAtual);
+  const numFormatado = String(proximoNum).padStart(3, '0');
+  const codigoCompleto = `Ofício nº ${numFormatado}/${anoAtual} - APS`;
+
+  document.getElementById('ofi-id').value = '';
+  document.getElementById('ofi-ano').value = anoAtual;
+  document.getElementById('ofi-numero').value = proximoNum;
+  document.getElementById('ofi-codigo').value = codigoCompleto;
+  document.getElementById('ofi-assunto').value = '';
+  document.getElementById('ofi-destinatario').value = '';
+  document.getElementById('ofi-cargo-destinatario').value = '';
+  document.getElementById('ofi-orgao-destinatario').value = '';
+  document.getElementById('ofi-cidade-data').value = `Luzilândia - PI, ${obterDataExtenso()}`;
+  document.getElementById('ofi-texto').value = '';
+
+  const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
+  const cfg = DB.config();
+  document.getElementById('ofi-emissor-nome').value = sessao.nome || cfg.coordenadorAPS || 'Coordenação APS';
+  document.getElementById('ofi-emissor-cargo').value = sessao.role === 'admin' ? 'Administrador do Sistema' : (cfg.subtituloSidebar || 'Coordenação da Atenção Primária à Saúde');
+
+  const titleEl = document.getElementById('ofi-form-title');
+  if (titleEl) titleEl.textContent = 'Novo Ofício Oficial';
+
+  atualizarPreviewOficio();
+}
+
+function atualizarPreviewOficio() {
+  const container = document.getElementById('ofi-preview-container');
+  if (!container) return;
+
+  const cfg = DB.config();
+  const logoEsq = (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
+  const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
+
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const subTitle = cfg.subtituloSidebar || 'Gestão de RH & Administração';
+
+  const codigo = document.getElementById('ofi-codigo')?.value || 'Ofício nº 001/2026 - APS';
+  const cidadeData = document.getElementById('ofi-cidade-data')?.value || `Luzilândia - PI, ${obterDataExtenso()}`;
+  const destinatario = document.getElementById('ofi-destinatario')?.value || 'À Sua Senhoria o Senhor Destinatário';
+  const cargoDest = document.getElementById('ofi-cargo-destinatario')?.value || 'Cargo do Destinatário';
+  const orgaoDest = document.getElementById('ofi-orgao-destinatario')?.value || 'Órgão / Secretaria / Empresa';
+  const assunto = document.getElementById('ofi-assunto')?.value || 'Assunto da correspondência';
+  const texto = document.getElementById('ofi-texto')?.value || 'Digite aqui o texto oficial do seu ofício...';
+  const emissorNome = document.getElementById('ofi-emissor-nome')?.value || 'Nome do Emissor';
+  const emissorCargo = document.getElementById('ofi-emissor-cargo')?.value || 'Cargo do Emissor';
+
+  // Formatador de parágrafos do texto do ofício
+  const paragrafosHtml = texto.split('\n').filter(p => p.trim()).map(p =>
+    `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:14px;">${esc(p)}</p>`
+  ).join('');
+
+  // Logos HTML
+  const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:60px; max-width:140px; object-fit:contain;">` : '<div style="font-size:24px;">🏛️</div>';
+  const logoDirHtml = logoDir ? `<img src="${logoDir}" style="max-height:60px; max-width:140px; object-fit:contain;">` : (logoPrint ? `<img src="${logoPrint}" style="max-height:60px; max-width:140px; object-fit:contain;">` : '<div style="font-size:24px;">🌴</div>');
+
+  container.innerHTML = `
+    <div style="background:#fff; color:#111; padding:48px 44px; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); font-family:'Sora', 'Times New Roman', serif; min-height:750px; position:relative;">
+      
+      <!-- Cabeçalho Oficial com Logos -->
+      <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #222; padding-bottom:14px; margin-bottom:24px;">
+        <div style="width:140px; text-align:left;">${logoEsqHtml}</div>
+        <div style="text-align:center; flex:1; padding:0 10px;">
+          <h2 style="font-size:14px; font-weight:800; text-transform:uppercase; margin:0; color:#1e293b; letter-spacing:0.02em;">${esc(orgNome)}</h2>
+          <h3 style="font-size:11px; font-weight:600; color:#64748b; margin:4px 0 0 0; text-transform:uppercase;">${esc(subTitle)}</h3>
+        </div>
+        <div style="width:140px; text-align:right;">${logoDirHtml}</div>
+      </div>
+
+      <!-- Número e Data -->
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;">
+        <div style="font-weight:700; font-size:14px; color:#0f172a;">${esc(codigo)}</div>
+        <div style="font-size:13px; color:#334155; font-weight:500;">${esc(cidadeData)}</div>
+      </div>
+
+      <!-- Destinatário -->
+      <div style="margin-bottom:24px; line-height:1.5; font-size:13.5px; color:#1e293b;">
+        <div><strong>${esc(destinatario)}</strong></div>
+        ${cargoDest ? `<div>${esc(cargoDest)}</div>` : ''}
+        ${orgaoDest ? `<div style="color:#475569;">${esc(orgaoDest)}</div>` : ''}
+      </div>
+
+      <!-- Assunto -->
+      <div style="margin-bottom:28px; background:#f8fafc; padding:10px 14px; border-left:4px solid #3b82f6; font-size:13.5px;">
+        <strong>Assunto:</strong> ${esc(assunto)}
+      </div>
+
+      <!-- Corpo do Ofício -->
+      <div style="min-height:220px; color:#0f172a;">
+        ${paragrafosHtml || '<p style="color:#94a3b8; font-style:italic;">Digite o texto no formulário ao lado...</p>'}
+      </div>
+
+      <!-- Fecho e Assinatura -->
+      <div style="margin-top:40px; text-align:center; page-break-inside:avoid;">
+        <div style="margin-bottom:45px; font-size:14px; color:#334155;">Atenciosamente,</div>
+        <div style="display:inline-block; border-top:1.5px solid #0f172a; padding-top:8px; min-width:280px;">
+          <div style="font-weight:700; font-size:14px; color:#0f172a;">${esc(emissorNome)}</div>
+          <div style="font-size:12px; color:#64748b;">${esc(emissorCargo)}</div>
+        </div>
+      </div>
+
+      <!-- Rodapé Oficial com Autenticação -->
+      <div style="position:absolute; bottom:20px; left:44px; right:44px; border-top:1px solid #e2e8f0; padding-top:8px; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
+        <div>Documento Oficial emitido pelo Sistema Atlas Saúde</div>
+        <div>Código de Autenticidade: VERIFICADO</div>
+      </div>
+    </div>
+  `;
+}
+
+async function salvarOficio() {
+  const id = document.getElementById('ofi-id').value;
+  const ano = parseInt(document.getElementById('ofi-ano').value) || new Date().getFullYear();
+  const numero = parseInt(document.getElementById('ofi-numero').value) || DB.proximoNumeroOficio(ano);
+  const codigo = document.getElementById('ofi-codigo').value.trim();
+  const assunto = document.getElementById('ofi-assunto').value.trim();
+  const texto = document.getElementById('ofi-texto').value.trim();
+
+  if (!assunto) return toastMsg('Informe o assunto do ofício.', 'warning');
+  if (!texto) return toastMsg('Informe o texto do corpo do ofício.', 'warning');
+
+  const btnSalvar = document.getElementById('btn-salvar-oficio');
+  if (btnSalvar) {
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = '⏳ Salvando...';
+  }
+
+  try {
+    _oficiosData = DB.oficios();
+    let token = '';
+
+    if (id) {
+      const antigo = _oficiosData.find(o => o.id === id);
+      token = antigo ? antigo.token : gerarTokenOficio();
+    } else {
+      token = gerarTokenOficio();
+    }
+
+    const dados = {
+      id: id || uidOficio(),
+      numero,
+      ano,
+      codigo: codigo || `Ofício nº ${String(numero).padStart(3, '0')}/${ano} - APS`,
+      assunto,
+      destinatario: document.getElementById('ofi-destinatario').value.trim(),
+      cargoDestinatario: document.getElementById('ofi-cargo-destinatario').value.trim(),
+      orgaoDestinatario: document.getElementById('ofi-orgao-destinatario').value.trim(),
+      cidadeData: document.getElementById('ofi-cidade-data').value.trim() || `Luzilândia - PI, ${obterDataExtenso()}`,
+      texto,
+      emissorNome: document.getElementById('ofi-emissor-nome').value.trim(),
+      emissorCargo: document.getElementById('ofi-emissor-cargo').value.trim(),
+      token,
+      criadoEm: new Date().toISOString()
+    };
+
+    if (id) {
+      const idx = _oficiosData.findIndex(o => o.id === id);
+      if (idx >= 0) _oficiosData[idx] = dados;
+    } else {
+      _oficiosData.push(dados);
+    }
+
+    await DB.saveOficios(_oficiosData);
+    toastMsg('Ofício emitido e salvo com sucesso!', 'success');
+    renderHistoricoOficios();
+
+    // Copiar link público automaticamente após emissão
+    const linkPublico = `${window.location.origin}${window.location.pathname}?oficio=${token}`;
+    document.getElementById('ofi-id').value = dados.id;
+
+    // Oferecer opções de link
+    const actionBox = document.getElementById('ofi-link-action-box');
+    if (actionBox) {
+      document.getElementById('ofi-link-input-display').value = linkPublico;
+      actionBox.style.display = 'flex';
+    }
+
+  } catch (err) {
+    console.error("Erro ao salvar ofício:", err);
+    toastMsg('Erro ao salvar ofício: ' + err.message, 'error');
+  } finally {
+    if (btnSalvar) {
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = '💾 Salvar & Emitir Ofício';
+    }
+  }
+}
+
+function copiarLinkOficio(token) {
+  const tok = token || (_oficiosData.find(o => o.id === document.getElementById('ofi-id').value)?.token);
+  if (!tok) return toastMsg('Nenhum ofício selecionado para compartilhar.', 'warning');
+
+  const url = `${window.location.origin}${window.location.pathname}?oficio=${tok}`;
+  navigator.clipboard.writeText(url).then(() => {
+    toastMsg('🔗 Link público copiado para a área de transferência!', 'success');
+  }).catch(() => {
+    const input = document.getElementById('ofi-link-input-display');
+    if (input) {
+      input.value = url;
+      input.select();
+      document.execCommand('copy');
+      toastMsg('🔗 Link público copiado!', 'success');
+    }
+  });
+}
+
+function imprimirOficioAtual() {
+  const container = document.getElementById('ofi-preview-container');
+  if (!container || !container.innerHTML) return toastMsg('Preencha o ofício para imprimir.', 'warning');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Impressão de Ofício Oficial</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sora', sans-serif; background: #fff; margin: 0; padding: 20px; }
+    @media print {
+      body { padding: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:15px;">
+    <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ Imprimir Ofício</button>
+  </div>
+  ${container.innerHTML}
+</body>
+</html>`);
+  win.document.close();
+}
+
+function renderHistoricoOficios() {
+  _oficiosData = DB.oficios();
+  const container = document.getElementById('lista-oficios');
+  if (!container) return;
+
+  const busca = (document.getElementById('ofi-busca')?.value || '').toLowerCase().trim();
+  let lista = _oficiosData;
+
+  if (busca) {
+    lista = lista.filter(o =>
+      (o.codigo || '').toLowerCase().includes(busca) ||
+      (o.assunto || '').toLowerCase().includes(busca) ||
+      (o.destinatario || '').toLowerCase().includes(busca) ||
+      (o.emissorNome || '').toLowerCase().includes(busca)
+    );
+  }
+
+  lista.sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
+
+  if (lista.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">📜</div><p>Nenhum ofício emitido ainda.</p></div>';
+    return;
+  }
+
+  container.innerHTML = lista.map(o => `
+    <div class="ev-list-item completo" style="margin-bottom:10px">
+      <div class="ev-list-header">
+        <div style="flex:1; min-width:0;">
+          <div class="ev-list-nome" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span>📜 ${esc(o.codigo)}</span>
+            <span class="tag tag-purple">${esc(o.assunto)}</span>
+          </div>
+          <div class="ev-list-meta" style="margin-top:4px; font-size:0.75rem;">
+            <span>👤 <strong>Destinatário:</strong> ${esc(o.destinatario || '-')}</span>
+            <span>✍️ <strong>Emissor:</strong> ${esc(o.emissorNome || '-')}</span>
+            <span>📅 ${o.criadoEm ? new Date(o.criadoEm).toLocaleDateString('pt-BR') : '-'}</span>
+          </div>
+        </div>
+        <div class="ev-list-actions" style="display:flex; gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="copiarLinkOficio('${o.token}')" title="Copiar Link Público">🔗 Link</button>
+          <button class="btn btn-ghost btn-sm" onclick="carregarOficioParaEditar('${o.id}')" title="Editar Ofício">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirOficio('${o.id}')" title="Excluir Ofício">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function carregarOficioParaEditar(id) {
+  const o = _oficiosData.find(x => x.id === id);
+  if (!o) return;
+
+  document.getElementById('ofi-id').value = o.id;
+  document.getElementById('ofi-ano').value = o.ano || new Date().getFullYear();
+  document.getElementById('ofi-numero').value = o.numero || 1;
+  document.getElementById('ofi-codigo').value = o.codigo || '';
+  document.getElementById('ofi-assunto').value = o.assunto || '';
+  document.getElementById('ofi-destinatario').value = o.destinatario || '';
+  document.getElementById('ofi-cargo-destinatario').value = o.cargoDestinatario || '';
+  document.getElementById('ofi-orgao-destinatario').value = o.orgaoDestinatario || '';
+  document.getElementById('ofi-cidade-data').value = o.cidadeData || '';
+  document.getElementById('ofi-texto').value = o.texto || '';
+  document.getElementById('ofi-emissor-nome').value = o.emissorNome || '';
+  document.getElementById('ofi-emissor-cargo').value = o.emissorCargo || '';
+
+  const titleEl = document.getElementById('ofi-form-title');
+  if (titleEl) titleEl.textContent = 'Editar Ofício - ' + o.codigo;
+
+  atualizarPreviewOficio();
+  const cardForm = document.getElementById('card-form-oficio');
+  if (cardForm) cardForm.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function excluirOficio(id) {
+  const o = _oficiosData.find(x => x.id === id);
+  if (!confirm(`Deseja realmente excluir o ${o ? o.codigo : 'ofício'}?`)) return;
+
+  _oficiosData = _oficiosData.filter(x => x.id !== id);
+  await DB.deleteOficio(id);
+  renderHistoricoOficios();
+  toastMsg('Ofício excluído com sucesso.', 'info');
+}
+
+// ===================== PÁGINA PÚBLICA DE OFÍCIO (SEM LOGIN) =====================
+async function renderOficioPublico(token) {
+  const appContainer = document.querySelector('.app-container');
+  const loginScreen = document.getElementById('login-screen');
+  if (appContainer) appContainer.style.display = 'none';
+  if (loginScreen) loginScreen.style.display = 'none';
+
+  // Buscar ofício no Supabase ou local
+  let oficio = DB.oficios().find(o => o.token === token);
+
+  if (!oficio) {
+    try {
+      const { data } = await supabaseClient.from('oficios').select('*').eq('token', token).single();
+      if (data) oficio = normalizarCamposObjeto(data);
+    } catch (e) { console.warn("Erro ao buscar ofício público:", e); }
+  }
+
+  if (!oficio) {
+    document.body.innerHTML = `
+      <div style="min-height:100vh; background:#060b14; color:#fff; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px; font-family:sans-serif;">
+        <div style="font-size:48px; margin-bottom:16px;">📜</div>
+        <h2 style="font-size:22px; margin-bottom:8px;">Ofício não encontrado ou inválido</h2>
+        <p style="color:#94a3b8; font-size:14px; margin-bottom:24px;">O documento solicitado não foi localizado no sistema.</p>
+        <a href="index.html.html" style="padding:10px 20px; background:#3b82f6; color:#fff; text-decoration:none; border-radius:8px; font-weight:bold;">Acessar o Sistema Atlas Saúde</a>
+      </div>
+    `;
+    return;
+  }
+
+  const cfg = DB.config();
+  const logoEsq = (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
+  const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
+
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const subTitle = cfg.subtituloSidebar || 'Gestão de RH & Administração';
+
+  const paragrafosHtml = (oficio.texto || '').split('\n').filter(p => p.trim()).map(p =>
+    `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:15px;">${esc(p)}</p>`
+  ).join('');
+
+  const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🏛️</div>';
+  const logoDirHtml = logoDir ? `<img src="${logoDir}" style="max-height:65px; max-width:150px; object-fit:contain;">` : (logoPrint ? `<img src="${logoPrint}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🌴</div>');
+
+  document.body.innerHTML = `
+    <div style="min-height:100vh; background:#0f172a; padding:30px 15px; font-family:'Sora', sans-serif; display:flex; flex-direction:column; align-items:center;">
+      
+      <!-- Top Action Bar -->
+      <div style="width:100%; max-width:800px; display:flex; justify-space-between; align-items:center; margin-bottom:20px; color:#fff;" class="no-print">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:20px;">📜</span>
+          <div>
+            <div style="font-weight:700; font-size:15px;">Documento Oficial Autêntico</div>
+            <div style="font-size:12px; color:#94a3b8;">Atlas Saúde · Validação de Autenticidade</div>
+          </div>
+        </div>
+        <button onclick="window.print()" style="padding:10px 18px; background:#3b82f6; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-family:'Sora', sans-serif;">🖨️ Imprimir / Salvar PDF</button>
+      </div>
+
+      <!-- Printable A4 Document Sheet -->
+      <div style="background:#fff; color:#111; width:100%; max-width:800px; padding:60px 50px; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); min-height:950px; position:relative;">
+        
+        <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2.5px solid #1e293b; padding-bottom:16px; margin-bottom:30px;">
+          <div style="width:150px; text-align:left;">${logoEsqHtml}</div>
+          <div style="text-align:center; flex:1; padding:0 15px;">
+            <h1 style="font-size:15px; font-weight:800; text-transform:uppercase; margin:0; color:#0f172a; letter-spacing:0.02em;">${esc(orgNome)}</h1>
+            <h2 style="font-size:12px; font-weight:600; color:#475569; margin:4px 0 0 0; text-transform:uppercase;">${esc(subTitle)}</h2>
+          </div>
+          <div style="width:150px; text-align:right;">${logoDirHtml}</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px;">
+          <div style="font-weight:800; font-size:15px; color:#0f172a;">${esc(oficio.codigo)}</div>
+          <div style="font-size:13.5px; color:#334155; font-weight:600;">${esc(oficio.cidadeData)}</div>
+        </div>
+
+        <div style="margin-bottom:28px; line-height:1.6; font-size:14px; color:#1e293b;">
+          <div><strong>${esc(oficio.destinatario || '')}</strong></div>
+          ${oficio.cargoDestinatario ? `<div>${esc(oficio.cargoDestinatario)}</div>` : ''}
+          ${oficio.orgaoDestinatario ? `<div style="color:#475569;">${esc(oficio.orgaoDestinatario)}</div>` : ''}
+        </div>
+
+        <div style="margin-bottom:32px; background:#f1f5f9; padding:12px 16px; border-left:4px solid #2563eb; font-size:14px; border-radius:0 6px 6px 0;">
+          <strong>Assunto:</strong> ${esc(oficio.assunto || '')}
+        </div>
+
+        <div style="min-height:300px; color:#0f172a;">
+          ${paragrafosHtml}
+        </div>
+
+        <div style="margin-top:60px; text-align:center;">
+          <div style="margin-bottom:50px; font-size:14px; color:#334155;">Atenciosamente,</div>
+          <div style="display:inline-block; border-top:1.5px solid #0f172a; padding-top:8px; min-width:300px;">
+            <div style="font-weight:800; font-size:14.5px; color:#0f172a;">${esc(oficio.emissorNome || '')}</div>
+            <div style="font-size:12.5px; color:#64748b;">${esc(oficio.emissorCargo || '')}</div>
+          </div>
+        </div>
+
+        <div style="position:absolute; bottom:25px; left:50px; right:50px; border-top:1px solid #cbd5e1; padding-top:10px; display:flex; justify-content:space-between; font-size:10.5px; color:#64748b;">
+          <div>Documento Oficial · emitido em ${oficio.criadoEm ? new Date(oficio.criadoEm).toLocaleDateString('pt-BR') : '-'}</div>
+          <div>Autenticidade Verificada pela Coordenação APS</div>
+        </div>
+
+      </div>
+    </div>
+  `;
+}

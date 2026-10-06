@@ -398,28 +398,38 @@ const DB = {
   saveVeiculos: async (d) => {
     _remoteData.veiculos = d;
     localStorage.setItem('srv_veiculos', JSON.stringify(d));
-    for (let i = 0; i < d.length; i++) {
-      try {
-        const { error } = await supabaseClient.from('veiculos').upsert(d[i], { onConflict: 'id' });
-        if (error) {
-          if (isQuotaError(error)) { saveToSyncQueue('veiculos', d[i]); }
-          else {
-            const { error: err2 } = await supabaseClient.rpc('salvar_veiculo', { p_dados: d[i] });
-            if (err2) { if (isQuotaError(err2)) saveToSyncQueue('veiculos', d[i]); else console.error("Erro ao salvar veículo:", err2); }
+    if (!d || !d.length) return;
+    try {
+      const { error } = await supabaseClient.from('veiculos').upsert(d, { onConflict: 'id' });
+      if (error) {
+        console.warn("⚠️ Erro upsert veiculos:", error.message);
+        if (isQuotaError(error)) {
+          saveToSyncQueue('veiculos', d);
+        } else {
+          for (const item of d) {
+            try {
+              const { error: errInd } = await supabaseClient.from('veiculos').upsert(item, { onConflict: 'id' });
+              if (errInd && isQuotaError(errInd)) saveToSyncQueue('veiculos', item);
+            } catch (eInd) {
+              if (isQuotaError(eInd)) saveToSyncQueue('veiculos', item);
+            }
           }
         }
-      } catch (e) {
-        if (isQuotaError(e)) { saveToSyncQueue('veiculos', d[i]); }
-        else { console.error("Erro ao salvar veículo:", e); }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) {
+        saveToSyncQueue('veiculos', d);
+      } else {
+        console.error("Erro ao salvar veículos no Supabase:", e);
       }
     }
   },
   deleteVeiculo: async (id) => {
+    _remoteData.veiculos = _remoteData.veiculos.filter(v => v.id !== id);
+    localStorage.setItem('srv_veiculos', JSON.stringify(_remoteData.veiculos));
     try {
       const { error } = await supabaseClient.from('veiculos').delete().eq('id', id);
-      if (error && error.code !== 'PGRST116') {
-        await supabaseClient.rpc('deletar_veiculo', { p_id: id }).catch(() => {});
-      }
+      if (error && !isQuotaError(error)) console.warn("Aviso ao deletar veículo:", error.message);
     } catch (e) { console.error("Erro ao deletar veículo:", e); }
   },
 
@@ -524,6 +534,39 @@ const DB = {
       else throw e;
     }
   },
+  // =================== GERADOR DE OFÍCIOS ===================
+  oficios: () => _remoteData.oficios.length ? _remoteData.oficios : JSON.parse(localStorage.getItem('srv_oficios') || '[]'),
+  saveOficios: async (d) => {
+    _remoteData.oficios = d;
+    localStorage.setItem('srv_oficios', JSON.stringify(d));
+    if (!d || !d.length) return;
+    try {
+      const { error } = await supabaseClient.from('oficios').upsert(d, { onConflict: 'id' });
+      if (error && !isQuotaError(error)) console.warn("Erro ao salvar ofícios no Supabase:", error.message);
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('oficios', d);
+      else console.error("Erro ao salvar ofícios no Supabase:", e);
+    }
+  },
+  deleteOficio: async (id) => {
+    _remoteData.oficios = _remoteData.oficios.filter(o => o.id !== id);
+    localStorage.setItem('srv_oficios', JSON.stringify(_remoteData.oficios));
+    try {
+      const { error } = await supabaseClient.from('oficios').delete().eq('id', id);
+      if (error && !isQuotaError(error)) console.warn("Aviso ao deletar ofício:", error.message);
+    } catch (e) { console.error("Erro ao deletar ofício:", e); }
+  },
+  proximoNumeroOficio: (ano) => {
+    const todos = DB.oficios();
+    const anoRef = ano || new Date().getFullYear();
+    const cfg = DB.config ? DB.config() : {};
+    const baseInicial = parseInt(cfg.sequenciaOficioInicial || localStorage.getItem('srv_oficio_seq_inicial') || 74);
+    const doAno = todos.filter(o => (o.ano === anoRef || parseInt(o.ano) === anoRef));
+    if (!doAno.length) return baseInicial;
+    const max = Math.max(baseInicial - 1, ...doAno.map(o => parseInt(o.numero) || 0));
+    return max + 1;
+  },
+
   deleteItemProtocolo: async (id) => {
     _remoteData.itensProtocolo = _remoteData.itensProtocolo.filter(i => i.id !== id);
     localStorage.setItem('srv_itens_protocolo', JSON.stringify(_remoteData.itensProtocolo));

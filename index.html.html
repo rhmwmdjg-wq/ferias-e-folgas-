@@ -1737,6 +1737,10 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
 
       <!-- ===== Autorizações e Solicitações ===== -->
       <div class="sidebar-section-label">Autorizações e Solicitações</div>
+      <button class="tab-btn" onclick="showTab('oficios')" id="tab-oficios">
+        <i class="fa-solid fa-file-pen"></i>
+        <span class="tab-label">Gerador de Ofícios</span>
+      </button>
       <button class="tab-btn" onclick="abrirModalAutorizacao()" id="tab-emitir-aut" style="color:var(--primary)">
         <i class="fa-solid fa-file-pdf"></i>
         <span class="tab-label" style="font-weight:800">Emitir Autorização</span>
@@ -1759,8 +1763,8 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <span class="badge" id="badge-eventos" style="background:var(--accent);display:none">0</span>
       </button>
       <button class="tab-btn" onclick="showTab('veiculos')" id="tab-veiculos">
-        <i class="fa-solid fa-truck"></i>
-        <span class="tab-label">Veículos</span>
+        <i class="fa-solid fa-truck-fast"></i>
+        <span class="tab-label">Controle de Frotas</span>
       </button>
       <button class="tab-btn" onclick="showTab('ponto')" id="tab-ponto" style="margin-bottom:4px">
         <i class="fa-solid fa-clock"></i>
@@ -3367,33 +3371,257 @@ Coordenação de RH
   </div>
 </div>
 
-<!-- ======================= ABA VEÍCULOS ======================= -->
-<div class="tab-panel" id="panel-veiculos">
-  <div class="section-title">🚗 Veículos</div>
-  <div class="ev-grid">
-    <div class="ev-card">
-      <h3>➕ Novo Veículo</h3>
-      <input type="hidden" id="veic-id">
-      <div class="form-row cols-2">
-        <div class="field"><label>Nome *</label><input id="veic-nome" placeholder="Ex: Carro APS"></div>
-        <div class="field"><label>Placa</label><input id="veic-placa" placeholder="ABC-1234"></div>
+<!-- ======================= ABA GERADOR DE OFÍCIOS ======================= -->
+<div class="tab-panel" id="panel-oficios">
+  <div class="section-title">📜 Gerador de Ofícios Oficiais</div>
+
+  <div class="ev-grid" style="grid-template-columns: 1fr 1.1fr;">
+    <!-- Form Card -->
+    <div class="ev-card" id="card-form-oficio">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0;">✍️ <span id="ofi-form-title">Novo Ofício Oficial</span></h3>
+        <button class="btn btn-ghost btn-sm" onclick="carregarNovoOficio()">➕ Novo Ofício</button>
       </div>
-      <div class="form-row cols-2">
-        <div class="field"><label>Modelo</label><input id="veic-modelo" placeholder="Ex: Fiat Uno"></div>
-        <div class="field"><label>Cor</label><input id="veic-cor" placeholder="Branco"></div>
+      
+      <input type="hidden" id="ofi-id">
+      <input type="hidden" id="ofi-ano">
+
+      <div class="form-row cols-3">
+        <div class="field" style="max-width:110px;">
+          <label>Nº Sequencial</label>
+          <input type="number" id="ofi-numero" min="1" placeholder="74" oninput="atualizarNumeroOficioManual(this.value)">
+        </div>
+        <div class="field">
+          <label>Código Formatado do Ofício</label>
+          <input id="ofi-codigo" placeholder="Ofício nº 074/2026 - APS" oninput="atualizarPreviewOficio()">
+        </div>
+        <div class="field">
+          <label>Cidade e Data por Extenso</label>
+          <input id="ofi-cidade-data" placeholder="Luzilândia - PI, 06 de Outubro de 2026" oninput="atualizarPreviewOficio()">
+        </div>
       </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Destinatário (Nome)</label>
+          <input id="ofi-destinatario" placeholder="Ex: À Sua Senhoria o Senhor..." oninput="atualizarPreviewOficio()">
+        </div>
+        <div class="field">
+          <label>Cargo do Destinatário</label>
+          <input id="ofi-cargo-destinatario" placeholder="Ex: Secretário Municipal de Saúde" oninput="atualizarPreviewOficio()">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Órgão / Secretaria / Empresa</label>
+          <input id="ofi-orgao-destinatario" placeholder="Ex: Prefeitura Municipal de Luzilândia" oninput="atualizarPreviewOficio()">
+        </div>
+        <div class="field">
+          <label>Assunto / Ementa *</label>
+          <input id="ofi-assunto" placeholder="Ex: Solicitação de Manutenção de Veículo" oninput="atualizarPreviewOficio()">
+        </div>
+      </div>
+
       <div class="field" style="margin-bottom:14px">
-        <label>Observação</label>
-        <textarea id="veic-obs" placeholder="Observações..." style="min-height:50px"></textarea>
+        <label>Texto do Corpo do Ofício * (Separe parágrafos com Enter)</label>
+        <textarea id="ofi-texto" placeholder="Digite o conteúdo oficial do ofício..." style="min-height:160px; line-height:1.6;" oninput="atualizarPreviewOficio()"></textarea>
       </div>
-      <div style="display:flex;gap:8px">
-        <button class="btn btn-primary" onclick="salvarVeiculo()">💾 Salvar Veículo</button>
-        <button class="btn btn-ghost" onclick="limparFormVeiculo()">🗑️ Limpar</button>
+
+      <div class="form-row cols-2" style="margin-bottom:16px;">
+        <div class="field">
+          <label>Nome do Emissor / Assinante</label>
+          <input id="ofi-emissor-nome" placeholder="Ex: Dra. Brenda Souza" oninput="atualizarPreviewOficio()">
+        </div>
+        <div class="field">
+          <label>Cargo do Emissor / Assinante</label>
+          <input id="ofi-emissor-cargo" placeholder="Ex: Coordenadora APS" oninput="atualizarPreviewOficio()">
+        </div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn btn-primary" id="btn-salvar-oficio" onclick="salvarOficio()">💾 Salvar & Emitir Ofício</button>
+        <button class="btn btn-ghost" onclick="imprimirOficioAtual()">🖨️ Imprimir PDF</button>
+        <button class="btn btn-ghost" onclick="carregarNovoOficio()">🧹 Limpar</button>
+      </div>
+
+      <!-- Action box for generated link -->
+      <div id="ofi-link-action-box" style="display:none; background:var(--surface); border:1px solid var(--border-mid); padding:12px; border-radius:var(--r-sm); gap:8px; align-items:center; margin-top:10px;">
+        <i class="fa-solid fa-link" style="color:var(--primary); font-size:1.1rem;"></i>
+        <input type="text" id="ofi-link-input-display" readonly style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--border); padding:6px 10px; border-radius:4px; color:var(--text); font-size:0.75rem;">
+        <button class="btn btn-primary btn-sm" onclick="copiarLinkOficio()">📋 Copiar Link Público</button>
       </div>
     </div>
+
+    <!-- Live Preview Card -->
     <div class="ev-card">
-      <h3>📋 Veículos Cadastrados</h3>
-      <div id="lista-veiculos"><div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div></div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3>👁️ Pré-Visualização A4 Oficial</h3>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirOficioAtual()">🖨️ Ampliar / Imprimir</button>
+      </div>
+      <div id="ofi-preview-container">
+        <!-- Live preview rendered here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Table History Card -->
+  <div class="ev-card" style="margin-top:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <h3>📜 Histórico de Ofícios Emitidos</h3>
+      <div style="display:flex; gap:8px; flex:1; max-width:340px;">
+        <input type="text" id="ofi-busca" placeholder="🔍 Buscar por número, assunto, destinatário..." oninput="renderHistoricoOficios()" style="padding:6px 10px; font-size:0.78rem; width:100%;">
+      </div>
+    </div>
+    <div id="lista-oficios">
+      <div class="empty"><div class="icon">📜</div><p>Nenhum ofício cadastrado.</p></div>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= ABA CONTROLE DE FROTAS ======================= -->
+<div class="tab-panel" id="panel-veiculos">
+  <div class="section-title">🚘 Controle de Frotas & Veículos</div>
+
+  <!-- KPI Indicator Cards -->
+  <div class="grid-4" style="margin-bottom: 20px;">
+    <div class="stat">
+      <div class="val" id="kpi-total-veiculos">0</div>
+      <div class="lbl">Total da Frota</div>
+    </div>
+    <div class="stat">
+      <div class="val" id="kpi-valor-total-frota" style="font-size: 1.3rem;">R$ 0,00</div>
+      <div class="lbl">Valor Total Investido</div>
+    </div>
+    <div class="stat">
+      <div class="val" id="kpi-veiculos-com-pdf">0</div>
+      <div class="lbl">Documentos PDF Anexados</div>
+    </div>
+    <div class="stat">
+      <div class="val" id="kpi-veiculos-fontes">0</div>
+      <div class="lbl">Fontes de Recurso</div>
+    </div>
+  </div>
+
+  <div class="ev-grid">
+    <!-- Form Card -->
+    <div class="ev-card" id="card-form-veiculo">
+      <h3>✍️ <span id="veic-form-title">Cadastrar Veículo</span></h3>
+      <input type="hidden" id="veic-id">
+      <input type="hidden" id="veic-pdf-url">
+      <input type="hidden" id="veic-pdf-nome">
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Nome / Identificação *</label>
+          <input id="veic-nome" placeholder="Ex: Ambulância UTI 01 / Gol APS">
+        </div>
+        <div class="field">
+          <label>Placa *</label>
+          <input id="veic-placa" placeholder="ABC-1D23" style="text-transform:uppercase">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Modelo / Marca</label>
+          <input id="veic-modelo" placeholder="Ex: Fiat Ducato / Toyota Hilux">
+        </div>
+        <div class="field">
+          <label>Cor</label>
+          <input id="veic-cor" placeholder="Ex: Branca">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>RENAVAM</label>
+          <input id="veic-renavam" placeholder="Ex: 00123456789" maxlength="11">
+        </div>
+        <div class="field">
+          <label>Nota Fiscal nº</label>
+          <input id="veic-nota-fiscal" placeholder="Ex: NF-e 004829">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Resolução de Compra</label>
+          <input id="veic-resolucao" placeholder="Ex: Resolução nº 045/2023 - SESA">
+        </div>
+        <div class="field">
+          <label>Ficha Orçamentária</label>
+          <input id="veic-ficha" placeholder="Ex: Ficha 1042">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Fonte do Recurso</label>
+          <input id="veic-fonte" placeholder="Ex: Fonte 1500 / FNS / Próprio">
+        </div>
+        <div class="field">
+          <label>Valor de Compra (R$)</label>
+          <input id="veic-valor" type="number" step="0.01" min="0" placeholder="0.00">
+        </div>
+      </div>
+
+      <div class="form-row cols-2">
+        <div class="field">
+          <label>Setor Atual (Onde está hoje)</label>
+          <input id="veic-setor-atual" placeholder="Ex: UBS Centro / SAMU / Base 01">
+        </div>
+        <div class="field">
+          <label>Setor de Origem (Pertence de fato)</label>
+          <input id="veic-setor-pertence" placeholder="Ex: Coordenação APS / Secretaria de Saúde">
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:16px">
+        <label>Anexo do Documento (PDF / NF / Resolução)</label>
+        <div class="img-upload-area" onclick="document.getElementById('veic-pdf-input').click()" style="padding:14px; text-align:center;">
+          <input type="file" id="veic-pdf-input" accept="application/pdf" style="display:none" onchange="processarArquivoPdfVeiculo(this)">
+          <div class="img-upload-icon" id="veic-pdf-icon" style="font-size: 22px;">📄</div>
+          <div class="img-upload-label" id="veic-pdf-label">
+            Clique para selecionar ou arrastar o arquivo PDF<br>
+            <small style="color:var(--muted)">Formatos: .pdf (Máx: 10MB)</small>
+          </div>
+        </div>
+        <div id="veic-pdf-status-area" style="display:none; margin-top:8px; align-items:center; justify-space-between; background:var(--surface); padding:8px 12px; border-radius:var(--r-sm); border:1px solid var(--border-mid);">
+          <div style="display:flex; align-items:center; gap:8px; overflow:hidden;">
+            <i class="fa-solid fa-file-pdf" style="color:var(--danger); font-size:1.2rem;"></i>
+            <span id="veic-pdf-nome-view" style="font-size:0.78rem; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">arquivo.pdf</span>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn btn-ghost btn-sm" onclick="visualizarPdfFormulario()" title="Visualizar PDF">👁️ Ver</button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="removerPdfFormulario()" title="Remover PDF">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px">
+        <label>Observação</label>
+        <textarea id="veic-obs" placeholder="Observações sobre manutenção, lote, lotação, etc..." style="min-height:50px"></textarea>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary" id="btn-salvar-veiculo" onclick="salvarVeiculo()">💾 Salvar Veículo</button>
+        <button class="btn btn-ghost" onclick="limparFormVeiculo()">🧹 Limpar</button>
+      </div>
+    </div>
+
+    <!-- Fleet List Card -->
+    <div class="ev-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+        <h3>📋 Frota Cadastrada</h3>
+        <div style="display:flex; gap:8px; flex:1; max-width:440px; align-items:center;">
+          <input type="text" id="veic-busca" placeholder="🔍 Buscar por placa, setor, modelo, renavam..." oninput="renderVeiculos()" style="padding:6px 10px; font-size:0.78rem; flex:1;">
+          <button class="btn btn-primary btn-sm" onclick="imprimirRelatorioFrota()" title="Imprimir Relatório Completo da Frota">🖨️ Imprimir Frota</button>
+        </div>
+      </div>
+      <div id="lista-veiculos">
+        <div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div>
+      </div>
     </div>
   </div>
 </div>
@@ -4766,6 +4994,7 @@ let _remoteData = {
   pontoMensal: [],
   protocolos: [],
   itensProtocolo: [],
+  oficios: [],
   config: {}
 };
 
@@ -4955,6 +5184,16 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.pontoMensal = unificados;
     localStorage.setItem('srv_ponto_mensal', JSON.stringify(unificados));
+  });
+
+  await syncTabela('oficios', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_oficios') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('oficios', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.oficios = unificados;
+    localStorage.setItem('srv_oficios', JSON.stringify(unificados));
   });
 
   await syncTabela('protocolos_entrega', '*', (data) => {
@@ -6393,7 +6632,30 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="eventos.js"></script>
 <script src="reports.js"></script>
 <script src="protocolo-entrega.js"></script>
+<script src="oficios.js"></script>
 <script>atualizarBadgeEventos();</script>
+
+<!-- ======================= MODAL VISUALIZADOR DE PDF ======================= -->
+<div class="modal-bg" id="modal-pdf-veiculo">
+  <div class="modal" style="max-width: 850px; width: 95%;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <h3 style="margin:0; display:flex; align-items:center; gap:8px;">
+        <i class="fa-solid fa-file-pdf" style="color:var(--danger)"></i>
+        <span id="modal-pdf-titulo">Documento do Veículo</span>
+      </h3>
+      <button class="btn btn-ghost btn-sm" onclick="fecharModal('modal-pdf-veiculo')">✕</button>
+    </div>
+    <div id="modal-pdf-body" style="width:100%; height:520px; background:var(--bg); border-radius:var(--r-sm); border:1px solid var(--border); overflow:hidden;">
+      <iframe id="modal-pdf-iframe" src="" style="width:100%; height:100%; border:none;"></iframe>
+    </div>
+    <div class="modal-footer" style="justify-content:space-between;">
+      <a id="modal-pdf-download-btn" href="" download target="_blank" class="btn btn-primary btn-sm">
+        <i class="fa-solid fa-download"></i> Baixar PDF
+      </a>
+      <button class="btn btn-ghost btn-sm" onclick="fecharModal('modal-pdf-veiculo')">Fechar</button>
+    </div>
+  </div>
+</div>
 
 <!-- TOAST CONTAINER -->
 <div id="toast-container" class="toast-container"></div>

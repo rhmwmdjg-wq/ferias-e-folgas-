@@ -24,90 +24,343 @@ function salvarVeiculosStorage() {
   DB.saveVeiculos(_veiculosData);
 }
 
-// ---- VEÍCULOS (painel independente) ----
-function renderVeiculos() {
-  const container = document.getElementById('lista-veiculos');
-  if (!container) return;
-  if (_veiculosData.length === 0) {
-    container.innerHTML = '<div class="empty"><div class="icon">🚗</div><p>Nenhum veículo cadastrado.</p></div>';
-    return;
+// ---- CONTROLE DE FROTAS & VEÍCULOS MODULE ----
+let _tempVeiculoPdfFile = null;
+
+function processarArquivoPdfVeiculo(input) {
+  const file = input.files[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') {
+    return toastMsg('Apenas arquivos no formato PDF são permitidos.', 'warning');
   }
-  container.innerHTML = _veiculosData.map(v => `
-    <div class="ev-list-item completo">
-      <div class="ev-list-header">
-        <div>
-          <div class="ev-list-nome">🚗 ${esc(v.nome)}</div>
-          <div class="ev-list-meta">${esc(v.placa||'-')} · ${esc(v.modelo||'-')} · ${esc(v.cor||'-')}</div>
-          ${v.obs ? `<div style="font-size:0.75rem;color:var(--muted);margin-top:4px">${esc(v.obs)}</div>` : ''}
-        </div>
-        <div class="ev-list-actions">
-          <button class="btn btn-ghost btn-sm" onclick="editarVeiculo('${v.id}')">✏️</button>
-          <button class="btn btn-danger btn-sm" onclick="excluirVeiculo('${v.id}')">🗑️</button>
-        </div>
-      </div>
-    </div>
-  `).join('');
+  if (file.size > 10 * 1024 * 1024) {
+    return toastMsg('Tamanho máximo permitido: 10MB', 'warning');
+  }
+  _tempVeiculoPdfFile = file;
+  const nameView = document.getElementById('veic-pdf-nome-view');
+  if (nameView) nameView.textContent = file.name + ' (' + (file.size / 1024 / 1024).toFixed(2) + 'MB)';
+  const statusArea = document.getElementById('veic-pdf-status-area');
+  if (statusArea) statusArea.style.display = 'flex';
+  toastMsg('Documento PDF selecionado!', 'info');
 }
 
-function salvarVeiculo() {
+function removerPdfFormulario() {
+  _tempVeiculoPdfFile = null;
+  const input = document.getElementById('veic-pdf-input');
+  if (input) input.value = '';
+  const urlEl = document.getElementById('veic-pdf-url');
+  if (urlEl) urlEl.value = '';
+  const nomeEl = document.getElementById('veic-pdf-nome');
+  if (nomeEl) nomeEl.value = '';
+  const statusArea = document.getElementById('veic-pdf-status-area');
+  if (statusArea) statusArea.style.display = 'none';
+}
+
+function visualizarPdfFormulario() {
+  const url = document.getElementById('veic-pdf-url')?.value;
+  const nome = document.getElementById('veic-pdf-nome')?.value || 'Documento';
+  if (_tempVeiculoPdfFile) {
+    const objectUrl = URL.createObjectURL(_tempVeiculoPdfFile);
+    abrirModalPdfVeiculo(objectUrl, _tempVeiculoPdfFile.name);
+  } else if (url) {
+    abrirModalPdfVeiculo(url, nome);
+  } else {
+    toastMsg('Nenhum PDF disponível para visualização.', 'warning');
+  }
+}
+
+function abrirModalPdfVeiculo(url, nome) {
+  const modal = document.getElementById('modal-pdf-veiculo');
+  const iframe = document.getElementById('modal-pdf-iframe');
+  const titulo = document.getElementById('modal-pdf-titulo');
+  const downloadBtn = document.getElementById('modal-pdf-download-btn');
+  if (!modal || !iframe) return;
+  
+  if (titulo) titulo.textContent = nome || 'Documento do Veículo';
+  iframe.src = url;
+  if (downloadBtn) {
+    downloadBtn.href = url;
+    downloadBtn.download = nome || 'documento_veiculo.pdf';
+  }
+  modal.classList.add('open');
+}
+
+async function uploadPdfParaStorage(file, veiculoId) {
+  if (!file) return null;
+  try {
+    const fileName = `veiculo_${veiculoId || Date.now()}_${Date.now()}.pdf`;
+    const filePath = `veiculos/${fileName}`;
+    let bucketName = 'documentos';
+
+    let { data, error } = await supabaseClient.storage
+      .from(bucketName)
+      .upload(filePath, file, { contentType: 'application/pdf', upsert: true });
+
+    if (error && (error.message?.includes('not found') || error.status === 404)) {
+      bucketName = 'FOTOS';
+      const retry = await supabaseClient.storage
+        .from(bucketName)
+        .upload(filePath, file, { contentType: 'application/pdf', upsert: true });
+      data = retry.data;
+      error = retry.error;
+    }
+
+    if (error) {
+      console.warn("⚠️ Fallback local base64 para PDF devido a restrição no Storage:", error);
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target.result);
+        reader.readAsDataURL(file);
+      });
+    }
+
+    const { data: { publicUrl } } = supabaseClient.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+
+    return publicUrl;
+  } catch (err) {
+    console.error("❌ Erro no upload do PDF:", err);
+    return null;
+  }
+}
+
+function renderVeiculos() {
+  _veiculosData = DB.veiculos();
+  const container = document.getElementById('lista-veiculos');
+  if (!container) return;
+
+  // Atualizar KPIs da Frota
+  const totalVeiculos = _veiculosData.length;
+  const valorTotal = _veiculosData.reduce((acc, v) => acc + (parseFloat(v.valorCompra) || 0), 0);
+  const totalPdfs = _veiculosData.filter(v => v.pdfUrl || v.pdf_url).length;
+  const fontesUnicas = new Set(_veiculosData.map(v => (v.fonte || '').trim().toUpperCase()).filter(Boolean)).size;
+
+  const kpiTotal = document.getElementById('kpi-total-veiculos');
+  const kpiValor = document.getElementById('kpi-valor-total-frota');
+  const kpiPdfs = document.getElementById('kpi-veiculos-com-pdf');
+  const kpiFontes = document.getElementById('kpi-veiculos-fontes');
+
+  if (kpiTotal) kpiTotal.textContent = totalVeiculos;
+  if (kpiValor) kpiValor.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal);
+  if (kpiPdfs) kpiPdfs.textContent = totalPdfs;
+  if (kpiFontes) kpiFontes.textContent = fontesUnicas;
+
+  // Filtragem
+  const busca = (document.getElementById('veic-busca')?.value || '').toLowerCase().trim();
+  let lista = _veiculosData;
+
+  if (busca) {
+    lista = lista.filter(v => 
+      (v.nome || '').toLowerCase().includes(busca) ||
+      (v.placa || '').toLowerCase().includes(busca) ||
+      (v.modelo || '').toLowerCase().includes(busca) ||
+      (v.renavam || '').toLowerCase().includes(busca) ||
+      (v.notaFiscal || v.nota_fiscal || '').toLowerCase().includes(busca) ||
+      (v.resolucao || '').toLowerCase().includes(busca) ||
+      (v.fonte || '').toLowerCase().includes(busca) ||
+      (v.ficha || '').toLowerCase().includes(busca)
+    );
+  }
+
+  if (lista.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">🚗</div><p>Nenhum veículo encontrado na frota.</p></div>';
+    return;
+  }
+
+  container.innerHTML = lista.map(v => {
+    const valorFmt = v.valorCompra ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v.valorCompra) : null;
+    const pdfUrl = v.pdfUrl || v.pdf_url;
+    const pdfNome = v.pdfNome || v.pdf_nome || 'Documento PDF';
+    const nf = v.notaFiscal || v.nota_fiscal;
+    const setorAtual = v.setorAtual || v.setor_atual || '-';
+    const setorPertence = v.setorPertence || v.setor_pertence || '-';
+
+    return `<div class="ev-list-item completo" style="margin-bottom:12px">
+      <div class="ev-list-header">
+        <div style="flex:1; min-width:0;">
+          <div class="ev-list-nome" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span>🚗 ${esc(v.nome)}</span>
+            ${v.placa ? `<span class="tag tag-blue">${esc(v.placa)}</span>` : ''}
+            ${valorFmt ? `<span class="tag tag-green">💰 ${valorFmt}</span>` : ''}
+          </div>
+          <div class="ev-list-meta" style="margin-top:6px; font-size:0.75rem; display:flex; gap:12px; flex-wrap:wrap;">
+            <span>📍 <strong>Setor Atual (Hoje):</strong> ${esc(setorAtual)}</span>
+            <span>🏢 <strong>Setor Origem (Pertence):</strong> ${esc(setorPertence)}</span>
+            ${v.modelo ? `<span>🚘 <strong>Modelo:</strong> ${esc(v.modelo)}</span>` : ''}
+            ${v.cor ? `<span>🎨 <strong>Cor:</strong> ${esc(v.cor)}</span>` : ''}
+            ${v.renavam ? `<span>📋 <strong>RENAVAM:</strong> ${esc(v.renavam)}</span>` : ''}
+            ${nf ? `<span>🧾 <strong>NF:</strong> ${esc(nf)}</span>` : ''}
+            ${v.resolucao ? `<span>📜 <strong>Resolução:</strong> ${esc(v.resolucao)}</span>` : ''}
+            ${v.ficha ? `<span>📑 <strong>Ficha:</strong> ${esc(v.ficha)}</span>` : ''}
+            ${v.fonte ? `<span>🏛️ <strong>Fonte:</strong> ${esc(v.fonte)}</span>` : ''}
+          </div>
+          ${v.obs ? `<div style="font-size:0.75rem; color:var(--muted); margin-top:6px; background:rgba(255,255,255,0.02); padding:4px 8px; border-radius:4px;">💬 ${esc(v.obs)}</div>` : ''}
+        </div>
+        <div class="ev-list-actions" style="display:flex; gap:6px; align-items:center;">
+          ${pdfUrl ? `<button class="btn btn-ghost btn-sm" style="color:var(--danger);" onclick="abrirModalPdfVeiculo('${pdfUrl}', '${esc(pdfNome)}')" title="Visualizar Documento PDF">📄 PDF</button>` : ''}
+          <button class="btn btn-ghost btn-sm" onclick="editarVeiculo('${v.id}')" title="Editar Veículo">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirVeiculo('${v.id}')" title="Excluir Veículo">🗑️</button>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function salvarVeiculo() {
   const id = document.getElementById('veic-id').value;
   const nome = document.getElementById('veic-nome').value.trim();
-  if (!nome) return toastMsg('Informe o nome do veículo.', 'warning');
+  const placa = document.getElementById('veic-placa').value.trim().toUpperCase();
 
-  const dados = {
-    nome,
-    placa: document.getElementById('veic-placa').value.trim(),
-    modelo: document.getElementById('veic-modelo').value.trim(),
-    cor: document.getElementById('veic-cor').value.trim(),
-    obs: document.getElementById('veic-obs').value.trim(),
-    criadoEm: new Date().toISOString()
-  };
+  if (!nome) return toastMsg('Informe o nome/descrição do veículo.', 'warning');
+  if (!placa) return toastMsg('Informe a placa do veículo.', 'warning');
 
-  if (id) {
-    const idx = _veiculosData.findIndex(v => v.id === id);
-    if (idx >= 0) { _veiculosData[idx] = { ..._veiculosData[idx], ...dados }; }
-    toastMsg('Veículo atualizado!', 'success');
-  } else {
-    dados.id = uid();
-    _veiculosData.push(dados);
-    toastMsg('Veículo cadastrado!', 'success');
+  const btnSalvar = document.getElementById('btn-salvar-veiculo');
+  if (btnSalvar) {
+    btnSalvar.disabled = true;
+    btnSalvar.textContent = '⏳ Salvando...';
   }
-  salvarVeiculosStorage();
-  limparFormVeiculo();
-  renderVeiculos();
-  popularSelectVeiculos('ev-veiculo');
-  if (document.getElementById('ev-sub-veiculos')?.style.display !== 'none') renderVeiculosSub();
+
+  try {
+    let pdfUrl = document.getElementById('veic-pdf-url').value;
+    let pdfNome = document.getElementById('veic-pdf-nome').value;
+
+    if (_tempVeiculoPdfFile) {
+      toastMsg('Enviando documento PDF...', 'info');
+      const urlEnviada = await uploadPdfParaStorage(_tempVeiculoPdfFile, id || uid());
+      if (urlEnviada) {
+        pdfUrl = urlEnviada;
+        pdfNome = _tempVeiculoPdfFile.name;
+      }
+    }
+
+    const valorRaw = parseFloat(document.getElementById('veic-valor').value);
+    const valorCompra = isNaN(valorRaw) ? 0 : valorRaw;
+
+    const dados = {
+      nome,
+      placa,
+      modelo: document.getElementById('veic-modelo').value.trim(),
+      cor: document.getElementById('veic-cor').value.trim(),
+      renavam: document.getElementById('veic-renavam').value.trim(),
+      notaFiscal: document.getElementById('veic-nota-fiscal').value.trim(),
+      resolucao: document.getElementById('veic-resolucao').value.trim(),
+      ficha: document.getElementById('veic-ficha').value.trim(),
+      fonte: document.getElementById('veic-fonte').value.trim(),
+      valorCompra,
+      setorAtual: document.getElementById('veic-setor-atual').value.trim(),
+      setorPertence: document.getElementById('veic-setor-pertence').value.trim(),
+      pdfUrl,
+      pdfNome,
+      obs: document.getElementById('veic-obs').value.trim(),
+      criadoEm: new Date().toISOString()
+    };
+
+    if (id) {
+      const idx = _veiculosData.findIndex(v => v.id === id);
+      if (idx >= 0) {
+        _veiculosData[idx] = { ..._veiculosData[idx], ...dados };
+      }
+      toastMsg('Veículo atualizado com sucesso!', 'success');
+    } else {
+      dados.id = uid();
+      _veiculosData.push(dados);
+      toastMsg('Veículo cadastrado com sucesso!', 'success');
+    }
+
+    await salvarVeiculosStorage();
+    limparFormVeiculo();
+    renderVeiculos();
+    popularSelectVeiculos('ev-veiculo');
+  } catch (err) {
+    console.error("Erro ao salvar veículo:", err);
+    toastMsg('Erro ao salvar veículo: ' + err.message, 'error');
+  } finally {
+    if (btnSalvar) {
+      btnSalvar.disabled = false;
+      btnSalvar.textContent = '💾 Salvar Veículo';
+    }
+  }
 }
 
 function editarVeiculo(id) {
   const v = _veiculosData.find(v => v.id === id);
   if (!v) return;
   document.getElementById('veic-id').value = v.id;
-  document.getElementById('veic-nome').value = v.nome;
+  document.getElementById('veic-nome').value = v.nome || '';
   document.getElementById('veic-placa').value = v.placa || '';
   document.getElementById('veic-modelo').value = v.modelo || '';
   document.getElementById('veic-cor').value = v.cor || '';
+  document.getElementById('veic-renavam').value = v.renavam || '';
+  document.getElementById('veic-nota-fiscal').value = v.notaFiscal || v.nota_fiscal || '';
+  document.getElementById('veic-resolucao').value = v.resolucao || '';
+  document.getElementById('veic-ficha').value = v.ficha || '';
+  document.getElementById('veic-fonte').value = v.fonte || '';
+  document.getElementById('veic-valor').value = v.valorCompra || '';
+  document.getElementById('veic-setor-atual').value = v.setorAtual || v.setor_atual || '';
+  document.getElementById('veic-setor-pertence').value = v.setorPertence || v.setor_pertence || '';
+  document.getElementById('veic-pdf-url').value = v.pdfUrl || v.pdf_url || '';
+  document.getElementById('veic-pdf-nome').value = v.pdfNome || v.pdf_nome || '';
   document.getElementById('veic-obs').value = v.obs || '';
-  document.getElementById('panel-veiculos').scrollIntoView({ behavior: 'smooth' });
+
+  _tempVeiculoPdfFile = null;
+  const statusArea = document.getElementById('veic-pdf-status-area');
+  const pdfUrl = v.pdfUrl || v.pdf_url;
+  if (pdfUrl && statusArea) {
+    const nameView = document.getElementById('veic-pdf-nome-view');
+    if (nameView) nameView.textContent = v.pdfNome || v.pdf_nome || 'Documento PDF Anexado';
+    statusArea.style.display = 'flex';
+  } else if (statusArea) {
+    statusArea.style.display = 'none';
+  }
+
+  const titleEl = document.getElementById('veic-form-title');
+  if (titleEl) titleEl.textContent = 'Editar Veículo';
+
+  const cardForm = document.getElementById('card-form-veiculo');
+  if (cardForm) cardForm.scrollIntoView({ behavior: 'smooth' });
 }
 
 async function excluirVeiculo(id) {
-  if (!confirm('Excluir este veículo permanentemente?')) return;
+  const v = _veiculosData.find(v => v.id === id);
+  const desc = v ? `${v.nome} (${v.placa || 'Sem placa'})` : 'este veículo';
+  if (!confirm(`Deseja realmente excluir permanentemente ${desc}?`)) return;
+
   _veiculosData = _veiculosData.filter(v => v.id !== id);
   salvarVeiculosStorage();
   await DB.deleteVeiculo(id);
   renderVeiculos();
   popularSelectVeiculos('ev-veiculo');
-  if (document.getElementById('ev-sub-veiculos')?.style.display !== 'none') renderVeiculosSub();
+  toastMsg('Veículo excluído com sucesso.', 'info');
 }
 
 function limparFormVeiculo() {
+  _tempVeiculoPdfFile = null;
   document.getElementById('veic-id').value = '';
   document.getElementById('veic-nome').value = '';
   document.getElementById('veic-placa').value = '';
   document.getElementById('veic-modelo').value = '';
   document.getElementById('veic-cor').value = '';
+  document.getElementById('veic-renavam').value = '';
+  document.getElementById('veic-nota-fiscal').value = '';
+  document.getElementById('veic-resolucao').value = '';
+  document.getElementById('veic-ficha').value = '';
+  document.getElementById('veic-fonte').value = '';
+  document.getElementById('veic-valor').value = '';
+  document.getElementById('veic-setor-atual').value = '';
+  document.getElementById('veic-setor-pertence').value = '';
+  document.getElementById('veic-pdf-url').value = '';
+  document.getElementById('veic-pdf-nome').value = '';
   document.getElementById('veic-obs').value = '';
+
+  const inputPdf = document.getElementById('veic-pdf-input');
+  if (inputPdf) inputPdf.value = '';
+
+  const statusArea = document.getElementById('veic-pdf-status-area');
+  if (statusArea) statusArea.style.display = 'none';
+
+  const titleEl = document.getElementById('veic-form-title');
+  if (titleEl) titleEl.textContent = 'Cadastrar Veículo';
 }
 
 function popularSelectVeiculos(selectId) {
@@ -636,4 +889,114 @@ function atualizarBadgeEventos() {
     badge.style.display = incompletos > 0 ? 'inline-flex' : 'none';
     badge.style.background = incompletos > 0 ? 'var(--danger)' : 'var(--accent)';
   }
+}
+
+// ===================== RELATÓRIO DE IMPRESSÃO DE FROTAS =====================
+function imprimirRelatorioFrota() {
+  const veiculos = DB.veiculos();
+  if (!veiculos || veiculos.length === 0) {
+    return toastMsg('Nenhum veículo cadastrado na frota para imprimir.', 'warning');
+  }
+
+  const cfg = DB.config();
+  const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
+  const subTitulo = cfg.subtituloSidebar || 'Gestão de RH & Logística de Frotas';
+  const dataHoje = new Date().toLocaleDateString('pt-BR');
+  const horaHoje = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+
+  const valorTotal = veiculos.reduce((acc, v) => acc + (parseFloat(v.valorCompra) || 0), 0);
+  const valorTotalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal);
+
+  const rowsHtml = veiculos.map((v, i) => {
+    const valorFmt = v.valorCompra ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v.valorCompra) : '-';
+    const nf = v.notaFiscal || v.nota_fiscal || '-';
+    const sAtual = v.setorAtual || v.setor_atual || '-';
+    const sPertence = v.setorPertence || v.setor_pertence || '-';
+
+    return `<tr>
+      <td style="text-align:center;">${i + 1}</td>
+      <td><strong>${esc(v.nome)}</strong><br><small style="color:#555;">Placa: ${esc(v.placa || '-')}</small></td>
+      <td>${esc(v.modelo || '-')} / ${esc(v.cor || '-')}</td>
+      <td>
+        <span style="color:#1d4ed8; font-weight:bold;">📍 Hoje:</span> ${esc(sAtual)}<br>
+        <span style="color:#7e22ce; font-weight:bold;">🏢 Origem:</span> ${esc(sPertence)}
+      </td>
+      <td>${esc(v.renavam || '-')}</td>
+      <td>${esc(nf)}</td>
+      <td>${esc(v.resolucao || '-')}</td>
+      <td>${esc(v.ficha || '-')} / ${esc(v.fonte || '-')}</td>
+      <td style="text-align:right; font-weight:bold; color:#047857;">${valorFmt}</td>
+      <td style="font-size:10px;">${esc(v.obs || '-')}</td>
+    </tr>`;
+  }).join('');
+
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Relatório Geral da Frota de Veículos</title>
+  <style>
+    body { font-family: 'Arial', sans-serif; font-size: 11px; color: #111; margin: 20px; }
+    .header { text-align: center; border-bottom: 2px solid #222; padding-bottom: 12px; margin-bottom: 15px; }
+    .header h1 { font-size: 18px; margin: 0 0 4px 0; text-transform: uppercase; color: #1e3a8a; }
+    .header h2 { font-size: 14px; margin: 0 0 6px 0; color: #4b5563; }
+    .header p { font-size: 11px; color: #6b7280; margin: 0; }
+    .kpi-bar { display: flex; justify-content: space-around; background: #f3f4f6; padding: 10px; border-radius: 6px; margin-bottom: 15px; border: 1px solid #e5e7eb; }
+    .kpi-item { text-align: center; }
+    .kpi-val { font-size: 16px; font-weight: bold; color: #111827; }
+    .kpi-lbl { font-size: 10px; color: #6b7280; text-transform: uppercase; }
+    table { width: 100%; border-collapse: collapse; margin-bottom: 20px; font-size: 10px; }
+    th { background: #1e293b; color: #fff; padding: 8px; text-align: left; font-size: 10px; text-transform: uppercase; border: 1px solid #0f172a; }
+    td { padding: 6px 8px; border: 1px solid #cbd5e1; vertical-align: top; }
+    tr:nth-child(even) { background: #f8fafc; }
+    .footer { margin-top: 30px; display: flex; justify-content: space-between; font-size: 10px; color: #6b7280; border-top: 1px solid #e2e8f0; padding-top: 8px; }
+    @media print {
+      body { margin: 0; }
+      .no-print { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="margin-bottom: 15px; text-align: right;">
+    <button onclick="window.print()" style="padding: 8px 16px; background: #2563eb; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">🖨️ Imprimir Agora</button>
+  </div>
+  <div class="header">
+    <h1>${esc(orgNome)}</h1>
+    <h2>Relatório Geral de Controle de Frotas e Veículos</h2>
+    <p>Gerado em: ${dataHoje} às ${horaHoje} · ${subTitulo}</p>
+  </div>
+
+  <div class="kpi-bar">
+    <div class="kpi-item"><div class="kpi-val">${veiculos.length}</div><div class="kpi-lbl">Total de Veículos na Frota</div></div>
+    <div class="kpi-item"><div class="kpi-val">${valorTotalFmt}</div><div class="kpi-lbl">Investimento Total na Frota</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:25px;">#</th>
+        <th>Veículo / Placa</th>
+        <th>Modelo / Cor</th>
+        <th>Setor Atual vs Origem</th>
+        <th>RENAVAM</th>
+        <th>Nota Fiscal</th>
+        <th>Resolução</th>
+        <th>Ficha / Fonte</th>
+        <th style="text-align:right;">Valor (R$)</th>
+        <th>Observações</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div>Atlas Saúde — Sistema de Gestão de RH e Frotas</div>
+    <div>Página 1 de 1</div>
+  </div>
+</body>
+</html>`);
+  win.document.close();
 }

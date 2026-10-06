@@ -4,6 +4,13 @@
 // ===================== SEGURANÇA E NAVEGAÇÃO =====================
 async function verificarSessao() {
   // Se for link de comprovante, renderiza direto sem login
+  const oficioParams = new URLSearchParams(window.location.search);
+  const oficioToken = oficioParams.get('oficio');
+  if (oficioToken) {
+    renderOficioPublico(oficioToken);
+    return;
+  }
+  
   const compParams = new URLSearchParams(window.location.search);
   const compToken = compParams.get('comp');
   if (compToken) {
@@ -52,7 +59,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-oficios', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);
