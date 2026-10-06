@@ -13,8 +13,8 @@ function limparFormGestor() {
 function popularSetoresGestor() {
   const container = document.getElementById('g-setores-check');
   if (!container) return;
-  const cfg = DB.config();
-  const setores = cfg.setores || [];
+  // Usa setores das Configurações + setores atrelados aos servidores automaticamente
+  const setores = (typeof getTodosSetores === 'function') ? getTodosSetores() : (DB.config().setores || []);
   if (!setores.length) {
     container.innerHTML = '<p style="color:var(--muted);font-size:.82rem">Nenhum setor cadastrado. Vá em Configurações para adicionar setores.</p>';
     return;
