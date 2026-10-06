@@ -26,13 +26,25 @@ function getImg(lado) {
   return localStorage.getItem('srv_img_' + lado);
 }
 
-function getAssinaturaCoordenador() {
+// Retorna o nome e o cargo do usuário logado (para assinaturas em documentos).
+// Gestor usa os dados do seu cadastro; admin também, se tiver cargo definido.
+function getAssinanteAtual() {
   const cfg = DB.config();
-  const nome = cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos';
+  const sessaoStr = sessionStorage.getItem('ferias_sessao');
+  const sessao = sessaoStr ? JSON.parse(sessaoStr) : {};
+  const genericos = ['Administrador', 'Usuário', 'Gestor', 'Servidor'];
+  const nomeSessao = (sessao.nome && !genericos.includes(sessao.nome)) ? sessao.nome : '';
+  const nome = nomeSessao || cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos';
+  const cargo = sessao.cargo || cfg.cargoCoordenador || 'Coordenador(a) da Atenção Primária à Saúde';
+  return { nome, cargo };
+}
+
+function getAssinaturaCoordenador() {
+  const a = getAssinanteAtual();
   return '<div style="margin-top:50px;page-break-inside:avoid;text-align:center">' +
     '<div style="border-top:1.5px solid #000;width:300px;margin:0 auto 8px"></div>' +
-    '<div style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">' + esc(nome) + '</div>' +
-    '<div style="font-size:9px;color:#444;font-weight:600">Coordenador da Atenção Primária à Saúde</div>' +
+    '<div style="font-weight:700;font-size:11px;text-transform:uppercase;letter-spacing:0.5px">' + esc(a.nome) + '</div>' +
+    '<div style="font-size:9px;color:#444;font-weight:600">' + esc(a.cargo) + '</div>' +
   '</div>';
 }
 

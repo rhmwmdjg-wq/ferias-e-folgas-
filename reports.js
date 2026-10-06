@@ -42,7 +42,9 @@ function imprimirListaPresenca() {
   const cfg = DB.config();
   const imgPrint = getImg('print') || getImg('esq');
   const orgNome = cfg.nomeOrganizacao || 'Coordenação da Atenção Primária à Saúde';
-  const coordenador = cfg.coordenadorAPS || 'Coordenador(a) da Atenção Primária';
+  const _ass = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : { nome: cfg.coordenadorAPS || 'Coordenador(a) da Atenção Primária', cargo: 'Coordenador(a) da Atenção Primária' };
+  const coordenador = _ass.nome;
+  const coordenadorCargo = _ass.cargo;
   const dataEmissao = new Date().toLocaleDateString('pt-BR');
   const setoresHtml = Object.keys(porSetor).sort((a, b) => a.localeCompare(b)).map((setor, idx) => {
     const linhas = porSetor[setor].map((srv, i) => `
@@ -73,7 +75,7 @@ function imprimirListaPresenca() {
         </table>
         <div class="signatures">
           <div class="sig"><div class="line"></div><div class="label">Gerente da Unidade</div></div>
-          <div class="sig"><div class="line"></div><div class="label">${esc(coordenador)}</div><div class="role">Coordenador da Atenção Primária</div></div>
+          <div class="sig"><div class="line"></div><div class="label">${esc(coordenador)}</div><div class="role">${esc(coordenadorCargo)}</div></div>
         </div>
       </section>
     `;
@@ -976,7 +978,7 @@ function imprimirRelatorioIndividual(srvId, tipo) {
       </div>
       <div class="sig-area">
         <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div class="sig-sub">Servidor(a) - Mat. ${srv.matricula}</div></div>
-        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(DB.config().coordenadorAPS || 'Ruan Pablo Ferreira dos Santos')}</div><div class="sig-sub">Coordenador da Atenção Primária à Saúde</div></div>
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(getAssinanteAtual().nome)}</div><div class="sig-sub">${esc(getAssinanteAtual().cargo)}</div></div>
       </div>
       <div class="footer-print">
         <span>© ${hoje.getFullYear()} - COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE</span>
@@ -1070,7 +1072,7 @@ function imprimirComprovanteFolga(folgaId) {
 
         <div class="sig-area">
           <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${srv.nome}</div><div style="font-size: 9px;">Assinatura do Servidor</div></div>
-          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(DB.config().coordenadorAPS || 'Ruan Pablo Ferreira dos Santos')}</div><div style="font-size: 9px;">Coordenador da Atenção Primária à Saúde</div></div>
+          <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(getAssinanteAtual().nome)}</div><div style="font-size: 9px;">${esc(getAssinanteAtual().cargo)}</div></div>
         </div>
         
         <div style="text-align: center; margin-top: 50px; font-size: 9px; color: #444; border-top: 1px solid #eee; padding-top: 10px;">
@@ -1222,8 +1224,8 @@ function imprimirRelatorioBancoHoras() {
         <div style="display:flex;justify-content:space-between;gap:40px">
           <div style="flex:1;text-align:center">
             <div style="border-top:1.2px solid #000;margin-bottom:8px;"></div>
-            <div style="font-weight:700;font-size:10px;text-transform:uppercase">${DB.config().coordenadorAPS || 'Responsável pelo Controle'}</div>
-            <div style="font-size:9px;color:#444;font-weight:600">Coordenador(a) da APS</div>
+            <div style="font-weight:700;font-size:10px;text-transform:uppercase">${esc(getAssinanteAtual().nome)}</div>
+            <div style="font-size:9px;color:#444;font-weight:600">${esc(getAssinanteAtual().cargo)}</div>
           </div>
           <div style="flex:1;text-align:center">
             <div style="border-top:1.2px solid #000;margin-bottom:8px;"></div>
@@ -1374,7 +1376,7 @@ function imprimirRelatorioBancoHorasGeral() {
         <strong>DECLARAÇÃO:</strong> Declaro que as informações acima são extratos fiéis dos registros constantes no sistema de gestão de banco de horas.
       </div>
       <div class="sig-area">
-        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${DB.config().coordenadorAPS || 'Responsável pelo Controle'}</div><div class="sig-sub">Coordenador(a) da APS</div></div>
+        <div class="sig-box"><div class="sig-line"></div><div class="sig-label">${esc(getAssinanteAtual().nome)}</div><div class="sig-sub">${esc(getAssinanteAtual().cargo)}</div></div>
         <div class="sig-box">
           <div class="sig-line"></div>
           <div class="sig-label">Entregue ao RH em</div>
@@ -2053,7 +2055,7 @@ function imprimirFormularioFeriasEmBranco() {
 
     '<div class="sig-area">' +
     '<div class="sig-box"><div class="sig-line"></div><div class="sig-nome">Assinatura do Servidor</div><div class="sig-cargo">Data: ___/___/______</div></div>' +
-    '<div class="sig-box"><div class="sig-line"></div><div class="sig-nome">' + esc(cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos') + '</div><div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div></div>' +
+    '<div class="sig-box"><div class="sig-line"></div><div class="sig-nome">' + esc(getAssinanteAtual().nome) + '</div><div class="sig-cargo">' + esc(getAssinanteAtual().cargo) + '</div></div>' +
     '</div>' +
 
     '<script>window.onload=function(){window.print();}<\/script>' +
@@ -2170,8 +2172,8 @@ function imprimirPlanilhaProgramacao() {
   html += '</tbody></table>' +
     '<div class="sig-area">' +
     '<div class="sig-line"></div>' +
-    '<div class="sig-nome">' + esc(cfg.coordenadorAPS || 'Ruan Pablo Ferreira dos Santos') + '</div>' +
-    '<div class="sig-cargo">Coordenador da Atenção Primária à Saúde</div>' +
+    '<div class="sig-nome">' + esc(getAssinanteAtual().nome) + '</div>' +
+    '<div class="sig-cargo">' + esc(getAssinanteAtual().cargo) + '</div>' +
     '</div>' +
     '<script>window.onload=function(){window.print();}<\/script>' +
     '</body></html>';

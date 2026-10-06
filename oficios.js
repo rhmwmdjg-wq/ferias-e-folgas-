@@ -74,7 +74,7 @@ function carregarNovoOficio() {
   const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
   const cfg = DB.config();
   document.getElementById('ofi-emissor-nome').value = sessao.nome || cfg.coordenadorAPS || 'Coordenação APS';
-  document.getElementById('ofi-emissor-cargo').value = sessao.role === 'admin' ? 'Administrador do Sistema' : (cfg.subtituloSidebar || 'Coordenação da Atenção Primária à Saúde');
+  document.getElementById('ofi-emissor-cargo').value = sessao.cargo || (sessao.role === 'admin' ? 'Administrador do Sistema' : (cfg.subtituloSidebar || 'Coordenador(a) da Atenção Primária à Saúde'));
   const emissorSel = document.getElementById('ofi-emissor-select');
   if (emissorSel) emissorSel.value = '';
 

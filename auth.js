@@ -239,6 +239,7 @@ async function tentarLogin() {
           id: adminNoSupabase.id,
           usuario: adminNoSupabase.usuario,
           nome: adminNoSupabase.nome || 'Administrador',
+          cargo: adminNoSupabase.cargo || '',
           role: 'admin',
           loginAt: new Date().toISOString()
         }));
@@ -321,6 +322,7 @@ async function tentarLogin() {
         id: matchGest.id,
         usuario: matchGest.usuario, 
         nome: matchGest.nome, 
+        cargo: matchGest.cargo || '',
         role: 'gestor',
         setores: matchGest.setores || [],
         modulos: matchGest.modulos || [],

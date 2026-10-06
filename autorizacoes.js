@@ -167,7 +167,8 @@ async function gerarAutorizacaoFerias() {
     obs,
     textoAutorizacao,
     tipoParc,
-    coordenador: cfg.coordenadorAPS || '',
+    coordenador: (typeof getAssinanteAtual === 'function' ? getAssinanteAtual().nome : cfg.coordenadorAPS) || '',
+    coordenadorCargo: (typeof getAssinanteAtual === 'function' ? getAssinanteAtual().cargo : '') || '',
     dataEmissao: new Date().toISOString()
   });
 
@@ -180,7 +181,7 @@ async function gerarAutorizacaoFerias() {
         if (p.inicio === per.inicio && p.fim === per.fim) {
           p.autorizado = true;
           p.autorizadoEm = new Date().toISOString();
-          p.autorizadoPor = cfg.coordenadorAPS || 'Coordenador';
+          p.autorizadoPor = (typeof getAssinanteAtual === 'function' ? getAssinanteAtual().nome : cfg.coordenadorAPS) || 'Coordenador';
           alterou = true;
         }
       });

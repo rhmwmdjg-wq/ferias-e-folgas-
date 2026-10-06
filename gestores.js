@@ -34,6 +34,8 @@ function limparFormGestor() {
   document.getElementById('g-nome').value = '';
   document.getElementById('g-usuario').value = '';
   document.getElementById('g-senha').value = '';
+  const cargoEl = document.getElementById('g-cargo');
+  if (cargoEl) cargoEl.value = '';
   document.getElementById('g-form-title').textContent = 'Novo Gestor';
   popularSetoresGestor();
   popularModulosGestor();
@@ -89,6 +91,7 @@ async function salvarGestor() {
   const nome = document.getElementById('g-nome').value.trim();
   const usuario = document.getElementById('g-usuario').value.trim();
   const senha = document.getElementById('g-senha').value;
+  const cargo = (document.getElementById('g-cargo')?.value || '').trim();
   if (!nome || !usuario || !senha) {
     toastMsg('Preencha nome, usuário e senha.', 'error'); return;
   }
@@ -109,13 +112,13 @@ async function salvarGestor() {
       if (lista[idx].usuario !== usuario && lista.some(function(g) { return g.usuario === usuario && g.id !== editId; })) {
         toastMsg('Usuário de login já existe.', 'error'); return;
       }
-      lista[idx] = { id: editId, nome: nome, usuario: usuario, senha: senha, setores: setores, modulos: modulos };
+      lista[idx] = Object.assign({}, lista[idx], { id: editId, nome: nome, usuario: usuario, senha: senha, cargo: cargo, setores: setores, modulos: modulos });
     }
   } else {
     if (lista.some(function(g) { return g.usuario === usuario; })) {
       toastMsg('Usuário de login já existe.', 'error'); return;
     }
-    lista.push({ id: uid(12), nome: nome, usuario: usuario, senha: senha, setores: setores, modulos: modulos });
+    lista.push({ id: uid(12), nome: nome, usuario: usuario, senha: senha, cargo: cargo, setores: setores, modulos: modulos });
   }
   await DB.saveGestores(lista);
   limparFormGestor();
@@ -130,6 +133,8 @@ function editarGestor(id) {
   document.getElementById('g-nome').value = g.nome;
   document.getElementById('g-usuario').value = g.usuario;
   document.getElementById('g-senha').value = g.senha;
+  const cargoEl = document.getElementById('g-cargo');
+  if (cargoEl) cargoEl.value = g.cargo || '';
   document.getElementById('g-form-title').textContent = '✏️ Editando Gestor';
   popularSetoresGestor();
   popularModulosGestor();
@@ -159,6 +164,6 @@ function renderGestores() {
     const modsHtml = mods.length >= MODULOS_SISTEMA.length
       ? '<span class="tag tag-green" title="Todos os módulos">Todos</span>'
       : (mods.map(function(m) { return '<span class="tag tag-purple" style="margin:2px">' + esc(labelModulo(m)) + '</span>'; }).join(' ') || '-');
-    return '<tr><td><strong>' + esc(g.nome) + '</strong></td><td>' + esc(g.usuario) + '</td><td>' + setoresHtml + '</td><td>' + modsHtml + '</td><td><button class="btn btn-ghost btn-sm" onclick="editarGestor(\'' + g.id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarGestor(\'' + g.id + '\')">🗑️</button></td></tr>';
+    return '<tr><td><strong>' + esc(g.nome) + '</strong>' + (g.cargo ? '<div style="font-size:.72rem;color:var(--muted)">' + esc(g.cargo) + '</div>' : '') + '</td><td>' + esc(g.usuario) + '</td><td>' + setoresHtml + '</td><td>' + modsHtml + '</td><td><button class="btn btn-ghost btn-sm" onclick="editarGestor(\'' + g.id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarGestor(\'' + g.id + '\')">🗑️</button></td></tr>';
   }).join('');
 }

@@ -2433,6 +2433,11 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <div class="field"><label>Usuário de Login *</label><input id="g-usuario" type="text" placeholder="Ex: gestoraps"></div>
       <div class="field"><label>Senha *</label><input id="g-senha" type="password" placeholder="••••••••"></div>
     </div>
+
+    <div class="field" style="margin-top:10px">
+      <label>Cargo do Gestor (usado nas impressões e autorizações)</label>
+      <input id="g-cargo" type="text" placeholder="Ex: Coordenador(a) da Atenção Primária à Saúde">
+    </div>
     
     <div class="field" style="margin-top:14px">
       <label>Setores sob Gerenciamento (Selecione um ou mais) *</label>
@@ -6437,7 +6442,9 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
   const hoje = new Date();
   const cfg = DB.config();
   const imgPrint = getImg('print');
-  const coordNome = cfg.coordenadorAPS || '';
+  const assinante = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : { nome: cfg.coordenadorAPS || '', cargo: 'Coordenador(a) da Atenção Primária à Saúde' };
+  const coordNome = assinante.nome || '';
+  const coordCargo = assinante.cargo || 'Coordenador(a) da Atenção Primária à Saúde';
 
   const tipoFerLabel = tipoFerias === 'premio' ? 'Férias Prêmio' : 'Férias Regulamentares';
 
@@ -6595,7 +6602,7 @@ function imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, tex
           <div class="sig-box">
             <div class="sig-line"></div>
             <div class="sig-label" style="text-transform: uppercase;">${coordNome}</div>
-            <div class="sig-sub">COORDENAÇÃO DA ATENÇÃO PRIMÁRIA À SAÚDE</div>
+            <div class="sig-sub">${coordCargo}</div>
           </div>` : ''}
         </div>
 
