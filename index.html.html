@@ -3589,7 +3589,7 @@ Coordenação de RH
       <div class="form-row cols-2">
         <div class="field">
           <label>Modelo / Marca</label>
-          <input id="veic-modelo" placeholder="Ex: Fiat Ducato / Toyota Hilux">
+          <input id="veic-modelo" list="datalist-veic-modelo" placeholder="Digite p/ pesquisar... Ex: Fiat Ducato / Honda CG 160" autocomplete="off">
         </div>
         <div class="field">
           <label>Cor</label>
@@ -3696,6 +3696,9 @@ Coordenação de RH
       </div>
     </div>
   </div>
+
+  <!-- Lista pré-cadastrada de modelos de veículos (pesquisável nos campos de modelo) -->
+  <datalist id="datalist-veic-modelo"></datalist>
 </div>
 
 <!-- ======================= ABA EVENTOS ======================= -->
@@ -3816,7 +3819,7 @@ Coordenação de RH
           <div class="field"><label>Placa</label><input id="ev-veic-placa" placeholder="ABC-1234"></div>
         </div>
         <div class="form-row cols-2">
-          <div class="field"><label>Modelo</label><input id="ev-veic-modelo" placeholder="Ex: Fiat Uno"></div>
+          <div class="field"><label>Modelo</label><input id="ev-veic-modelo" list="datalist-veic-modelo" placeholder="Digite para pesquisar... Ex: Fiat Uno" autocomplete="off"></div>
           <div class="field"><label>Cor</label><input id="ev-veic-cor" placeholder="Branco"></div>
         </div>
         <div class="field" style="margin-bottom:14px">
