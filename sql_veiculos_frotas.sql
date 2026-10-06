@@ -18,6 +18,7 @@ CREATE TABLE IF NOT EXISTS veiculos (
   "valorCompra" NUMERIC DEFAULT 0,
   "setorAtual"   TEXT,
   "setorPertence" TEXT,
+  sucata        BOOLEAN DEFAULT false,
   "pdfUrl"      TEXT,
   "pdfNome"     TEXT,
   obs           TEXT,
@@ -33,6 +34,7 @@ ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS fonte TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "valorCompra" NUMERIC DEFAULT 0;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "setorAtual" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "setorPertence" TEXT;
+ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS sucata BOOLEAN DEFAULT false;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "pdfUrl" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "pdfNome" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "criadoEm" TEXT;

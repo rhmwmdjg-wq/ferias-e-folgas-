@@ -135,16 +135,19 @@ function renderVeiculos() {
   const valorTotal = _veiculosData.reduce((acc, v) => acc + (parseFloat(v.valorCompra) || 0), 0);
   const totalPdfs = _veiculosData.filter(v => v.pdfUrl || v.pdf_url).length;
   const fontesUnicas = new Set(_veiculosData.map(v => (v.fonte || '').trim().toUpperCase()).filter(Boolean)).size;
+  const totalSucatas = _veiculosData.filter(v => v.sucata === true).length;
 
   const kpiTotal = document.getElementById('kpi-total-veiculos');
   const kpiValor = document.getElementById('kpi-valor-total-frota');
   const kpiPdfs = document.getElementById('kpi-veiculos-com-pdf');
   const kpiFontes = document.getElementById('kpi-veiculos-fontes');
+  const kpiSucata = document.getElementById('kpi-veiculos-sucata');
 
   if (kpiTotal) kpiTotal.textContent = totalVeiculos;
   if (kpiValor) kpiValor.textContent = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal);
   if (kpiPdfs) kpiPdfs.textContent = totalPdfs;
   if (kpiFontes) kpiFontes.textContent = fontesUnicas;
+  if (kpiSucata) kpiSucata.textContent = totalSucatas;
 
   // Filtragem
   const busca = (document.getElementById('veic-busca')?.value || '').toLowerCase().trim();
@@ -159,7 +162,8 @@ function renderVeiculos() {
       (v.notaFiscal || v.nota_fiscal || '').toLowerCase().includes(busca) ||
       (v.resolucao || '').toLowerCase().includes(busca) ||
       (v.fonte || '').toLowerCase().includes(busca) ||
-      (v.ficha || '').toLowerCase().includes(busca)
+      (v.ficha || '').toLowerCase().includes(busca) ||
+      (v.sucata ? 'sucata baixado' : '').includes(busca)
     );
   }
 
@@ -175,12 +179,14 @@ function renderVeiculos() {
     const nf = v.notaFiscal || v.nota_fiscal;
     const setorAtual = v.setorAtual || v.setor_atual || '-';
     const setorPertence = v.setorPertence || v.setor_pertence || '-';
+    const isSucata = v.sucata === true;
 
-    return `<div class="ev-list-item completo" style="margin-bottom:12px">
+    return `<div class="ev-list-item completo" style="margin-bottom:12px${isSucata ? ';opacity:0.85;border-left:4px solid var(--danger)' : ''}">
       <div class="ev-list-header">
         <div style="flex:1; min-width:0;">
           <div class="ev-list-nome" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span>🚗 ${esc(v.nome)}</span>
+            <span style="${isSucata ? 'text-decoration:line-through' : ''}">🚗 ${esc(v.nome)}</span>
+            ${isSucata ? '<span class="tag tag-red">🗑️ SUCATA</span>' : ''}
             ${v.placa ? `<span class="tag tag-blue">${esc(v.placa)}</span>` : ''}
             ${valorFmt ? `<span class="tag tag-green">💰 ${valorFmt}</span>` : ''}
           </div>
@@ -250,6 +256,7 @@ async function salvarVeiculo() {
       valorCompra,
       setorAtual: document.getElementById('veic-setor-atual').value.trim(),
       setorPertence: document.getElementById('veic-setor-pertence').value.trim(),
+      sucata: document.getElementById('veic-sucata')?.checked === true,
       pdfUrl,
       pdfNome,
       obs: document.getElementById('veic-obs').value.trim(),
@@ -299,6 +306,8 @@ function editarVeiculo(id) {
   document.getElementById('veic-valor').value = v.valorCompra || '';
   document.getElementById('veic-setor-atual').value = v.setorAtual || v.setor_atual || '';
   document.getElementById('veic-setor-pertence').value = v.setorPertence || v.setor_pertence || '';
+  const sucataEl = document.getElementById('veic-sucata');
+  if (sucataEl) sucataEl.checked = v.sucata === true;
   document.getElementById('veic-pdf-url').value = v.pdfUrl || v.pdf_url || '';
   document.getElementById('veic-pdf-nome').value = v.pdfNome || v.pdf_nome || '';
   document.getElementById('veic-obs').value = v.obs || '';
@@ -349,6 +358,8 @@ function limparFormVeiculo() {
   document.getElementById('veic-valor').value = '';
   document.getElementById('veic-setor-atual').value = '';
   document.getElementById('veic-setor-pertence').value = '';
+  const sucataEl = document.getElementById('veic-sucata');
+  if (sucataEl) sucataEl.checked = false;
   document.getElementById('veic-pdf-url').value = '';
   document.getElementById('veic-pdf-nome').value = '';
   document.getElementById('veic-obs').value = '';
@@ -385,10 +396,10 @@ function renderVeiculosNoContainer(container) {
     return;
   }
   container.innerHTML = _veiculosData.map(v => `
-    <div class="ev-list-item completo" style="cursor:default">
+    <div class="ev-list-item completo" style="cursor:default${v.sucata === true ? ';opacity:0.85;border-left:4px solid var(--danger)' : ''}">
       <div class="ev-list-header">
         <div>
-          <div class="ev-list-nome">🚗 ${esc(v.nome)}</div>
+          <div class="ev-list-nome">🚗 ${esc(v.nome)} ${v.sucata === true ? '<span class="tag tag-red">🗑️ SUCATA</span>' : ''}</div>
           <div class="ev-list-meta">${esc(v.placa||'-')} · ${esc(v.modelo||'-')} · ${esc(v.cor||'-')}</div>
         </div>
         <div class="ev-list-actions">
@@ -408,6 +419,7 @@ function salvarVeiculoEv() {
     placa: document.getElementById('ev-veic-placa').value.trim(),
     modelo: document.getElementById('ev-veic-modelo').value.trim(),
     cor: document.getElementById('ev-veic-cor').value.trim(),
+    sucata: document.getElementById('ev-veic-sucata')?.checked === true,
     obs: document.getElementById('ev-veic-obs').value.trim(),
     criadoEm: new Date().toISOString()
   };
@@ -433,6 +445,8 @@ function limparFormVeiculoEv() {
   document.getElementById('ev-veic-placa').value = '';
   document.getElementById('ev-veic-modelo').value = '';
   document.getElementById('ev-veic-cor').value = '';
+  const sucataEl = document.getElementById('ev-veic-sucata');
+  if (sucataEl) sucataEl.checked = false;
   document.getElementById('ev-veic-obs').value = '';
 }
 
@@ -906,6 +920,7 @@ function imprimirRelatorioFrota() {
 
   const valorTotal = veiculos.reduce((acc, v) => acc + (parseFloat(v.valorCompra) || 0), 0);
   const valorTotalFmt = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valorTotal);
+  const totalSucatas = veiculos.filter(v => v.sucata === true).length;
 
   const rowsHtml = veiculos.map((v, i) => {
     const valorFmt = v.valorCompra ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v.valorCompra) : '-';
@@ -926,6 +941,7 @@ function imprimirRelatorioFrota() {
       <td>${esc(v.resolucao || '-')}</td>
       <td>${esc(v.ficha || '-')} / ${esc(v.fonte || '-')}</td>
       <td style="text-align:right; font-weight:bold; color:#047857;">${valorFmt}</td>
+      <td style="text-align:center; font-weight:bold; color:${v.sucata === true ? '#b91c1c' : '#047857'};">${v.sucata === true ? 'SUCATA' : 'Em uso'}</td>
       <td style="font-size:10px;">${esc(v.obs || '-')}</td>
     </tr>`;
   }).join('');
@@ -970,6 +986,7 @@ function imprimirRelatorioFrota() {
   <div class="kpi-bar">
     <div class="kpi-item"><div class="kpi-val">${veiculos.length}</div><div class="kpi-lbl">Total de Veículos na Frota</div></div>
     <div class="kpi-item"><div class="kpi-val">${valorTotalFmt}</div><div class="kpi-lbl">Investimento Total na Frota</div></div>
+    <div class="kpi-item"><div class="kpi-val" style="color:#b91c1c">${totalSucatas}</div><div class="kpi-lbl">Sucatas / Baixados</div></div>
   </div>
 
   <table>
@@ -984,6 +1001,7 @@ function imprimirRelatorioFrota() {
         <th>Resolução</th>
         <th>Ficha / Fonte</th>
         <th style="text-align:right;">Valor (R$)</th>
+        <th>Situação</th>
         <th>Observações</th>
       </tr>
     </thead>

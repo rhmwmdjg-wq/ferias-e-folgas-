@@ -410,18 +410,24 @@ const DB = {
       const { error } = await supabaseClient.from('veiculos').upsert(d, { onConflict: 'id' });
       if (error) {
         console.warn("⚠️ Erro upsert veiculos:", error.message);
-        if (isQuotaError(error)) {
-          saveToSyncQueue('veiculos', d);
-        } else {
-          for (const item of d) {
-            try {
-              const { error: errInd } = await supabaseClient.from('veiculos').upsert(item, { onConflict: 'id' });
-              if (errInd && isQuotaError(errInd)) saveToSyncQueue('veiculos', item);
-            } catch (eInd) {
-              if (isQuotaError(eInd)) saveToSyncQueue('veiculos', item);
-            }
+      if (isQuotaError(error)) {
+        saveToSyncQueue('veiculos', d);
+      } else if ((error.message || '').toLowerCase().includes('sucata')) {
+        // Coluna "sucata" ainda não existe na nuvem: salva sem ela
+        console.warn("Coluna 'sucata' ausente em veiculos. Salvando em modo compatível.");
+        const safe = d.map(v => { const c = { ...v }; delete c.sucata; return c; });
+        const { error: errSafe } = await supabaseClient.from('veiculos').upsert(safe, { onConflict: 'id' });
+        if (errSafe && !isQuotaError(errSafe)) console.warn("Aviso ao salvar veículos (modo compatível):", errSafe.message);
+      } else {
+        for (const item of d) {
+          try {
+            const { error: errInd } = await supabaseClient.from('veiculos').upsert(item, { onConflict: 'id' });
+            if (errInd && isQuotaError(errInd)) saveToSyncQueue('veiculos', item);
+          } catch (eInd) {
+            if (isQuotaError(eInd)) saveToSyncQueue('veiculos', item);
           }
         }
+      }
       }
     } catch (e) {
       if (isQuotaError(e)) {

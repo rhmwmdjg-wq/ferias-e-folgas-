@@ -3561,6 +3561,10 @@ Coordenação de RH
       <div class="val" id="kpi-veiculos-fontes">0</div>
       <div class="lbl">Fontes de Recurso</div>
     </div>
+    <div class="stat">
+      <div class="val" id="kpi-veiculos-sucata" style="color:var(--danger)">0</div>
+      <div class="lbl">Sucatas / Baixados</div>
+    </div>
   </div>
 
   <div class="ev-grid">
@@ -3635,6 +3639,14 @@ Coordenação de RH
           <label>Setor de Origem (Pertence de fato)</label>
           <input id="veic-setor-pertence" placeholder="Ex: Coordenação APS / Secretaria de Saúde">
         </div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px">
+        <label>Situação do Veículo</label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:10px 12px;">
+          <input type="checkbox" id="veic-sucata" style="width:auto;margin:0">
+          <span>🗑️ Marcar como <strong>SUCATA</strong> (veículo baixado / fora de operação)</span>
+        </label>
       </div>
 
       <div class="field" style="margin-bottom:16px">
@@ -3806,6 +3818,11 @@ Coordenação de RH
         <div class="form-row cols-2">
           <div class="field"><label>Modelo</label><input id="ev-veic-modelo" placeholder="Ex: Fiat Uno"></div>
           <div class="field"><label>Cor</label><input id="ev-veic-cor" placeholder="Branco"></div>
+        </div>
+        <div class="field" style="margin-bottom:14px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="ev-veic-sucata" style="width:auto;margin:0"> 🗑️ Veículo é SUCATA / baixado
+          </label>
         </div>
         <div class="field" style="margin-bottom:14px">
           <label>Observação</label>
