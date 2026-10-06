@@ -5,7 +5,8 @@ let autTipoPeriodo = 0;
 
 function abrirModalAutorizacao(srvId, inicio, fim, tipo, periodo) {
   autTipoPeriodo = 0;
-  const srvs = DB.servidores();
+  // Somente servidores dos setores habilitados para o gestor (admin vê todos)
+  const srvs = (typeof getServidoresAcessiveis === 'function') ? getServidoresAcessiveis() : DB.servidores();
   const sel = document.getElementById('aut-servidor');
   sel.innerHTML = '<option value="">Selecione o servidor...</option>' +
     srvs.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
