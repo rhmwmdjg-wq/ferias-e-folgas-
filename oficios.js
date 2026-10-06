@@ -721,4 +721,17 @@ async function carregarDadosOficiosPublico() {
     const { data: emi } = await supabaseClient.from('emissores').select('*');
     if (Array.isArray(emi)) _remoteData.emissores = emi;
   } catch (e) { console.warn('Modo público de ofícios: falha ao carregar emissores.', e); }
+  try {
+    const { data: cfgRows } = await supabaseClient.from('configuracoes').select('chave,valor');
+    if (Array.isArray(cfgRows)) {
+      const cfgObj = { ...(_remoteData.config || {}) };
+      cfgRows.forEach(item => {
+        if (item && item.chave && item.chave.startsWith('img_') &&
+            typeof item.valor === 'string' && (item.valor.startsWith('http') || item.valor.startsWith('data:image'))) {
+          cfgObj[item.chave] = item.valor;
+        }
+      });
+      _remoteData.config = cfgObj;
+    }
+  } catch (e) { console.warn('Modo público de ofícios: falha ao carregar logos.', e); }
 }

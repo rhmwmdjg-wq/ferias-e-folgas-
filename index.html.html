@@ -5284,8 +5284,15 @@ async function syncComSupabase(silencioso = false) {
   await syncTabela('configuracoes', 'chave,valor', (data) => {
     const localCfg = JSON.parse(localStorage.getItem('srv_config') || '{}');
     const configObj = { ...localCfg };
+    const imgCloud = {};
     data.forEach(item => {
-      if (!item.chave.startsWith('img_') && !(item.chave in localCfg)) {
+      if (!item || !item.chave) return;
+      if (item.chave.startsWith('img_')) {
+        const v = item.valor;
+        if (typeof v === 'string' && (v.startsWith('http') || v.startsWith('data:image'))) imgCloud[item.chave] = v;
+        return;
+      }
+      if (!(item.chave in localCfg)) {
         let val = item.valor;
         if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
           try {
@@ -5297,8 +5304,11 @@ async function syncComSupabase(silencioso = false) {
         configObj[item.chave] = val;
       }
     });
-    _remoteData.config = configObj;
-    localStorage.setItem('srv_config', JSON.stringify(configObj));
+    _remoteData.config = { ...configObj, ...imgCloud };
+    // Não persistir base64 no localStorage (economia de espaço); apenas URLs públicas.
+    const persist = { ...configObj };
+    Object.keys(persist).forEach(k => { if (k.startsWith('img_') && String(persist[k]).startsWith('data:')) delete persist[k]; });
+    localStorage.setItem('srv_config', JSON.stringify(persist));
   });
     
   if (erros > 0 && sucessos === 0) {
@@ -5357,9 +5367,9 @@ function aplicarConfiguracoesSalvas() {
   // 2. Aplicar Logos (do localStorage, NÃO do Supabase para economizar egress)
   const logos = ['esq', 'dir', 'side', 'login', 'print'];
   logos.forEach(lado => {
-    // Usar localStorage ao invés de carregar do Supabase
-    const base64 = localStorage.getItem('srv_img_' + lado);
-    if (base64) aplicarImagemHeader(lado, base64);
+    // getImg usa a URL pública da nuvem (se houver) ou a imagem local
+    const img = getImg(lado);
+    if (img) aplicarImagemHeader(lado, img);
   });
 
   // 3. Aplicar Textos de Branding (Sidebar)

@@ -85,6 +85,58 @@ async function uploadImagemParaStorage(base64, matricula) {
   }
 }
 
+// Redimensiona mantendo a proporção (sem recorte), ideal para logos/brasões.
+function redimensionarLogo(base64, maxSize = 400) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onerror = () => reject(new Error("Erro ao carregar imagem."));
+    img.onload = () => {
+      try {
+        let w = img.width, h = img.height;
+        const escala = Math.min(1, maxSize / Math.max(w, h));
+        w = Math.max(1, Math.round(w * escala));
+        h = Math.max(1, Math.round(h * escala));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/png'));
+      } catch (e) { reject(e); }
+    };
+    img.src = base64;
+  });
+}
+
+// Publica o logo no Supabase Storage e retorna a URL pública.
+async function uploadLogoParaStorage(base64, lado) {
+  try {
+    const resized = await redimensionarLogo(base64, 400);
+    const blob = base64ToBlob(resized);
+    const filePath = `logos/logo_${lado}_${Date.now()}.png`;
+    let bucketName = 'FOTOS';
+    let { error } = await supabaseClient.storage
+      .from(bucketName)
+      .upload(filePath, blob, { contentType: 'image/png', upsert: true });
+    if (error && (error.message?.includes('not found') || error.status === 404)) {
+      bucketName = 'fotos';
+      const retry = await supabaseClient.storage
+        .from(bucketName)
+        .upload(filePath, blob, { contentType: 'image/png', upsert: true });
+      error = retry.error;
+    }
+    if (error) {
+      console.warn('Falha ao publicar logo no Storage:', error.message || error);
+      return null;
+    }
+    const { data: { publicUrl } } = supabaseClient.storage.from(bucketName).getPublicUrl(filePath);
+    return publicUrl;
+  } catch (e) {
+    console.warn('Erro ao processar/publicar logo:', e);
+    return null;
+  }
+}
+
 async function migrarFotosLegado() {
   const servidores = _remoteData.servidores.filter(s => s.foto && s.foto.startsWith('data:image'));
   if (servidores.length === 0) return;
@@ -278,15 +330,28 @@ function carregarImagem(lado, input) {
   reader.onload = async (e) => {
     const base64 = e.target.result;
     localStorage.setItem('srv_img_' + lado, base64);
-    
-    // Salvar apenas referência no Supabase, não a imagem inteira
-    // Armazenar só que a imagem existe e foi modificada
-    await supabaseClient.from('configuracoes').upsert({ chave: 'img_' + lado, valor: 'stored_locally' });
     _remoteData.config['img_' + lado] = base64;
-
     aplicarImagemHeader(lado, base64);
+
     const nomes = { esq: 'esquerda', dir: 'direita', print: 'de impressão', side: 'lateral', login: 'de login' };
-    toastMsg('Imagem ' + (nomes[lado] || lado) + ' salva!');
+    toastMsg('Imagem ' + (nomes[lado] || lado) + ' salva! Publicando na nuvem...', 'info');
+
+    // Publicar no Storage para ficar disponível também no acesso público (link de ofícios).
+    // Se não for possível, salva a imagem inteira como fallback na tabela de configurações.
+    const url = await uploadLogoParaStorage(base64, lado);
+    try {
+      if (url) {
+        await supabaseClient.from('configuracoes').upsert({ chave: 'img_' + lado, valor: url });
+        _remoteData.config['img_' + lado] = url;
+        toastMsg('Imagem publicada! Já aparece no link público.', 'success');
+      } else {
+        await supabaseClient.from('configuracoes').upsert({ chave: 'img_' + lado, valor: base64 });
+        toastMsg('Imagem salva com backup no banco (modo offline).', 'warning');
+      }
+    } catch (err) {
+      console.warn('Erro ao publicar imagem:', err);
+      toastMsg('Imagem salva localmente, mas falhou ao publicar na nuvem.', 'warning');
+    }
   };
   reader.readAsDataURL(file);
 }
