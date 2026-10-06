@@ -190,6 +190,13 @@ const DB = {
         if (isQuotaError(error)) {
           saveToSyncQueue('gestores', d);
           toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+        } else if ((error.message || '').toLowerCase().includes('modulos')) {
+          // Coluna "modulos" ainda não existe na nuvem: salva sem ela
+          console.warn("Coluna 'modulos' ausente em gestores. Salvando em modo compatível.");
+          const safe = d.map(g => { const c = { ...g }; delete c.modulos; return c; });
+          const { error: err2 } = await supabaseClient.from('gestores').upsert(safe);
+          if (err2 && err2.code === '23505') toastMsg("Erro: Usuário de Login já existe!", "error");
+          else toastMsg("Gestor salvo localmente. Rode o SQL da coluna 'modulos' para sincronizar os acessos.", "warning");
         } else {
           if (error.code === '23505') toastMsg("Erro: Usuário de Login já existe!", "error");
           else toastMsg("Erro ao salvar gestores na nuvem: " + error.message, "error");

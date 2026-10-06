@@ -76,16 +76,49 @@ async function verificarSessao() {
     gestorTabs.forEach(id => {
       const el = document.getElementById(id);
       if (el) {
-        if (isAdmin || isGestor) el.style.display = 'flex';
+        if (isAdmin) el.style.display = 'flex';
+        else if (isGestor) el.style.display = 'flex'; // ajustado pelas permissões abaixo
         else el.style.display = (id === 'tab-relatorio' || id === 'tab-solicitacoes') ? 'flex' : 'none';
       }
     });
+
+    // Aplica os módulos liberados para o gestor (se ele tiver uma lista definida)
+    let modulosLiberados = null;
+    if (isGestor && !isAdmin && Array.isArray(sessao.modulos) && sessao.modulos.length) {
+      modulosLiberados = sessao.modulos;
+      if (typeof MODULOS_SISTEMA !== 'undefined') {
+        MODULOS_SISTEMA.forEach(m => {
+          const el = document.getElementById(m.tab);
+          if (el) el.style.display = modulosLiberados.includes(m.id) ? 'flex' : 'none';
+        });
+      }
+      // Ajusta também a barra de navegação inferior (mobile)
+      const bnavMap = {
+        'bnav-alertas': 'alertas',
+        'bnav-servidores': 'servidores',
+        'bnav-ferias': 'ferias',
+        'bnav-folgas': 'folgas',
+        'bnav-mapaausencias': 'mapaausencias',
+        'bnav-protocolo': 'protocolo'
+      };
+      Object.entries(bnavMap).forEach(([elId, modId]) => {
+        const el = document.getElementById(elId);
+        if (el) el.style.display = modulosLiberados.includes(modId) ? 'flex' : 'none';
+      });
+    }
     
     const activeTab = document.querySelector('.tab-btn.active');
     if (activeTab) {
       const el = document.getElementById(activeTab.id);
       if (el && el.style.display === 'none') {
-        const fallback = (isAdmin || isGestor) ? 'alertas' : 'relatorio';
+        let fallback = (isAdmin || isGestor) ? 'alertas' : 'relatorio';
+        // Se o gestor não tem acesso ao Dashboard, usa o primeiro módulo liberado
+        if (isGestor && !isAdmin && modulosLiberados && !modulosLiberados.includes('alertas')) {
+          const primeiro = (typeof MODULOS_SISTEMA !== 'undefined')
+            ? MODULOS_SISTEMA.find(m => modulosLiberados.includes(m.id))
+            : null;
+          if (primeiro) fallback = primeiro.id;
+        }
         showTab(fallback);
       }
     }
@@ -290,6 +323,7 @@ async function tentarLogin() {
         nome: matchGest.nome, 
         role: 'gestor',
         setores: matchGest.setores || [],
+        modulos: matchGest.modulos || [],
         loginAt: new Date().toISOString() 
       }));
       logadoComSucesso();

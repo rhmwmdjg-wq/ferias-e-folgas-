@@ -2441,6 +2441,17 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       </div>
     </div>
 
+    <div class="field" style="margin-top:14px">
+      <label>Módulos com Acesso (Selecione quais ele pode visualizar) *</label>
+      <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="marcarTodosModulosGestor(true)">✔️ Marcar todos</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="marcarTodosModulosGestor(false)">✖️ Limpar seleção</button>
+      </div>
+      <div id="g-modulos-check" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:10px;padding:15px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm)">
+        <!-- Preenchido via JS -->
+      </div>
+    </div>
+
     <div style="display:flex;gap:10px;margin-top:20px">
       <button class="btn btn-primary" onclick="salvarGestor()">💾 Salvar Gestor</button>
       <button class="btn btn-ghost" onclick="limparFormGestor()">🗑️ Limpar</button>
@@ -2454,11 +2465,12 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
           <th>Nome</th>
           <th>Usuário</th>
           <th>Setores sob Gestão</th>
+          <th>Módulos de Acesso</th>
           <th>Ações</th>
         </tr>
       </thead>
       <tbody id="tbody-gestores">
-        <tr><td colspan="4" style="text-align:center;color:var(--muted);padding:40px">Nenhum gestor cadastrado.</td></tr>
+        <tr><td colspan="5" style="text-align:center;color:var(--muted);padding:40px">Nenhum gestor cadastrado.</td></tr>
       </tbody>
     </table>
   </div>

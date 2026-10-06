@@ -17,7 +17,7 @@ function showTab(tab) {
   if (tab === 'alertas') renderDashboard();
   if (tab === 'servidores') { renderTabela(); atualizarSelectsSetores(); }
   if (tab === 'config') renderConfig();
-  if (tab === 'gestores') renderGestores(), popularSetoresGestor();
+  if (tab === 'gestores') { renderGestores(); popularSetoresGestor(); popularModulosGestor(); }
   if (tab === 'ferias') renderProgramacoes(), popularSelectServidor();
   if (tab === 'calendario') iniciarCalendario();
   if (tab === 'relatorio') renderRelatorio(), popularSelectRelatorio();
