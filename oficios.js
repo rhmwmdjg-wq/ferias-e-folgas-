@@ -5,6 +5,24 @@ let _oficiosData = [];
 let _oficioEditingId = null;
 let _ofiDestinatarios = [];
 
+const OFICIO_HEADER = {
+  titulo: 'SECRETARIA MUNICIPAL DE SAÚDE - ITACARAMBI',
+  linhas: [
+    'ESTADO DE MINAS GERAIS - CNPJ: 18.283.101/0001-82',
+    'Rua Alferes Propécio, Nº 39 - Centro – CEP: 39.470-000 - Centro - Tel: (38)3613-1148 – 1401/1957',
+    'E-mail: smsitac@yahoo.com.br'
+  ]
+};
+
+function oficioHeaderHtml(escala = 1) {
+  const titulo = escala >= 2 ? '15px' : '13.5px';
+  const linha = escala >= 2 ? '10.5px' : '9.5px';
+  return `
+    <h1 style="font-size:${titulo}; font-weight:800; text-transform:uppercase; margin:0; color:#0f172a; letter-spacing:0.02em;">${esc(OFICIO_HEADER.titulo)}</h1>
+    ${OFICIO_HEADER.linhas.map(l => `<div style="font-size:${linha}; font-weight:600; color:#475569; margin-top:3px;">${esc(l)}</div>`).join('')}
+  `;
+}
+
 function uidOficio(size = 10) {
   return 'ofi_' + Math.random().toString(36).substring(2, 2 + size) + Date.now().toString(36);
 }
@@ -49,7 +67,7 @@ function carregarNovoOficio() {
   document.getElementById('ofi-numero').value = proximoNum;
   document.getElementById('ofi-codigo').value = codigoCompleto;
   document.getElementById('ofi-assunto').value = '';
-  document.getElementById('ofi-cidade-data').value = `Luzilândia - PI, ${obterDataExtenso()}`;
+  document.getElementById('ofi-cidade-data').value = `ITACARAMBI - MG, ${obterDataExtenso()}`;
   document.getElementById('ofi-texto').value = '';
 
   const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
@@ -240,7 +258,7 @@ function atualizarPreviewOficio() {
   const subTitle = cfg.subtituloSidebar || 'Gestão de RH & Administração';
 
   const codigo = document.getElementById('ofi-codigo')?.value || 'Ofício nº 001/2026 - APS';
-  const cidadeData = document.getElementById('ofi-cidade-data')?.value || `Luzilândia - PI, ${obterDataExtenso()}`;
+  const cidadeData = document.getElementById('ofi-cidade-data')?.value || `ITACARAMBI - MG, ${obterDataExtenso()}`;
   const assunto = document.getElementById('ofi-assunto')?.value || 'Assunto da correspondência';
   const texto = document.getElementById('ofi-texto')?.value || 'Digite aqui o texto oficial do seu ofício...';
   const emissorNome = document.getElementById('ofi-emissor-nome')?.value || 'Nome do Emissor';
@@ -272,8 +290,7 @@ function atualizarPreviewOficio() {
       <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #222; padding-bottom:14px; margin-bottom:24px;">
         <div style="width:140px; text-align:left;">${logoEsqHtml}</div>
         <div style="text-align:center; flex:1; padding:0 10px;">
-          <h2 style="font-size:14px; font-weight:800; text-transform:uppercase; margin:0; color:#1e293b; letter-spacing:0.02em;">${esc(orgNome)}</h2>
-          <h3 style="font-size:11px; font-weight:600; color:#64748b; margin:4px 0 0 0; text-transform:uppercase;">${esc(subTitle)}</h3>
+          ${oficioHeaderHtml(1)}
         </div>
         <div style="width:140px; text-align:right;">${logoDirHtml}</div>
       </div>
@@ -360,7 +377,7 @@ async function salvarOficio() {
       destinatario: primeiro.nome || '',
       cargoDestinatario: primeiro.cargo || '',
       orgaoDestinatario: primeiro.orgao || '',
-      cidadeData: document.getElementById('ofi-cidade-data').value.trim() || `Luzilândia - PI, ${obterDataExtenso()}`,
+      cidadeData: document.getElementById('ofi-cidade-data').value.trim() || `ITACARAMBI - MG, ${obterDataExtenso()}`,
       texto,
       emissorNome: document.getElementById('ofi-emissor-nome').value.trim(),
       emissorCargo: document.getElementById('ofi-emissor-cargo').value.trim(),
@@ -618,8 +635,7 @@ async function renderOficioPublico(token) {
         <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2.5px solid #1e293b; padding-bottom:16px; margin-bottom:30px;">
           <div style="width:150px; text-align:left;">${logoEsqHtml}</div>
           <div style="text-align:center; flex:1; padding:0 15px;">
-            <h1 style="font-size:15px; font-weight:800; text-transform:uppercase; margin:0; color:#0f172a; letter-spacing:0.02em;">${esc(orgNome)}</h1>
-            <h2 style="font-size:12px; font-weight:600; color:#475569; margin:4px 0 0 0; text-transform:uppercase;">${esc(subTitle)}</h2>
+            ${oficioHeaderHtml(2)}
           </div>
           <div style="width:150px; text-align:right;">${logoDirHtml}</div>
         </div>
