@@ -4370,6 +4370,11 @@ Coordenação de RH
       <button class="btn btn-ghost" onclick="pmExportarCSV()">📥 Exportar CSV</button>
       <button class="btn btn-ghost" onclick="pmPuxarCadastro()">🔄 Puxar servidores do cadastro</button>
       <button class="btn btn-ghost" onclick="pmReporBase()">♻️ Repor lista base</button>
+      <button class="btn btn-ghost" onclick="pmAbrirConfigPiso()">⚙️ Configurar Piso</button>
+    </div>
+    <div class="field" style="margin-top:12px">
+      <label>🔍 Buscar servidor (nome ou matrícula)</label>
+      <input id="pm-busca" placeholder="Digite o nome ou a matrícula..." oninput="pmSetBusca(this.value)">
     </div>
     <div class="info-box" style="margin-top:12px;font-size:.78rem">
       Ao abrir um mês novo, o sistema <strong>puxa automaticamente todos os servidores cadastrados</strong>
@@ -4431,6 +4436,23 @@ Coordenação de RH
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="pmSalvarAlteracao()">💾 Salvar alteração</button>
       <button class="btn btn-ghost" onclick="fecharModal('modal-pm-edicao')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL CONFIGURAR PISO ======================= -->
+<div class="modal-bg" id="modal-pm-piso">
+  <div class="modal">
+    <h3>⚙️ Configurar Complemento do Piso</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">Informe os valores. Ao aplicar, o sistema preenche automaticamente a coluna <strong>COMP. PISO</strong> de todos os servidores conforme a função.</p>
+    <div class="form-row cols-2">
+      <div class="field"><label>Técnicos de Enfermagem (R$)</label><input id="pm-piso-tec" type="number" step="0.01" min="0" placeholder="0.00"></div>
+      <div class="field"><label>Enfermeiros (R$)</label><input id="pm-piso-enf" type="number" step="0.01" min="0" placeholder="0.00"></div>
+    </div>
+    <div class="field" style="margin-top:10px"><label>Justificativa (obrigatória se o mês estiver fechado)</label><input id="pm-piso-just" placeholder="Motivo da alteração..."></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="pmAplicarPiso()">✔️ Aplicar e preencher</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-pm-piso')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -6973,6 +6995,7 @@ let _pmFolha = null;
 let _pmMesAtual = '';
 let _pmEditCtx = null;
 let _pmSaveTimer = null;
+let _pmBusca = '';
 
 function pmLabel(campo) {
   const c = PM_CAMPOS.find(x => x.key === campo);
@@ -7134,23 +7157,105 @@ function pmRenderStatus() {
   }
 }
 
+function pmSetBusca(valor) {
+  _pmBusca = String(valor || '').toLowerCase().trim();
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+}
+
 function pmRenderTabela(tipo) {
   const tbody = document.getElementById(tipo === 'medico' ? 'pm-corpo-medicos' : 'pm-corpo-servidores');
   if (!tbody) return;
   const lista = pmList(tipo);
-  if (!lista.length) {
-    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 1}" style="text-align:center;padding:18px;color:var(--muted)">Nenhum registro. Use "Adicionar linha".</td></tr>`;
+  const entradas = lista.map((p, idx) => ({ p, idx })).filter(e => {
+    if (!_pmBusca) return true;
+    return String(e.p.nome || '').toLowerCase().includes(_pmBusca) ||
+           String(e.p.matricula || '').toLowerCase().includes(_pmBusca);
+  });
+  if (!entradas.length) {
+    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 1}" style="text-align:center;padding:18px;color:var(--muted)">${_pmBusca ? 'Nenhum servidor encontrado para a busca.' : 'Nenhum registro. Use "Adicionar linha".'}</td></tr>`;
     return;
   }
-  tbody.innerHTML = lista.map((p, i) => {
+  tbody.innerHTML = entradas.map(({ p, idx }) => {
     const tds = PM_CAMPOS.map(c => {
       const alt = p.alterados && p.alterados[c.key];
       const val = String(p[c.key] ?? '');
       const editavel = c.key !== 'item';
-      return `<td class="pm-cell ${alt ? 'pm-alterado' : ''}"${editavel ? ` onclick="pmAbrirEdicao('${tipo}',${i},'${c.key}')"` : ''} title="${esc(val)}">${esc(val)}</td>`;
+      return `<td class="pm-cell ${alt ? 'pm-alterado' : ''}"${editavel ? ` onclick="pmAbrirEdicao('${tipo}',${idx},'${c.key}')"` : ''} title="${esc(val)}">${esc(val)}</td>`;
     }).join('');
-    return `<tr>${tds}<td class="pm-acoes"><button class="btn btn-danger btn-sm" onclick="pmRemoverLinha('${tipo}',${i})" title="Remover">🗑️</button></td></tr>`;
+    return `<tr>${tds}<td class="pm-acoes"><button class="btn btn-danger btn-sm" onclick="pmRemoverLinha('${tipo}',${idx})" title="Remover">🗑️</button></td></tr>`;
   }).join('');
+}
+
+// Normaliza texto (sem acentos, minúsculo) para comparar funções
+function pmNorm(s) {
+  return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+}
+
+function pmAbrirConfigPiso() {
+  if (!_pmFolha) return;
+  const cfg = DB.config();
+  document.getElementById('pm-piso-tec').value = (cfg.pisoTecnicos != null && cfg.pisoTecnicos !== '') ? cfg.pisoTecnicos : '';
+  document.getElementById('pm-piso-enf').value = (cfg.pisoEnfermeiros != null && cfg.pisoEnfermeiros !== '') ? cfg.pisoEnfermeiros : '';
+  document.getElementById('pm-piso-just').value = '';
+  document.getElementById('modal-pm-piso').classList.add('open');
+}
+
+function pmAplicarPiso() {
+  if (!_pmFolha) return;
+  const tec = parseFloat(document.getElementById('pm-piso-tec').value);
+  const enf = parseFloat(document.getElementById('pm-piso-enf').value);
+  const just = document.getElementById('pm-piso-just').value.trim();
+
+  if (isNaN(tec) && isNaN(enf)) return toastMsg('Informe ao menos um valor.', 'warning');
+  if (_pmFolha.fechado && !just) return toastMsg('Mês fechado: informe a justificativa.', 'warning');
+
+  // Guarda os valores na configuração para reutilizar
+  const cfg = DB.config();
+  if (!isNaN(tec)) cfg.pisoTecnicos = tec;
+  if (!isNaN(enf)) cfg.pisoEnfermeiros = enf;
+  DB.saveConfig(cfg);
+
+  let qtd = 0;
+  ['servidores', 'medicos'].forEach(k => {
+    (_pmFolha.dados[k] || []).forEach(p => {
+      const f = pmNorm(p.funcao);
+      let valor = null;
+      if (/enfermeir/.test(f)) valor = enf;                                  // Enfermeiro(a)
+      else if (/enfermagem/.test(f) && /(tec|tecn)/.test(f)) valor = tec;    // Técnico(a) de Enfermagem
+      if (valor === null || isNaN(valor)) return;
+
+      const novo = Number(valor) > 0 ? Number(valor).toFixed(2) : '-';
+      if (String(p.comp) !== novo) {
+        const anterior = p.comp;
+        p.comp = novo;
+        qtd++;
+        if (_pmFolha.fechado) {
+          if (!p.alterados) p.alterados = {};
+          p.alterados.comp = true;
+          DB.addPontoHistorico({
+            id: uid(),
+            mes: _pmFolha.mes,
+            data: new Date().toLocaleString('pt-BR'),
+            funcionario: p.nome || '',
+            campo: 'COMP. PISO',
+            anterior,
+            novo,
+            justificativa: just || 'Configuração automática de piso.',
+            usuario: pmUsuarioAtual(),
+            criadoEm: new Date().toISOString()
+          });
+        }
+      }
+    });
+  });
+
+  DB.savePontoFolha(_pmFolha);
+  fecharModal('modal-pm-piso');
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  pmRenderHistorico();
+  toastMsg(qtd ? `${qtd} registro(s) preenchido(s) automaticamente.` : 'Nenhum registro correspondente encontrado.', qtd ? 'success' : 'info');
 }
 
 function pmAbrirEdicao(tipo, index, campo) {
