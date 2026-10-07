@@ -3582,7 +3582,7 @@ Coordenação de RH
         </div>
         <div class="field">
           <label>Placa *</label>
-          <input id="veic-placa" placeholder="ABC-1D23" style="text-transform:uppercase">
+          <input id="veic-placa" placeholder="ABC-1D23" style="text-transform:uppercase" oninput="verificarDuplicidadeVeiculo()">
         </div>
       </div>
 
@@ -3600,13 +3600,15 @@ Coordenação de RH
       <div class="form-row cols-2">
         <div class="field">
           <label>RENAVAM</label>
-          <input id="veic-renavam" placeholder="Ex: 00123456789" maxlength="11">
+          <input id="veic-renavam" placeholder="Ex: 00123456789" maxlength="11" oninput="verificarDuplicidadeVeiculo()">
         </div>
         <div class="field">
           <label>Nota Fiscal nº</label>
           <input id="veic-nota-fiscal" placeholder="Ex: NF-e 004829">
         </div>
       </div>
+
+      <div id="veic-dup-alerta" style="display:none; margin-bottom:14px; background:var(--danger-dim); border:1px solid rgba(255,77,106,0.35); color:#ff8090; padding:10px 12px; border-radius:var(--r-sm); font-size:0.78rem; font-weight:600; line-height:1.5;"></div>
 
       <div class="form-row cols-2">
         <div class="field">
@@ -3816,8 +3818,9 @@ Coordenação de RH
         <h3>➕ Novo Veículo</h3>
         <div class="form-row cols-2">
           <div class="field"><label>Nome *</label><input id="ev-veic-nome" placeholder="Ex: Carro APS"></div>
-          <div class="field"><label>Placa</label><input id="ev-veic-placa" placeholder="ABC-1234"></div>
+          <div class="field"><label>Placa</label><input id="ev-veic-placa" placeholder="ABC-1234" oninput="verificarDuplicidadeVeiculoEv()"></div>
         </div>
+        <div id="ev-veic-dup-alerta" style="display:none; margin-bottom:12px; background:var(--danger-dim); border:1px solid rgba(255,77,106,0.35); color:#ff8090; padding:8px 10px; border-radius:var(--r-sm); font-size:0.75rem; font-weight:600;"></div>
         <div class="form-row cols-2">
           <div class="field"><label>Modelo</label><input id="ev-veic-modelo" list="datalist-veic-modelo" placeholder="Digite para pesquisar... Ex: Fiat Uno" autocomplete="off"></div>
           <div class="field"><label>Cor</label><input id="ev-veic-cor" placeholder="Branco"></div>

@@ -118,6 +118,77 @@ function popularDatalistModelosVeiculos() {
   dl.innerHTML = arr.map(m => `<option value="${esc(m)}"></option>`).join('');
 }
 
+// Normaliza placa para comparação (remove espaços, hífens e pontos)
+function _placaNorm(p) {
+  return String(p || '').toUpperCase().replace(/[\s\-\.]/g, '');
+}
+
+// Verifica se já existe veículo com a mesma placa ou RENAVAM.
+// Retorna o veículo duplicado ou null. Ignora placeholders genéricos.
+function veiculoDuplicado(placa, renavam, ignoreId) {
+  const p = _placaNorm(placa);
+  const r = String(renavam || '').replace(/\D/g, '');
+  const placeholders = ['', 'ADEFINIR', 'SEMPLACA', 'NAOINFORMADO', 'PENDENTE', 'AREQUERER'];
+  return (_veiculosData || []).find(v => {
+    if (!v || (ignoreId && v.id === ignoreId)) return false;
+    const vp = _placaNorm(v.placa);
+    const vr = String(v.renavam || '').replace(/\D/g, '');
+    if (p && !placeholders.includes(p) && vp && vp === p) return v;
+    if (r && vr && vr === r) return v;
+    return false;
+  });
+}
+
+// Confirma com o usuário caso já exista placa/RENAVAM repetido. Retorna true para continuar.
+function confirmarVeiculoDuplicado(placa, renavam, ignoreId) {
+  const dup = veiculoDuplicado(placa, renavam, ignoreId);
+  if (!dup) return true;
+  const motivo = (_placaNorm(dup.placa) === _placaNorm(placa) && placa) ? 'placa' : 'RENAVAM';
+  return confirm(`⚠️ ATENÇÃO: já existe um veículo cadastrado com esta ${motivo.toUpperCase()}!\n\n• ${dup.nome}${dup.placa ? ' (' + dup.placa + ')' : ''}${dup.modelo ? ' - ' + dup.modelo : ''}\n• Setor: ${(dup.setorAtual || dup.setor_atual || '-')}\n\nDeseja cadastrar mesmo assim?`);
+}
+
+// Alerta em tempo real enquanto digita a placa/RENAVAM (formulário principal)
+function verificarDuplicidadeVeiculo() {
+  const alertEl = document.getElementById('veic-dup-alerta');
+  const placaEl = document.getElementById('veic-placa');
+  const renavamEl = document.getElementById('veic-renavam');
+  const id = document.getElementById('veic-id')?.value || null;
+  const placa = (placaEl?.value || '').trim();
+  const renavam = (renavamEl?.value || '').trim();
+  const dup = ((placa || renavam) ? veiculoDuplicado(placa, renavam, id) : null);
+
+  if (dup) {
+    if (alertEl) {
+      alertEl.style.display = 'block';
+      alertEl.innerHTML = '⚠️ Já existe veículo com esta placa/RENAVAM: <strong>' + esc(dup.nome) + '</strong>' +
+        (dup.placa ? ' (' + esc(dup.placa) + ')' : '') +
+        (dup.modelo ? ' - ' + esc(dup.modelo) : '') +
+        ' · Setor: ' + esc(dup.setorAtual || dup.setor_atual || '-');
+    }
+    if (placaEl) placaEl.style.borderColor = (placa && _placaNorm(placa) === _placaNorm(dup.placa)) ? 'var(--danger)' : '';
+    if (renavamEl) renavamEl.style.borderColor = (renavam && String(renavam).replace(/\D/g, '') === String(dup.renavam || '').replace(/\D/g, '')) ? 'var(--danger)' : '';
+  } else {
+    if (alertEl) { alertEl.style.display = 'none'; alertEl.innerHTML = ''; }
+    if (placaEl) placaEl.style.borderColor = '';
+    if (renavamEl) renavamEl.style.borderColor = '';
+  }
+}
+
+// Alerta em tempo real no formulário rápido de Eventos → Veículos
+function verificarDuplicidadeVeiculoEv() {
+  const placaEl = document.getElementById('ev-veic-placa');
+  const alertEl = document.getElementById('ev-veic-dup-alerta');
+  const placa = (placaEl?.value || '').trim();
+  const dup = placa ? veiculoDuplicado(placa, '', null) : null;
+  if (dup) {
+    if (alertEl) { alertEl.style.display = 'block'; alertEl.innerHTML = '⚠️ Placa já cadastrada: <strong>' + esc(dup.nome) + '</strong>' + (dup.placa ? ' (' + esc(dup.placa) + ')' : ''); }
+    if (placaEl) placaEl.style.borderColor = 'var(--danger)';
+  } else {
+    if (alertEl) { alertEl.style.display = 'none'; alertEl.innerHTML = ''; }
+    if (placaEl) placaEl.style.borderColor = '';
+  }
+}
+
 function processarArquivoPdfVeiculo(input) {
   const file = input.files[0];
   if (!file) return;
@@ -313,6 +384,10 @@ async function salvarVeiculo() {
   if (!nome) return toastMsg('Informe o nome/descrição do veículo.', 'warning');
   if (!placa) return toastMsg('Informe a placa do veículo.', 'warning');
 
+  // Avisa se já existe veículo com a mesma placa ou RENAVAM
+  const renavamCheck = document.getElementById('veic-renavam').value.trim();
+  if (!confirmarVeiculoDuplicado(placa, renavamCheck, id || null)) return;
+
   const btnSalvar = document.getElementById('btn-salvar-veiculo');
   if (btnSalvar) {
     btnSalvar.disabled = true;
@@ -420,6 +495,7 @@ function editarVeiculo(id) {
 
   const cardForm = document.getElementById('card-form-veiculo');
   if (cardForm) cardForm.scrollIntoView({ behavior: 'smooth' });
+  if (typeof verificarDuplicidadeVeiculo === 'function') verificarDuplicidadeVeiculo();
 }
 
 async function excluirVeiculo(id) {
@@ -464,6 +540,7 @@ function limparFormVeiculo() {
 
   const titleEl = document.getElementById('veic-form-title');
   if (titleEl) titleEl.textContent = 'Cadastrar Veículo';
+  if (typeof verificarDuplicidadeVeiculo === 'function') verificarDuplicidadeVeiculo();
 }
 
 function popularSelectVeiculos(selectId) {
@@ -507,6 +584,8 @@ function renderVeiculosNoContainer(container) {
 function salvarVeiculoEv() {
   const nome = document.getElementById('ev-veic-nome').value.trim();
   if (!nome) return toastMsg('Informe o nome do veículo.', 'warning');
+  const placaEv = document.getElementById('ev-veic-placa').value.trim();
+  if (placaEv && !confirmarVeiculoDuplicado(placaEv, '', null)) return;
   const dados = {
     id: uid(),
     nome,
@@ -542,6 +621,7 @@ function limparFormVeiculoEv() {
   const sucataEl = document.getElementById('ev-veic-sucata');
   if (sucataEl) sucataEl.checked = false;
   document.getElementById('ev-veic-obs').value = '';
+  if (typeof verificarDuplicidadeVeiculoEv === 'function') verificarDuplicidadeVeiculoEv();
 }
 
 // ---- SUBTAB NAVIGATION (dentro do painel Eventos) ----
