@@ -7703,6 +7703,11 @@ function pmImprimir() {
       <div class="field"><label>Arquivo do Certificado (.pfx/.p12)</label><input type="file" id="ds-pfx" accept=".pfx,.p12,application/x-pkcs12"></div>
       <div class="field"><label>Senha do Certificado</label><input type="password" id="ds-senha" placeholder="••••••••"></div>
     </div>
+    <div class="field" style="margin-top:10px">
+      <label>Cadeia de certificados — AC intermediária/raiz (.cer/.crt/.pem/.p7b) — opcional</label>
+      <input type="file" id="ds-chain" accept=".cer,.crt,.pem,.p7b,.p7c" multiple onchange="dsAdicionarCadeia(this)">
+      <div style="font-size:.72rem;color:var(--muted);margin-top:4px">Serve para o Adobe validar a <strong>identidade do assinante</strong>. Adicione o(s) certificado(s) da Autoridade Certificadora do seu certificado.</div>
+    </div>
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
       <button class="btn btn-primary" onclick="dsCarregarPfx()">🔓 Carregar Certificado</button>
       <button class="btn btn-ghost" onclick="dsLimparCert()">🗑️ Remover</button>
@@ -7755,7 +7760,52 @@ function dsLimparCert() {
   if (info) { info.style.display = 'none'; info.innerHTML = ''; }
   const f = document.getElementById('ds-pfx'); if (f) f.value = '';
   const s = document.getElementById('ds-senha'); if (s) s.value = '';
+  const c = document.getElementById('ds-chain'); if (c) c.value = '';
   toastMsg('Certificado removido da sessão.', 'info');
+}
+
+function dsMostrarInfoCert() {
+  const info = document.getElementById('ds-cert-info');
+  if (!info || !_dsCert) return;
+  const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '(sem nome)';
+  const issuer = _dsCert.issuer.getField('CN') ? _dsCert.issuer.getField('CN').value : '';
+  const notAfter = _dsCert.validity.notAfter;
+  const qtd = _dsCerts.length;
+  info.style.display = 'block';
+  info.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Certificado carregado</div>' +
+    '<div><strong>Titular:</strong> ' + esc(cn) + '</div>' +
+    '<div><strong>Emissor:</strong> ' + esc(issuer) + '</div>' +
+    '<div><strong>Válido até:</strong> ' + notAfter.toLocaleDateString('pt-BR') + '</div>' +
+    '<div><strong>Certificados na cadeia:</strong> ' + qtd + (qtd < 2 ? ' <span style="color:var(--warning)">(adicione a AC do emissor para o Adobe validar)</span>' : '') + '</div>';
+}
+
+async function dsAdicionarCadeia(input) {
+  const files = Array.from(input.files || []);
+  if (!files.length) return;
+  let add = 0;
+  for (const file of files) {
+    try {
+      const buf = await file.arrayBuffer();
+      const bin = dsBinFromArrayBuffer(buf);
+      let added = false;
+      try {
+        const text = new TextDecoder().decode(new Uint8Array(buf));
+        if (/BEGIN CERTIFICATE/.test(text)) { _dsCerts.push(forge.pki.certificateFromPem(text)); added = true; }
+      } catch (e) { /* ignore */ }
+      if (!added) {
+        try { _dsCerts.push(forge.pki.certificateFromAsn1(forge.asn1.fromDer(bin))); added = true; } catch (e) { /* ignore */ }
+      }
+      if (!added) {
+        try {
+          const msg = forge.pkcs7.messageFromAsn1(forge.asn1.fromDer(bin));
+          if (msg.certificates && msg.certificates.length) { msg.certificates.forEach(function (c) { _dsCerts.push(c); }); added = true; }
+        } catch (e) { /* ignore */ }
+      }
+      if (added) add++;
+    } catch (e) { /* ignore */ }
+  }
+  if (add) { dsMostrarInfoCert(); toastMsg(add + ' arquivo(s) de cadeia adicionado(s)!', 'success'); }
+  else toastMsg('Não foi possível ler os arquivos de cadeia.', 'warning');
 }
 
 function dsCarregarPfx() {
@@ -7786,16 +7836,7 @@ function dsCarregarPfx() {
       _dsCert = cert; _dsKey = key;
       _dsCerts = certArr.map(function (b) { return b.cert; }).filter(Boolean);
 
-      const cn = cert.subject.getField('CN') ? cert.subject.getField('CN').value : '(sem nome)';
-      const issuer = cert.issuer.getField('CN') ? cert.issuer.getField('CN').value : '';
-      const notAfter = cert.validity.notAfter;
-
-      const info = document.getElementById('ds-cert-info');
-      info.style.display = 'block';
-      info.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Certificado carregado</div>' +
-        '<div><strong>Titular:</strong> ' + esc(cn) + '</div>' +
-        '<div><strong>Emissor:</strong> ' + esc(issuer) + '</div>' +
-        '<div><strong>Válido até:</strong> ' + notAfter.toLocaleDateString('pt-BR') + '</div>';
+      dsMostrarInfoCert();
       toastMsg('Certificado carregado com sucesso!', 'success');
     } catch (err) {
       console.error(err);
