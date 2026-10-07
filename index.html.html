@@ -8095,11 +8095,12 @@ async function dsAssinarPades() {
       window.Buffer = bm.Buffer;
     }
     const pdfLib = await import('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm');
-    const utils = await import('https://cdn.jsdelivr.net/npm/@signpdf/utils@3.2.4/+esm');
     const signpdfMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/signpdf@3.2.4/+esm');
     const placeMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/placeholder-pdf-lib@3.2.4/+esm');
     const SignPdf = signpdfMod.SignPdf || signpdfMod.default;
-    const pdflibAddPlaceholder = placeMod.pdflibAddPlaceholder;
+    const Signer = signpdfMod.Signer || (signpdfMod.default && signpdfMod.default.Signer);
+    const pdflibAddPlaceholder = placeMod.pdflibAddPlaceholder || (placeMod.default && placeMod.default.pdflibAddPlaceholder);
+    if (!SignPdf || !Signer || !pdflibAddPlaceholder) throw new Error('Bibliotecas PAdES não carregaram corretamente.');
 
     const doc = await pdfLib.PDFDocument.load(_dsPdfBytes);
     const page = doc.getPage(_dsPlace.page);
@@ -8138,7 +8139,7 @@ async function dsAssinarPades() {
     const withPlaceholder = await doc.save({ useObjectStreams: false });
 
     // Assinador: gera o PKCS#7 (CMS) com o certificado
-    const signer = new utils.Signer();
+    const signer = new Signer();
     signer.sign = async function (buffer) {
       const p7 = forge.pkcs7.createSignedData();
       p7.content = forge.util.createBuffer(buffer.toString('binary'));
