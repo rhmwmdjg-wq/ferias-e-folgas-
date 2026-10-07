@@ -322,6 +322,7 @@ function renderVeiculos() {
       (v.placa || '').toLowerCase().includes(busca) ||
       (v.modelo || '').toLowerCase().includes(busca) ||
       (v.renavam || '').toLowerCase().includes(busca) ||
+      (v.chassi || '').toLowerCase().includes(busca) ||
       (v.notaFiscal || v.nota_fiscal || '').toLowerCase().includes(busca) ||
       (v.resolucao || '').toLowerCase().includes(busca) ||
       (v.fonte || '').toLowerCase().includes(busca) ||
@@ -359,6 +360,7 @@ function renderVeiculos() {
             ${v.modelo ? `<span>🚘 <strong>Modelo:</strong> ${esc(v.modelo)}</span>` : ''}
             ${v.cor ? `<span>🎨 <strong>Cor:</strong> ${esc(v.cor)}</span>` : ''}
             ${v.renavam ? `<span>📋 <strong>RENAVAM:</strong> ${esc(v.renavam)}</span>` : ''}
+            ${v.chassi ? `<span>🔩 <strong>Chassi:</strong> ${esc(v.chassi)}</span>` : ''}
             ${nf ? `<span>🧾 <strong>NF:</strong> ${esc(nf)}</span>` : ''}
             ${v.resolucao ? `<span>📜 <strong>Resolução:</strong> ${esc(v.resolucao)}</span>` : ''}
             ${v.ficha ? `<span>📑 <strong>Ficha:</strong> ${esc(v.ficha)}</span>` : ''}
@@ -416,6 +418,7 @@ async function salvarVeiculo() {
       modelo: document.getElementById('veic-modelo').value.trim(),
       cor: document.getElementById('veic-cor').value.trim(),
       renavam: document.getElementById('veic-renavam').value.trim(),
+      chassi: document.getElementById('veic-chassi').value.trim(),
       notaFiscal: document.getElementById('veic-nota-fiscal').value.trim(),
       resolucao: document.getElementById('veic-resolucao').value.trim(),
       ficha: document.getElementById('veic-ficha').value.trim(),
@@ -466,6 +469,8 @@ function editarVeiculo(id) {
   document.getElementById('veic-modelo').value = v.modelo || '';
   document.getElementById('veic-cor').value = v.cor || '';
   document.getElementById('veic-renavam').value = v.renavam || '';
+  const chassiEl = document.getElementById('veic-chassi');
+  if (chassiEl) chassiEl.value = v.chassi || '';
   document.getElementById('veic-nota-fiscal').value = v.notaFiscal || v.nota_fiscal || '';
   document.getElementById('veic-resolucao').value = v.resolucao || '';
   document.getElementById('veic-ficha').value = v.ficha || '';
@@ -519,6 +524,8 @@ function limparFormVeiculo() {
   document.getElementById('veic-modelo').value = '';
   document.getElementById('veic-cor').value = '';
   document.getElementById('veic-renavam').value = '';
+  const chassiEl = document.getElementById('veic-chassi');
+  if (chassiEl) chassiEl.value = '';
   document.getElementById('veic-nota-fiscal').value = '';
   document.getElementById('veic-resolucao').value = '';
   document.getElementById('veic-ficha').value = '';
@@ -1111,6 +1118,7 @@ function imprimirRelatorioFrota() {
         <span style="color:#7e22ce; font-weight:bold;">🏢 Origem:</span> ${esc(sPertence)}
       </td>
       <td>${esc(v.renavam || '-')}</td>
+      <td>${esc(v.chassi || '-')}</td>
       <td>${esc(nf)}</td>
       <td>${esc(v.resolucao || '-')}</td>
       <td>${esc(v.ficha || '-')} / ${esc(v.fonte || '-')}</td>
@@ -1171,6 +1179,7 @@ function imprimirRelatorioFrota() {
         <th>Modelo / Cor</th>
         <th>Setor Atual vs Origem</th>
         <th>RENAVAM</th>
+        <th>Chassi</th>
         <th>Nota Fiscal</th>
         <th>Resolução</th>
         <th>Ficha / Fonte</th>

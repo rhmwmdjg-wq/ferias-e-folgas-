@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS veiculos (
   modelo        TEXT,
   cor           TEXT,
   renavam       TEXT,
+  chassi        TEXT,
   "notaFiscal"  TEXT,
   resolucao     TEXT,
   ficha         TEXT,
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS veiculos (
 
 -- 2. Adicionar colunas se a tabela já existia previamente
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS renavam TEXT;
+ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS chassi TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS "notaFiscal" TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS resolucao TEXT;
 ALTER TABLE veiculos ADD COLUMN IF NOT EXISTS ficha TEXT;
