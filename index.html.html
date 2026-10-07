@@ -7814,16 +7814,78 @@ function dsLimparCert() {
 function dsMostrarInfoCert() {
   const info = document.getElementById('ds-cert-info');
   if (!info || !_dsCert) return;
-  const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '(sem nome)';
-  const issuer = _dsCert.issuer.getField('CN') ? _dsCert.issuer.getField('CN').value : '';
-  const notAfter = _dsCert.validity.notAfter;
   const qtd = _dsCerts.length;
   info.style.display = 'block';
   info.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Certificado carregado</div>' +
-    '<div><strong>Titular:</strong> ' + esc(cn) + '</div>' +
-    '<div><strong>Emissor:</strong> ' + esc(issuer) + '</div>' +
-    '<div><strong>Válido até:</strong> ' + notAfter.toLocaleDateString('pt-BR') + '</div>' +
-    '<div><strong>Certificados na cadeia:</strong> ' + qtd + (qtd < 2 ? ' <span style="color:var(--warning)">(adicione a AC do emissor para o Adobe validar)</span>' : '') + '</div>';
+    '<div><strong>Titular:</strong> ' + esc(dsNomeCert(_dsCert)) + '</div>' +
+    '<div><strong>Emissor:</strong> ' + esc(dsEmissorCert(_dsCert)) + '</div>' +
+    '<div><strong>Válido até:</strong> ' + _dsCert.validity.notAfter.toLocaleDateString('pt-BR') + '</div>' +
+    '<div style="margin-top:6px"><strong>Cadeia (' + qtd + '):</strong></div>' +
+    '<div style="max-height:120px;overflow:auto;font-size:.75rem">' + dsCadeiaHtml() + '</div>' +
+    (qtd < 2 ? '<div style="color:var(--warning);margin-top:6px">⚠️ Cadeia incompleta — o Adobe pode dizer que o certificado é inválido. Adicione a AC do emissor abaixo.</div>' : '');
+}
+
+function dsNomeCert(c) {
+  try { return (c.subject.getField('CN') ? c.subject.getField('CN').value : '(sem nome)'); } catch (e) { return '(?)'; }
+}
+function dsEmissorCert(c) {
+  try { return (c.issuer.getField('CN') ? c.issuer.getField('CN').value : '(?)'); } catch (e) { return '(?)'; }
+}
+function dsJaTemCert(cert) {
+  const s = String(cert.serialNumber || '');
+  return _dsCerts.some(function (c) { return String(c.serialNumber || '') === s && dsEmissorCert(c) === dsEmissorCert(cert); });
+}
+function dsCadeiaHtml() {
+  return _dsCerts.map(function (c) {
+    return '<div style="padding:4px 0;border-bottom:1px dotted var(--border)">' +
+      '<span style="font-weight:600">' + esc(dsNomeCert(c)) + '</span>' +
+      '<span style="color:var(--muted)"> — emitido por: ' + esc(dsEmissorCert(c)) + '</span></div>';
+  }).join('');
+}
+
+// Busca bytes de uma URL, tentando HTTPS e proxies (para AIA em HTTP/CORS)
+async function dsBuscarBytes(url) {
+  const tentativas = [
+    url,
+    url.replace(/^http:/i, 'https:'),
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(url),
+    'https://corsproxy.io/?' + encodeURIComponent(url)
+  ];
+  for (const u of tentativas) {
+    try {
+      const r = await fetch(u, { redirect: 'follow' });
+      if (r.ok) { const ab = await r.arrayBuffer(); if (ab.byteLength > 200) return ab; }
+    } catch (e) { /* tenta o próximo */ }
+  }
+  return null;
+}
+
+// Completa a cadeia pela extensão AIA (caIssuers) do certificado
+async function dsBuscarCadeiaAIA(cert, profundidade) {
+  if (!cert || profundidade > 6) return;
+  let ext;
+  try { ext = cert.getExtension && cert.getExtension('authorityInfoAccess'); } catch (e) { ext = null; }
+  if (!ext || !ext.accessDescriptions) return;
+  for (const ad of ext.accessDescriptions) {
+    if (ad.accessMethod !== '1.3.6.1.5.5.7.48.2') continue; // caIssuers
+    const loc = ad.accessLocation;
+    if (!loc || !loc.value) continue;
+    const bytes = await dsBuscarBytes(String(loc.value));
+    if (!bytes) continue;
+    let emitente = null;
+    try { emitente = forge.pki.certificateFromAsn1(forge.asn1.fromDer(dsBinFromArrayBuffer(bytes))); } catch (e) {
+      try {
+        const msg = forge.pkcs7.messageFromAsn1(forge.asn1.fromDer(dsBinFromArrayBuffer(bytes)));
+        if (msg.certificates && msg.certificates.length) emitente = msg.certificates[0];
+      } catch (e2) { /* ignore */ }
+    }
+    if (emitente && !dsJaTemCert(emitente)) {
+      _dsCerts.push(emitente);
+      if (dsNomeCert(emitente) !== dsEmissorCert(emitente)) {
+        await dsBuscarCadeiaAIA(emitente, profundidade + 1);
+      }
+    }
+  }
 }
 
 async function dsAdicionarCadeia(input) {
@@ -7862,7 +7924,7 @@ function dsCarregarPfx() {
   if (!file) return toastMsg('Selecione o arquivo .pfx.', 'warning');
 
   const reader = new FileReader();
-  reader.onload = function (e) {
+  reader.onload = async function (e) {
     try {
       const bin = dsBinFromArrayBuffer(e.target.result);
       const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(bin), senha);
@@ -7883,6 +7945,9 @@ function dsCarregarPfx() {
       _dsCert = cert; _dsKey = key;
       _dsCerts = certArr.map(function (b) { return b.cert; }).filter(Boolean);
 
+      dsMostrarInfoCert();
+      toastMsg('Certificado carregado! Buscando cadeia de ACs...', 'info');
+      try { await dsBuscarCadeiaAIA(_dsCert, 0); } catch (e2) { console.warn('AIA:', e2); }
       dsMostrarInfoCert();
       toastMsg('Certificado carregado com sucesso!', 'success');
     } catch (err) {
