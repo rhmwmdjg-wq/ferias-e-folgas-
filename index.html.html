@@ -7723,7 +7723,8 @@ function pmImprimir() {
       <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">💡 Clique na página onde a assinatura deve ficar · arraste a caixa para mover · use o canto inferior direito para redimensionar.</div>
       <div id="ds-preview" style="max-height:62vh;overflow:auto;background:#3a4450;padding:12px;border-radius:var(--r-sm)"></div>
       <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
-        <button class="btn btn-primary" onclick="dsAssinarComPosicao()">🔐 Assinar e baixar</button>
+        <button class="btn btn-primary" onclick="dsAssinarPades()">🖋️ Assinar PAdES (Adobe)</button>
+        <button class="btn btn-ghost" onclick="dsAssinarComPosicao()">📎 Assinar + arquivo .p7s</button>
         <button class="btn btn-ghost" onclick="dsLimparPosicao()">🧹 Limpar posição</button>
       </div>
     </div>
@@ -7735,6 +7736,7 @@ function pmImprimir() {
 // ===================== ASSINATURA DIGITAL (A1 / PFX) =====================
 let _dsCert = null;
 let _dsKey = null;
+let _dsCerts = [];
 
 // Converte ArrayBuffer para string binária entendida pelo forge
 function dsBinFromArrayBuffer(buffer) {
@@ -7748,7 +7750,7 @@ function dsBinFromArrayBuffer(buffer) {
 }
 
 function dsLimparCert() {
-  _dsCert = null; _dsKey = null;
+  _dsCert = null; _dsKey = null; _dsCerts = [];
   const info = document.getElementById('ds-cert-info');
   if (info) { info.style.display = 'none'; info.innerHTML = ''; }
   const f = document.getElementById('ds-pfx'); if (f) f.value = '';
@@ -7782,6 +7784,7 @@ function dsCarregarPfx() {
       if (!cert || !key) throw new Error('Certificado ou chave privada não encontrados no arquivo.');
 
       _dsCert = cert; _dsKey = key;
+      _dsCerts = certArr.map(function (b) { return b.cert; }).filter(Boolean);
 
       const cn = cert.subject.getField('CN') ? cert.subject.getField('CN').value : '(sem nome)';
       const issuer = cert.issuer.getField('CN') ? cert.issuer.getField('CN').value : '';
@@ -7815,7 +7818,7 @@ function dsAssinarPdf() {
 
       const p7 = forge.pkcs7.createSignedData();
       p7.content = forge.util.createBuffer(bin);
-      p7.addCertificate(_dsCert);
+      (_dsCerts.length ? _dsCerts : [_dsCert]).forEach(function (c) { p7.addCertificate(c); });
       p7.addSigner({
         key: _dsKey,
         certificate: _dsCert,
@@ -8071,6 +8074,105 @@ async function dsAssinarComPosicao() {
   } catch (err) {
     console.error(err);
     toastMsg('Erro ao assinar: ' + (err.message || err), 'error');
+  }
+}
+
+// ===================== ASSINATURA PAdES (EMBUTIDA - reconhecida pelo Adobe) =====================
+async function dsAssinarPades() {
+  if (!_dsCert || !_dsKey) return toastMsg('Carregue o certificado primeiro.', 'warning');
+  if (!_dsPdfBytes) return toastMsg('Selecione o PDF.', 'warning');
+  if (!_dsPlace) return toastMsg('Clique na página para posicionar a assinatura.', 'warning');
+  if (typeof forge === 'undefined') return toastMsg('Biblioteca forge não carregou.', 'error');
+
+  const res = document.getElementById('ds-result');
+  res.style.display = 'block';
+  res.innerHTML = '⏳ Gerando assinatura PAdES... aguarde.';
+
+  try {
+    // Polyfill de Buffer (as bibliotecas PAdES usam Buffer do Node)
+    if (!window.Buffer) {
+      const bm = await import('https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm');
+      window.Buffer = bm.Buffer;
+    }
+    const pdfLib = await import('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm');
+    const utils = await import('https://cdn.jsdelivr.net/npm/@signpdf/utils@3.2.4/+esm');
+    const signpdfMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/signpdf@3.2.4/+esm');
+    const placeMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/placeholder-pdf-lib@3.2.4/+esm');
+    const SignPdf = signpdfMod.SignPdf || signpdfMod.default;
+    const pdflibAddPlaceholder = placeMod.pdflibAddPlaceholder;
+
+    const doc = await pdfLib.PDFDocument.load(_dsPdfBytes);
+    const page = doc.getPage(_dsPlace.page);
+    const x = _dsPlace.xPt, y = _dsPlace.yPt, w = _dsPlace.wPt, h = _dsPlace.hPt;
+    const { rgb, StandardFonts } = pdfLib;
+    const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+
+    // Aparência visível no local escolhido
+    page.drawRectangle({ x, y, width: w, height: h, borderColor: rgb(0.1, 0.4, 0.2), borderWidth: 1 });
+    if (_dsImgBytes) {
+      const png = await doc.embedPng(_dsImgBytes);
+      page.drawImage(png, { x: x + 2, y: y + 2, width: Math.max(1, w - 4), height: Math.max(1, h - 4) });
+    } else {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+      const fs = Math.max(6, Math.min(9, h / 5));
+      page.drawText('Assinado digitalmente por:', { x: x + 4, y: y + h - fs - 3, size: fs, font: bold, color: rgb(0.06, 0.4, 0.2) });
+      page.drawText(cn.substring(0, 60), { x: x + 4, y: y + h - fs * 2.1 - 3, size: fs, font, color: rgb(0, 0, 0) });
+      page.drawText('Em ' + new Date().toLocaleString('pt-BR'), { x: x + 4, y: y + h - fs * 3.2 - 3, size: fs, font, color: rgb(0.2, 0.2, 0.2) });
+    }
+
+    // Cria o campo de assinatura (placeholder) com ByteRange/Contents
+    pdflibAddPlaceholder({
+      pdfDoc: doc,
+      reason: 'Assinatura digital',
+      contactInfo: '',
+      name: cn,
+      location: 'Itacarambi - MG',
+      signingTime: new Date(),
+      signatureLength: 16384,
+      widgetRect: [x, y, x + w, y + h],
+      subFilter: 'adbe.pkcs7.detached'
+    });
+
+    // Objeto streams desativado (obrigatório para localizar o placeholder)
+    const withPlaceholder = await doc.save({ useObjectStreams: false });
+
+    // Assinador: gera o PKCS#7 (CMS) com o certificado
+    const signer = new utils.Signer();
+    signer.sign = async function (buffer) {
+      const p7 = forge.pkcs7.createSignedData();
+      p7.content = forge.util.createBuffer(buffer.toString('binary'));
+      (_dsCerts.length ? _dsCerts : [_dsCert]).forEach(function (c) { p7.addCertificate(c); });
+      p7.addSigner({
+        key: _dsKey, certificate: _dsCert, digestAlgorithm: forge.pki.oids.sha256,
+        authenticatedAttributes: [
+          { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
+          { type: forge.pki.oids.messageDigest },
+          { type: forge.pki.oids.signingTime, value: new Date() }
+        ]
+      });
+      p7.sign({ detached: true });
+      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+      return window.Buffer.from(der, 'binary');
+    };
+
+    const signed = await new SignPdf().sign(window.Buffer.from(withPlaceholder), signer);
+    const out = new Uint8Array(signed.length);
+    for (let i = 0; i < signed.length; i++) out[i] = signed[i];
+
+    const baseName = (document.getElementById('ds-pdf').files[0].name || 'documento.pdf').replace(/\.pdf$/i, '');
+    dsBaixar(new Blob([out], { type: 'application/pdf' }), baseName + '_assinado.pdf');
+
+    res.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ PDF assinado em PAdES!</div>' +
+      '<div><strong>Arquivo:</strong> ' + esc(baseName) + '_assinado.pdf</div>' +
+      '<div><strong>Assinado por:</strong> ' + esc(cn) + '</div>' +
+      '<div><strong>Data:</strong> ' + new Date().toLocaleString('pt-BR') + '</div>' +
+      '<div style="margin-top:6px">Abra no Adobe Reader para ver o painel de assinatura.</div>';
+    toastMsg('PDF assinado em PAdES!', 'success');
+  } catch (err) {
+    console.error(err);
+    res.innerHTML = '<div style="color:var(--danger);font-weight:700">❌ Erro: ' + esc(err.message || String(err)) + '</div>';
+    toastMsg('Erro no PAdES: ' + (err.message || err), 'error');
   }
 }
 </script>
