@@ -7754,6 +7754,53 @@ function dsBinFromArrayBuffer(buffer) {
   return bin;
 }
 
+// Gera uma imagem (PNG) do selo de assinatura no padrão ICP-Brasil
+function dsGerarImagemAssinaturaAparencia() {
+  return new Promise(function (resolve) {
+    const W = 900, H = 300;
+    const cv = document.createElement('canvas');
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext('2d');
+    const verde = '#1b7f3b';
+
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = verde; ctx.lineWidth = 3; ctx.strokeRect(6, 6, W - 12, H - 12);
+    ctx.fillStyle = verde; ctx.fillRect(6, 6, W - 12, 56);
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 26px Arial'; ctx.textBaseline = 'middle';
+    ctx.fillText('Assinatura Digital ICP-Brasil', 26, 35);
+
+    ctx.beginPath(); ctx.arc(W - 48, 34, 18, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();
+    ctx.fillStyle = verde; ctx.font = 'bold 24px Arial'; ctx.textAlign = 'center';
+    ctx.fillText('\u2713', W - 48, 36); ctx.textAlign = 'left';
+
+    const cn = _dsCert && _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+    let nome = cn, cpf = '';
+    if (cn.indexOf(':') >= 0) { const p = cn.split(':'); nome = p[0]; cpf = p.slice(1).join(':'); }
+
+    ctx.fillStyle = '#444'; ctx.font = '20px Arial';
+    ctx.fillText('Assinado digitalmente por:', 26, 100);
+    ctx.fillStyle = '#111'; ctx.font = 'bold 30px Arial';
+    ctx.fillText(nome.substring(0, 44), 26, 142);
+
+    ctx.fillStyle = '#333'; ctx.font = '20px Arial';
+    let y = 184;
+    if (cpf) { ctx.fillText('CPF: ' + cpf, 26, y); y += 34; }
+    ctx.fillText('Data/Hora: ' + new Date().toLocaleString('pt-BR'), 26, y);
+
+    ctx.fillStyle = verde; ctx.font = 'bold 15px Arial';
+    ctx.fillText('Documento assinado digitalmente \u2014 certificado ICP-Brasil', 26, H - 30);
+
+    cv.toBlob(function (b) { b.arrayBuffer().then(function (ab) { resolve(new Uint8Array(ab)); }); }, 'image/png');
+  });
+}
+
+async function dsObterAparenciaBytes() {
+  if (_dsImgBytes) return _dsImgBytes;
+  return await dsGerarImagemAssinaturaAparencia();
+}
+
 function dsLimparCert() {
   _dsCert = null; _dsKey = null; _dsCerts = [];
   const info = document.getElementById('ds-cert-info');
@@ -7990,8 +8037,8 @@ async function dsRenderPreview() {
 function dsPosicionarBox(wrap, pageNum, x, y) {
   if (_dsBoxEl && _dsBoxEl.parentElement) _dsBoxEl.parentElement.removeChild(_dsBoxEl);
   const size = _dsPageSizes[pageNum - 1];
-  const w = Math.min(220, size.vpW * 0.5);
-  const h = w * 0.45;
+  const w = Math.min(270, size.vpW * 0.6);
+  const h = w / 3;
   const left = Math.max(0, Math.min(x - w / 2, size.vpW - w));
   const top = Math.max(0, Math.min(y - h / 2, size.vpH - h));
 
@@ -8080,21 +8127,13 @@ async function dsAssinarComPosicao() {
     const doc = await PDFLib.PDFDocument.load(_dsPdfBytes);
     const page = doc.getPage(_dsPlace.page);
     const box = { x: _dsPlace.xPt, y: _dsPlace.yPt, width: _dsPlace.wPt, height: _dsPlace.hPt };
-    page.drawRectangle({ x: box.x, y: box.y, width: box.width, height: box.height, borderColor: rgb(0.1, 0.4, 0.2), borderWidth: 1 });
 
-    if (_dsImgBytes) {
-      const png = await doc.embedPng(_dsImgBytes);
-      page.drawImage(png, { x: box.x + 2, y: box.y + 2, width: Math.max(1, box.width - 4), height: Math.max(1, box.height - 4) });
-    } else {
-      const font = await doc.embedFont(StandardFonts.Helvetica);
-      const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-      const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
-      const data = new Date().toLocaleString('pt-BR');
-      const fs = Math.max(6, Math.min(9, box.height / 5));
-      page.drawText('Assinado digitalmente por:', { x: box.x + 4, y: box.y + box.height - fs - 3, size: fs, font: bold, color: rgb(0.06, 0.4, 0.2) });
-      page.drawText(cn.substring(0, 60), { x: box.x + 4, y: box.y + box.height - fs * 2.1 - 3, size: fs, font, color: rgb(0, 0, 0) });
-      page.drawText('Em ' + data, { x: box.x + 4, y: box.y + box.height - fs * 3.2 - 3, size: fs, font, color: rgb(0.2, 0.2, 0.2) });
-    }
+    // Aparência visível: selo ICP-Brasil (ou imagem do usuário), ajustado à caixa sem distorcer
+    const aparenciaBytes = await dsObterAparenciaBytes();
+    const png = await doc.embedPng(aparenciaBytes);
+    const fit = Math.min(box.width / png.width, box.height / png.height);
+    const dw = png.width * fit, dh = png.height * fit;
+    page.drawImage(png, { x: box.x + (box.width - dw) / 2, y: box.y + (box.height - dh) / 2, width: dw, height: dh });
 
     try { await doc.attach(p7s, 'assinatura.p7s', { mimeType: 'application/pkcs7-signature', description: 'Assinatura digital PKCS#7' }); } catch (e) { console.warn(e); }
     const out = await doc.save();
@@ -8149,19 +8188,12 @@ async function dsAssinarPades() {
     const { rgb, StandardFonts } = pdfLib;
     const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
 
-    // Aparência visível no local escolhido
-    page.drawRectangle({ x, y, width: w, height: h, borderColor: rgb(0.1, 0.4, 0.2), borderWidth: 1 });
-    if (_dsImgBytes) {
-      const png = await doc.embedPng(_dsImgBytes);
-      page.drawImage(png, { x: x + 2, y: y + 2, width: Math.max(1, w - 4), height: Math.max(1, h - 4) });
-    } else {
-      const font = await doc.embedFont(StandardFonts.Helvetica);
-      const bold = await doc.embedFont(StandardFonts.HelveticaBold);
-      const fs = Math.max(6, Math.min(9, h / 5));
-      page.drawText('Assinado digitalmente por:', { x: x + 4, y: y + h - fs - 3, size: fs, font: bold, color: rgb(0.06, 0.4, 0.2) });
-      page.drawText(cn.substring(0, 60), { x: x + 4, y: y + h - fs * 2.1 - 3, size: fs, font, color: rgb(0, 0, 0) });
-      page.drawText('Em ' + new Date().toLocaleString('pt-BR'), { x: x + 4, y: y + h - fs * 3.2 - 3, size: fs, font, color: rgb(0.2, 0.2, 0.2) });
-    }
+    // Aparência visível: selo ICP-Brasil (ou imagem do usuário), ajustado à caixa sem distorcer
+    const aparenciaBytes = await dsObterAparenciaBytes();
+    const png = await doc.embedPng(aparenciaBytes);
+    const fit = Math.min(w / png.width, h / png.height);
+    const dw = png.width * fit, dh = png.height * fit;
+    page.drawImage(png, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
 
     // Cria o campo de assinatura (placeholder) com ByteRange/Contents
     pdflibAddPlaceholder({
