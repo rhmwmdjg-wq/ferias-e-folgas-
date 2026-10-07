@@ -4328,22 +4328,28 @@ Coordenação de RH
 
 <!-- ======================= PANEL FECHAMENTO DE PONTO MENSAL ======================= -->
 <style>
-  #panel-pontomensal .pm-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  #panel-pontomensal .pm-table { width:100%; border-collapse:collapse; table-layout:auto; font-size:13px; }
   #panel-pontomensal .pm-table th,
-  #panel-pontomensal .pm-table td { border:1px solid var(--border-mid); padding:4px 3px; font-size:11px; text-align:center; vertical-align:middle; height:28px; overflow:hidden; text-overflow:ellipsis; }
-  #panel-pontomensal .pm-table th { background:var(--surface); font-weight:800; color:var(--text-mid); text-transform:uppercase; font-size:9.5px; letter-spacing:.03em; }
-  #panel-pontomensal .pm-table tbody tr:hover td { background:rgba(77,139,255,0.04); }
+  #panel-pontomensal .pm-table td { border:1px solid var(--border-mid); padding:7px 7px; font-size:13px; text-align:center; vertical-align:middle; }
+  #panel-pontomensal .pm-table th { background:var(--surface); font-weight:800; color:var(--text-mid); text-transform:uppercase; font-size:11px; letter-spacing:.02em; white-space:normal; line-height:1.2; position:sticky; top:0; z-index:3; }
+  #panel-pontomensal .pm-table td { white-space:nowrap; }
+  #panel-pontomensal .pm-table tbody tr:nth-child(even) td { background:rgba(255,255,255,0.02); }
+  #panel-pontomensal .pm-table tbody tr:hover td { background:rgba(77,139,255,0.08); }
   #panel-pontomensal .pm-table td:nth-child(2),
   #panel-pontomensal .pm-table td:nth-child(4),
   #panel-pontomensal .pm-table td:nth-child(5),
-  #panel-pontomensal .pm-table td:nth-child(15) { text-align:left; }
+  #panel-pontomensal .pm-table td:nth-child(15) { text-align:left; white-space:normal; }
+  #panel-pontomensal .pm-table td:nth-child(2), #panel-pontomensal .pm-table th:nth-child(2) { min-width:210px; }
+  #panel-pontomensal .pm-table td:nth-child(4), #panel-pontomensal .pm-table th:nth-child(4) { min-width:150px; }
+  #panel-pontomensal .pm-table td:nth-child(5), #panel-pontomensal .pm-table th:nth-child(5) { min-width:150px; }
   #panel-pontomensal .pm-cell { cursor:pointer; }
-  #panel-pontomensal .pm-cell:hover { background:rgba(77,139,255,0.12); }
+  #panel-pontomensal .pm-cell:hover { background:rgba(77,139,255,0.16) !important; }
   #panel-pontomensal .pm-alterado { color:var(--danger) !important; font-weight:800; }
-  #panel-pontomensal .pm-acoes { width:44px; }
-  #panel-pontomensal .pm-table input[type=checkbox] { width:auto; margin:0; }
-  #panel-pontomensal .pm-scroll { overflow-x:auto; }
-  #modal-pm-benef .pm-table input { padding:4px 3px; font-size:11px; min-width:52px; text-align:center; }
+  #panel-pontomensal .pm-acoes { width:46px; }
+  #panel-pontomensal .pm-table input[type=checkbox] { width:auto; margin:0; transform:scale(1.15); }
+  #panel-pontomensal .pm-scroll { overflow:auto; max-height:72vh; border-radius:var(--r-sm); }
+  #panel-pontomensal .pm-dica { font-size:0.72rem; color:var(--muted); margin-bottom:8px; }
+  #modal-pm-benef .pm-table input { padding:5px 4px; font-size:12px; min-width:52px; text-align:center; }
   #modal-pm-benef .pm-table td { padding:3px; }
 </style>
 <div class="tab-panel" id="panel-pontomensal">
@@ -4394,6 +4400,7 @@ Coordenação de RH
       <h3 style="margin:0">🧑⚕️ Servidores lotados na APS</h3>
       <button class="btn btn-ghost btn-sm" onclick="pmAdicionarLinha('servidor')">➕ Adicionar linha</button>
     </div>
+    <div class="pm-dica">💡 Clique numa célula para editar · deslize a tabela na horizontal para ver todas as colunas.</div>
     <div class="pm-scroll">
       <table class="pm-table">
         <thead><tr id="pm-head-servidores"></tr></thead>
