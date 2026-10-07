@@ -6918,7 +6918,465 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="reports.js"></script>
 <script src="protocolo-entrega.js"></script>
 <script src="oficios.js"></script>
-<script src="ponto-mensal.js"></script>
+<script>
+// Módulo Fechamento de Ponto Mensal (APS).
+// Grade editável, fechamento do mês, histórico e impressão com alterações em vermelho.
+
+const PM_SENHA_REABRIR = 'APS2026';
+
+const PM_CAMPOS = [
+  { key: 'item', label: 'Item' },
+  { key: 'nome', label: 'Nome do Funcionário' },
+  { key: 'matricula', label: 'Mat.' },
+  { key: 'setor', label: 'Setor' },
+  { key: 'funcao', label: 'Função' },
+  { key: 'situacao', label: 'Situação' },
+  { key: 'falta', label: 'Falta' },
+  { key: 'fracao', label: 'Fração de Plantão' },
+  { key: 'ins', label: 'Ins' },
+  { key: 'not', label: 'Not' },
+  { key: 'int', label: 'Int' },
+  { key: 'disp', label: 'Disp' },
+  { key: 'grat', label: 'Grat.' },
+  { key: 'comp', label: 'COMP. PISO' },
+  { key: 'obs', label: 'OBS' }
+];
+
+const PM_BASE_SERVIDORES = [
+  { nome: 'Adria Denica Lafaete Luna', matricula: '7762', setor: 'ESF - FABIÃO', funcao: 'Téc. de Enfermagem', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '1', disp: '-', grat: '-', comp: '1022.42', obs: '' },
+  { nome: 'Adriana Pereira Sá', matricula: '8422', setor: 'AMBULATÓRIO', funcao: 'Enfermeira', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '808.87', obs: '' },
+  { nome: 'Ailton Lojor de Oliveira', matricula: '7750', setor: 'PASCOALINA', funcao: 'Motorista', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Alan Alves Lisboa', matricula: '6793', setor: 'AMBULATÓRIO', funcao: 'Educador Físico', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Albaneffson Pimenta Alves', matricula: '8059', setor: 'ESF - SERRARIA', funcao: 'ACS', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '1', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Alessandra Vieira dos Santos', matricula: '8525', setor: 'AMBULATÓRIO', funcao: 'Enfermeira', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '808.87', obs: 'Atestado' },
+  { nome: 'Alessandro Sousa Alves', matricula: '5726', setor: 'ESF - FABIÃO', funcao: 'ACS', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '1', not: '-', int: '1', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Alexandro Oliveira Ribeiro', matricula: '7732', setor: 'APS', funcao: 'Motorista', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Aline Monteiro Mendes', matricula: '5241', setor: 'ESF - MARIA DAS DORES', funcao: 'ASP', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '-', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: 'LIP' },
+  { nome: 'Aline Rodrigues Queiroz', matricula: '5293', setor: 'PSF - MARIA DAS DORES', funcao: 'ACS', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Ana Carolina Gonçalves Cardoso', matricula: '7258', setor: 'ESF- PASCOALINA', funcao: 'Técnica de Enfermagem', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '1022.42', obs: '' },
+  { nome: 'Ana Celia de Souza Seixas', matricula: '1504', setor: 'AMBULATÓRIO', funcao: 'Téc. em Enfermagem', situacao: 'EFETIVO', falta: '-', fracao: '-', ins: '-', not: '-', int: '-', disp: '-', grat: '-', comp: '1022.42', obs: 'Licença saúde' },
+  { nome: 'Ana Luiza Mendes Rodrigues', matricula: '', setor: 'ESF- SORAIA DURAES', funcao: 'Enfermeira', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '808.87', obs: '' },
+  { nome: 'Ana Luiza Montalvão Seixas', matricula: '', setor: 'Vila Florentina', funcao: 'Enfermeira', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '1', disp: '-', grat: '-', comp: '808.87', obs: '' },
+  { nome: 'Anna Raquel Machado Guedes', matricula: '5294', setor: 'AMBULATÓRIO', funcao: 'Nutricionista', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '%', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: 'Atestado' },
+  { nome: 'Anne Karoline Niz Pinheiro', matricula: '7848', setor: 'AMBULATÓRIO', funcao: 'ACS', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' },
+  { nome: 'Arnaldo Barbosa Pereira', matricula: '4229', setor: 'AMBULATÓRIO', funcao: 'Téc.de Enfermagem', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '%', not: '-', int: '-', disp: '-', grat: '-', comp: '1022.42', obs: 'Atestado' },
+  { nome: 'Assis de Castro Santos', matricula: '4381', setor: 'ESF- PASCOALINA', funcao: 'ACS', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '%', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: 'Falta injustificada de 1 dia.' },
+  { nome: 'Brenda Cristina Rodrigues de Almeida', matricula: '7821', setor: 'APS', funcao: 'ENFERMEIRA ESF', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '808.87', obs: '' },
+  { nome: 'Ruan Pablo Ferreira dos Santos', matricula: '4368', setor: 'APS', funcao: 'ACS', situacao: 'EFETIVO(A)', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' }
+];
+
+const PM_BASE_MEDICOS = [
+  { item: 108, nome: 'Fabiano Alves de Souza', matricula: '7777', setor: 'ESF- PASCOALINA', funcao: 'Médico ESF', situacao: 'CONTRATO', falta: '-', fracao: '-', ins: '1', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '' }
+];
+
+let _pmFolha = null;
+let _pmMesAtual = '';
+let _pmEditCtx = null;
+let _pmSaveTimer = null;
+
+function pmLabel(campo) {
+  const c = PM_CAMPOS.find(x => x.key === campo);
+  return c ? c.label : campo;
+}
+
+function pmBaseDados() {
+  return {
+    servidores: PM_BASE_SERVIDORES.map((p, i) => ({ ...p, item: i + 1, alterados: {} })),
+    medicos: PM_BASE_MEDICOS.map((p, i) => ({ ...p, item: p.item || (i + 1), alterados: {} }))
+  };
+}
+
+function pmServidoresDoCadastro() {
+  let lista = [];
+  try {
+    lista = (typeof getServidoresAcessiveis === 'function') ? getServidoresAcessiveis() : DB.servidores();
+  } catch (e) { lista = DB.servidores(); }
+
+  const ehMedico = (cargo) => /m[ée]dic/i.test(String(cargo || ''));
+  const mapRow = (s, item) => ({
+    item,
+    nome: s.nome || '',
+    matricula: s.matricula || '',
+    setor: s.setor || '',
+    funcao: s.cargo || '',
+    situacao: (String(s.vinculo || '').toLowerCase() === 'contratado') ? 'CONTRATO' : 'EFETIVO(A)',
+    falta: '-', fracao: '-', ins: '', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '',
+    alterados: {}
+  });
+
+  const todos = (lista || []).filter(s => s && s.nome);
+  todos.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+
+  const servidores = [], medicos = [];
+  todos.forEach(s => { (ehMedico(s.cargo) ? medicos : servidores).push(s); });
+
+  return {
+    servidores: servidores.map((s, i) => mapRow(s, i + 1)),
+    medicos: medicos.map((s, i) => mapRow(s, i + 1))
+  };
+}
+
+function pmList(tipo) {
+  if (!_pmFolha || !_pmFolha.dados) return [];
+  return tipo === 'medico' ? _pmFolha.dados.medicos : _pmFolha.dados.servidores;
+}
+
+function pmPeriodo(mes) {
+  if (!mes) return '';
+  const partes = mes.split('-');
+  const ano = partes[0], m = partes[1];
+  const ultimo = new Date(Number(ano), Number(m), 0).getDate();
+  return `01/${m}/${ano} a ${String(ultimo).padStart(2, '0')}/${m}/${ano}`;
+}
+
+function pmUsuarioAtual() {
+  try { return (JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}').nome) || ''; } catch (e) { return ''; }
+}
+
+function pmIniciar() {
+  pmRenderHeads();
+  const mesInput = document.getElementById('pm-mes');
+  if (mesInput && !mesInput.value) {
+    const d = new Date();
+    mesInput.value = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+  }
+  pmCarregarMes();
+}
+
+function pmRenderHeads() {
+  const ths = PM_CAMPOS.map(c => `<th>${esc(c.label)}</th>`).join('') + '<th>Ações</th>';
+  const s = document.getElementById('pm-head-servidores');
+  const m = document.getElementById('pm-head-medicos');
+  if (s) s.innerHTML = ths;
+  if (m) m.innerHTML = ths;
+}
+
+async function pmCarregarMes() {
+  const mesInput = document.getElementById('pm-mes');
+  let mes = mesInput ? mesInput.value : '';
+  if (!mes) {
+    const d = new Date();
+    mes = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+    if (mesInput) mesInput.value = mes;
+  }
+  _pmMesAtual = mes;
+
+  let folha = DB.pontoFolhas().find(f => f.mes === mes);
+  if (!folha) {
+    folha = pmCriarFolha(mes);
+    await DB.savePontoFolha(folha);
+  }
+  _pmFolha = folha;
+
+  const a = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : { nome: '', cargo: '' };
+  document.getElementById('pm-responsavel').value = folha.responsavel || a.nome || '';
+  document.getElementById('pm-funcao').value = folha.funcao || a.cargo || 'Coordenador';
+
+  pmRenderStatus();
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  pmRenderHistorico();
+}
+
+function pmCriarFolha(mes) {
+  const a = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : { nome: '', cargo: '' };
+
+  let dados = pmServidoresDoCadastro();
+  const temCadastro = (dados.servidores.length + dados.medicos.length) > 0;
+  if (!temCadastro) {
+    dados = pmBaseDados();
+  } else if (!dados.medicos.length) {
+    dados.medicos = PM_BASE_MEDICOS.map((p, i) => ({ ...p, item: p.item || (i + 1), alterados: {} }));
+  }
+
+  return {
+    id: uid(),
+    mes,
+    responsavel: a.nome || '',
+    funcao: a.cargo || 'Coordenador',
+    fechado: false,
+    fechadoEm: '',
+    dados,
+    criadoEm: new Date().toISOString()
+  };
+}
+
+function pmPuxarCadastro() {
+  if (!_pmFolha) return;
+  if (!confirm('Substituir a grade deste mês por TODOS os servidores do cadastro?\n\nAs alterações já feitas neste mês serão perdidas.')) return;
+  const dados = pmServidoresDoCadastro();
+  if (!dados.servidores.length && !dados.medicos.length) return toastMsg('Nenhum servidor cadastrado encontrado.', 'warning');
+  if (!dados.medicos.length) dados.medicos = PM_BASE_MEDICOS.map((p, i) => ({ ...p, item: p.item || (i + 1), alterados: {} }));
+  _pmFolha.dados = dados;
+  DB.savePontoFolha(_pmFolha);
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  toastMsg('Servidores do cadastro carregados!', 'success');
+}
+
+function pmAtualizarResponsavel() {
+  if (!_pmFolha) return;
+  _pmFolha.responsavel = document.getElementById('pm-responsavel').value;
+  _pmFolha.funcao = document.getElementById('pm-funcao').value;
+  clearTimeout(_pmSaveTimer);
+  _pmSaveTimer = setTimeout(() => { DB.savePontoFolha(_pmFolha); }, 800);
+}
+
+function pmRenderStatus() {
+  const el = document.getElementById('pm-status');
+  if (!el) return;
+  if (_pmFolha && _pmFolha.fechado) {
+    el.textContent = '🔒 FECHADO';
+    el.className = 'tag tag-red';
+  } else {
+    el.textContent = '🔓 ABERTO';
+    el.className = 'tag tag-green';
+  }
+}
+
+function pmRenderTabela(tipo) {
+  const tbody = document.getElementById(tipo === 'medico' ? 'pm-corpo-medicos' : 'pm-corpo-servidores');
+  if (!tbody) return;
+  const lista = pmList(tipo);
+  if (!lista.length) {
+    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 1}" style="text-align:center;padding:18px;color:var(--muted)">Nenhum registro. Use "Adicionar linha".</td></tr>`;
+    return;
+  }
+  tbody.innerHTML = lista.map((p, i) => {
+    const tds = PM_CAMPOS.map(c => {
+      const alt = p.alterados && p.alterados[c.key];
+      const val = String(p[c.key] ?? '');
+      const editavel = c.key !== 'item';
+      return `<td class="pm-cell ${alt ? 'pm-alterado' : ''}"${editavel ? ` onclick="pmAbrirEdicao('${tipo}',${i},'${c.key}')"` : ''} title="${esc(val)}">${esc(val)}</td>`;
+    }).join('');
+    return `<tr>${tds}<td class="pm-acoes"><button class="btn btn-danger btn-sm" onclick="pmRemoverLinha('${tipo}',${i})" title="Remover">🗑️</button></td></tr>`;
+  }).join('');
+}
+
+function pmAbrirEdicao(tipo, index, campo) {
+  const pessoa = pmList(tipo)[index];
+  if (!pessoa) return;
+  _pmEditCtx = { tipo, index, campo };
+  document.getElementById('pm-modal-funcionario').value = pessoa.nome || '';
+  document.getElementById('pm-modal-campo').value = pmLabel(campo);
+  document.getElementById('pm-modal-anterior').value = pessoa[campo] ?? '';
+  document.getElementById('pm-modal-novo').value = pessoa[campo] ?? '';
+  document.getElementById('pm-modal-justificativa').value = '';
+  document.getElementById('modal-pm-edicao').classList.add('open');
+  setTimeout(() => { const el = document.getElementById('pm-modal-novo'); if (el) el.focus(); }, 50);
+}
+
+function pmSalvarAlteracao() {
+  if (!_pmEditCtx || !_pmFolha) return;
+  const { tipo, index, campo } = _pmEditCtx;
+  const pessoa = pmList(tipo)[index];
+  if (!pessoa) return;
+
+  const anterior = pessoa[campo] ?? '';
+  const novo = document.getElementById('pm-modal-novo').value;
+  const justificativa = document.getElementById('pm-modal-justificativa').value.trim();
+
+  if (String(novo) === String(anterior)) return toastMsg('Nenhuma alteração foi realizada.', 'info');
+  if (_pmFolha.fechado && !justificativa) return toastMsg('Mês fechado: informe a justificativa da alteração.', 'warning');
+
+  pessoa[campo] = novo;
+  if (!pessoa.alterados) pessoa.alterados = {};
+  pessoa.alterados[campo] = true;
+
+  DB.addPontoHistorico({
+    id: uid(),
+    mes: _pmFolha.mes,
+    data: new Date().toLocaleString('pt-BR'),
+    funcionario: pessoa.nome || '',
+    campo: pmLabel(campo),
+    anterior,
+    novo,
+    justificativa: justificativa || 'Alteração realizada antes do fechamento.',
+    usuario: pmUsuarioAtual(),
+    criadoEm: new Date().toISOString()
+  });
+  DB.savePontoFolha(_pmFolha);
+
+  fecharModal('modal-pm-edicao');
+  pmRenderTabela(tipo);
+  pmRenderHistorico();
+  toastMsg('Alteração registrada!', 'success');
+}
+
+function pmAdicionarLinha(tipo) {
+  if (!_pmFolha) return;
+  const lista = pmList(tipo);
+  lista.push({ item: lista.length + 1, nome: '', matricula: '', setor: '', funcao: '', situacao: '', falta: '-', fracao: '-', ins: '', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '', alterados: {} });
+  DB.savePontoFolha(_pmFolha);
+  pmRenderTabela(tipo);
+}
+
+function pmRemoverLinha(tipo, idx) {
+  if (!_pmFolha) return;
+  const lista = pmList(tipo);
+  const p = lista[idx];
+  if (!p) return;
+  if (!confirm(`Remover a linha "${p.nome || 'sem nome'}"?`)) return;
+  lista.splice(idx, 1);
+  lista.forEach((x, i) => { x.item = i + 1; });
+  DB.savePontoFolha(_pmFolha);
+  pmRenderTabela(tipo);
+}
+
+function pmFechar() {
+  if (!_pmFolha) return;
+  if (_pmFolha.fechado) return toastMsg('Este mês já está fechado.', 'info');
+  if (!confirm(`Fechar o ponto de ${pmPeriodo(_pmFolha.mes)}?\n\nDepois de fechado, as alterações sairão em vermelho na impressão e exigirão justificativa.`)) return;
+  _pmFolha.fechado = true;
+  _pmFolha.fechadoEm = new Date().toISOString();
+  DB.savePontoFolha(_pmFolha);
+  pmRenderStatus();
+  if (typeof DB.saveLog === 'function') DB.saveLog('Documento', `Fechou o ponto de ${_pmFolha.mes}`, 'ponto_folhas', _pmFolha.id);
+  toastMsg('Ponto fechado com sucesso!', 'success');
+}
+
+function pmReabrir() {
+  if (!_pmFolha) return;
+  if (!_pmFolha.fechado) return toastMsg('Este mês já está aberto.', 'info');
+  const senha = prompt('Informe a senha administrativa para reabrir:');
+  if (senha === null) return;
+  if (senha !== PM_SENHA_REABRIR) return toastMsg('Senha incorreta.', 'error');
+  _pmFolha.fechado = false;
+  DB.savePontoFolha(_pmFolha);
+  pmRenderStatus();
+  toastMsg('Mês reaberto.', 'info');
+}
+
+function pmReporBase() {
+  if (!_pmFolha) return;
+  if (!confirm('Isso substitui a grade deste mês pela lista base. Continuar?')) return;
+  _pmFolha.dados = pmBaseDados();
+  DB.savePontoFolha(_pmFolha);
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  toastMsg('Lista base reposta.', 'info');
+}
+
+function pmRenderHistorico() {
+  const tbody = document.getElementById('pm-historico');
+  if (!tbody) return;
+  const regs = DB.pontoHistorico()
+    .filter(h => h.mes === _pmMesAtual)
+    .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
+  if (!regs.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Nenhuma alteração registrada.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = regs.map(h => `<tr>
+    <td>${esc(h.data || '')}</td>
+    <td>${esc(h.funcionario || '')}</td>
+    <td>${esc(h.campo || '')}</td>
+    <td>${esc(h.anterior || '')}</td>
+    <td style="color:var(--danger);font-weight:700">${esc(h.novo || '')}</td>
+    <td>${esc(h.justificativa || '')}</td>
+  </tr>`).join('');
+}
+
+function pmExportarCSV() {
+  if (!_pmFolha) return;
+  const linhas = [PM_CAMPOS.map(c => c.label).join(';')];
+  ['servidores', 'medicos'].forEach(k => {
+    (_pmFolha.dados[k] || []).forEach(p => {
+      linhas.push(PM_CAMPOS.map(c => `"${String(p[c.key] ?? '').replace(/"/g, '""')}"`).join(';'));
+    });
+  });
+  const blob = new Blob(['\uFEFF' + linhas.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PONTO_${_pmFolha.mes}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function pmTabelaPrint(lista) {
+  const head = PM_CAMPOS.map(c => `<th>${esc(c.label)}</th>`).join('');
+  const body = (lista || []).map(p => {
+    const tds = PM_CAMPOS.map(c => {
+      const alt = p.alterados && p.alterados[c.key];
+      return `<td class="${alt ? 'alt' : ''}">${esc(String(p[c.key] ?? ''))}</td>`;
+    }).join('');
+    return `<tr>${tds}</tr>`;
+  }).join('');
+  return `<table class="point-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
+}
+
+function pmImprimir() {
+  if (!_pmFolha) return;
+  const responsavel = _pmFolha.responsavel || '';
+  const funcao = _pmFolha.funcao || '';
+  const periodo = pmPeriodo(_pmFolha.mes);
+
+  const cabecalho = (titulo, periodoEl) => `
+    <div class="print-header">
+      <div class="secretaria">SECRETARIA MUNICIPAL DE SAÚDE - ITACARAMBI</div>
+      <div class="cnpj">ESTADO DE MINAS GERAIS - CNPJ: 18.283.101/0001-82<br>
+        Rua Alferes Propécio, Nº 39 - Centro – CEP: 39.470-000 - Centro - Tel: (38)3613-1148 – 1401/1957<br>
+        E-mail: smsitac@yahoo.com.br</div>
+      <div class="document-title">${esc(titulo)}</div>
+      <div class="document-info">
+        <strong>Responsável:</strong> ${esc(responsavel)} &nbsp;&nbsp;&nbsp;
+        <strong>Função:</strong> ${esc(funcao)} &nbsp;&nbsp;&nbsp;
+        <strong>PERÍODO:</strong> ${esc(periodoEl)}
+      </div>
+    </div>`;
+
+  const assinaturas = `
+    <div class="assinatura">
+      Coordenador(a): ${esc(responsavel)}<br>
+      ________________________________________________ Data: ____/____/______
+      <br><br>
+      Coordenador(a) do RH: ________________________________________ Data: ____/____/______
+    </div>`;
+
+  const html = `<!DOCTYPE html>
+  <html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8">
+    <title>Fechamento de Ponto - ${esc(_pmFolha.mes)}</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: Arial, Helvetica, sans-serif; color:#111; margin:0; padding:10px; }
+      .secretaria { text-align:center; font-size:12px; font-weight:bold; }
+      .cnpj { text-align:center; font-size:9.5px; }
+      .document-title { text-align:center; font-size:14px; font-weight:bold; margin-top:10px; }
+      .document-info { font-size:10.5px; margin:8px 0; }
+      .point-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+      .point-table th, .point-table td { border:1px solid #333; padding:2px 3px; font-size:8px; text-align:center; vertical-align:middle; height:19px; overflow:hidden; }
+      .point-table th { background:#e8e8e8; font-weight:bold; }
+      .alt { color:#d00000 !important; font-weight:bold; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+      .assinatura { margin-top:22px; font-size:10px; }
+      .page-break { page-break-before: always; margin-top:20px; }
+      @page { size: A4 landscape; margin: 7mm; }
+      @media print { body { padding:0; } .no-print { display:none; } }
+    </style>
+  </head>
+  <body>
+    <div class="no-print" style="text-align:right;margin-bottom:10px">
+      <button onclick="window.print()" style="padding:8px 16px;background:#145c37;color:#fff;border:0;border-radius:4px;font-weight:bold;cursor:pointer">🖨 Imprimir</button>
+    </div>
+
+    ${cabecalho('PONTO DOS SERVIDORES LOTADOS NA APS', periodo)}
+    ${pmTabelaPrint(_pmFolha.dados.servidores)}
+    ${assinaturas}
+
+    <div class="page-break"></div>
+    ${cabecalho('PONTO DOS SERVIDORES LOTADOS NA APS - MÉDICOS DA ESF', periodo)}
+    ${pmTabelaPrint(_pmFolha.dados.medicos)}
+    ${assinaturas}
+  </body>
+  </html>`;
+
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+}
+</script>
 <script>atualizarBadgeEventos();</script>
 
 <!-- ======================= MODAL VISUALIZADOR DE PDF ======================= -->
