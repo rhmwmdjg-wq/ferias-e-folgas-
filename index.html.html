@@ -4341,7 +4341,10 @@ Coordenação de RH
   #panel-pontomensal .pm-cell:hover { background:rgba(77,139,255,0.12); }
   #panel-pontomensal .pm-alterado { color:var(--danger) !important; font-weight:800; }
   #panel-pontomensal .pm-acoes { width:44px; }
+  #panel-pontomensal .pm-table input[type=checkbox] { width:auto; margin:0; }
   #panel-pontomensal .pm-scroll { overflow-x:auto; }
+  #modal-pm-benef .pm-table input { padding:4px 3px; font-size:11px; min-width:52px; text-align:center; }
+  #modal-pm-benef .pm-table td { padding:3px; }
 </style>
 <div class="tab-panel" id="panel-pontomensal">
   <div class="section-title">📋 Fechamento de Ponto Mensal</div>
@@ -4371,6 +4374,7 @@ Coordenação de RH
       <button class="btn btn-ghost" onclick="pmPuxarCadastro()">🔄 Puxar servidores do cadastro</button>
       <button class="btn btn-ghost" onclick="pmReporBase()">♻️ Repor lista base</button>
       <button class="btn btn-ghost" onclick="pmAbrirConfigPiso()">⚙️ Configurar Piso</button>
+      <button class="btn btn-ghost" onclick="pmAbrirBeneficios()">🧷 Benefícios Fixos</button>
     </div>
     <div class="field" style="margin-top:12px">
       <label>🔍 Buscar servidor (nome ou matrícula)</label>
@@ -4453,6 +4457,27 @@ Coordenação de RH
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="pmAplicarPiso()">✔️ Aplicar e preencher</button>
       <button class="btn btn-ghost" onclick="fecharModal('modal-pm-piso')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL BENEFÍCIOS FIXOS ======================= -->
+<div class="modal-bg" id="modal-pm-benef">
+  <div class="modal" style="max-width:920px">
+    <h3>🧷 Benefícios Fixos</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:12px">
+      Defina os benefícios que ficam <strong>fixos todos os meses</strong> para cada servidor. Use <strong>-</strong> ou deixe vazio para não aplicar.
+      Para <strong>tirar</strong> um benefício de um servidor, apague o valor e salve.
+    </p>
+    <div class="table-wrap" style="max-height:55vh;overflow:auto">
+      <table class="pm-table" style="table-layout:auto">
+        <thead><tr><th style="text-align:left;min-width:180px">Servidor</th><th>Ins</th><th>Not</th><th>Int</th><th>Disp</th><th>Grat.</th></tr></thead>
+        <tbody id="pm-benef-lista"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="pmSalvarBeneficios()">💾 Salvar benefícios fixos</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-pm-benef')">Cancelar</button>
     </div>
   </div>
 </div>
@@ -7056,6 +7081,129 @@ function pmUsuarioAtual() {
   try { return (JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}').nome) || ''; } catch (e) { return ''; }
 }
 
+// Chave estável do servidor (matrícula; senão o nome normalizado)
+function pmChave(p) {
+  const m = String(p && p.matricula || '').trim();
+  return m ? ('mat:' + m) : ('nome:' + pmNorm(p && p.nome));
+}
+
+// Registra uma alteração no histórico do mês
+function pmAddHist(pessoa, campoKey, anterior, novo, just) {
+  DB.addPontoHistorico({
+    id: uid(),
+    mes: _pmFolha.mes,
+    data: new Date().toLocaleString('pt-BR'),
+    funcionario: pessoa.nome || '',
+    campo: pmLabel(campoKey),
+    anterior,
+    novo,
+    justificativa: just || 'Alteração realizada antes do fechamento.',
+    usuario: pmUsuarioAtual(),
+    criadoEm: new Date().toISOString()
+  });
+}
+
+// Aplica os benefícios fixos (definidos na configuração) à grade de um mês
+function pmAplicarBeneficiosFixos(dados) {
+  const cfg = DB.config();
+  const fixos = cfg.beneficiosFixos || {};
+  ['servidores', 'medicos'].forEach(k => {
+    (dados[k] || []).forEach(p => {
+      const b = fixos[pmChave(p)];
+      if (!b) return;
+      ['ins', 'not', 'int', 'disp', 'grat'].forEach(c => {
+        if (b[c] !== undefined && b[c] !== null && b[c] !== '') p[c] = b[c];
+      });
+    });
+  });
+}
+
+// Marca/desmarca o servidor como "de férias" e, se desejado, retira Ins e Int do mês
+function pmToggleFerias(tipo, idx, checked) {
+  if (!_pmFolha) return;
+  const p = pmList(tipo)[idx];
+  if (!p) return;
+  p.ferias = !!checked;
+  if (checked) {
+    const remover = confirm(`Marcar "${p.nome || 'servidor'}" como EM FÉRIAS.\n\nDeseja retirar a INSALUBRIDADE (Ins) e a INTERIORIZAÇÃO (Int) neste mês?`);
+    if (remover) {
+      [['ins', 'Insalubridade'], ['int', 'Interiorização']].forEach(par => {
+        const campo = par[0];
+        const atual = String(p[campo] ?? '');
+        if (atual !== '' && atual !== '-') {
+          const anterior = p[campo];
+          p[campo] = '-';
+          if (_pmFolha.fechado) {
+            if (!p.alterados) p.alterados = {};
+            p.alterados[campo] = true;
+            pmAddHist(p, campo, anterior, '-', 'Retirada de benefício por férias');
+          }
+        }
+      });
+    }
+  }
+  DB.savePontoFolha(_pmFolha);
+  pmRenderTabela(tipo);
+  if (checked) pmRenderHistorico();
+  toastMsg(checked ? 'Servidor marcado de férias.' : 'Marcação de férias removida.', 'info');
+}
+
+function pmAbrirBeneficios() {
+  if (!_pmFolha) return;
+  const cfg = DB.config();
+  const fixos = cfg.beneficiosFixos || {};
+  const linhas = [];
+  const vistos = new Set();
+  ['servidores', 'medicos'].forEach(k => {
+    (_pmFolha.dados[k] || []).forEach(p => {
+      const chave = pmChave(p);
+      if (vistos.has(chave)) return;
+      vistos.add(chave);
+      const b = fixos[chave] || p;
+      linhas.push({ chave, nome: p.nome || '', ins: b.ins ?? '', not: b.not ?? '', int: b.int ?? '', disp: b.disp ?? '', grat: b.grat ?? '' });
+    });
+  });
+  const tbody = document.getElementById('pm-benef-lista');
+  tbody.innerHTML = linhas.map(l => `<tr data-chave="${esc(l.chave)}">
+    <td style="text-align:left">${esc(l.nome)}</td>
+    <td><input value="${esc(l.ins)}"></td>
+    <td><input value="${esc(l.not)}"></td>
+    <td><input value="${esc(l.int)}"></td>
+    <td><input value="${esc(l.disp)}"></td>
+    <td><input value="${esc(l.grat)}"></td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;padding:16px;color:var(--muted)">Nenhum servidor na grade.</td></tr>';
+  document.getElementById('modal-pm-benef').classList.add('open');
+}
+
+function pmSalvarBeneficios() {
+  if (!_pmFolha) return;
+  const mapa = {};
+  document.querySelectorAll('#pm-benef-lista tr[data-chave]').forEach(tr => {
+    const chave = tr.getAttribute('data-chave');
+    const inputs = tr.querySelectorAll('input');
+    const obj = {
+      ins: inputs[0] ? inputs[0].value.trim() : '',
+      not: inputs[1] ? inputs[1].value.trim() : '',
+      int: inputs[2] ? inputs[2].value.trim() : '',
+      disp: inputs[3] ? inputs[3].value.trim() : '',
+      grat: inputs[4] ? inputs[4].value.trim() : ''
+    };
+    const temAlgo = Object.values(obj).some(v => v !== '' && v !== '-');
+    if (temAlgo) mapa[chave] = obj;
+  });
+  const cfg = DB.config();
+  cfg.beneficiosFixos = mapa;
+  DB.saveConfig(cfg);
+
+  // Aplica imediatamente à grade atual
+  pmAplicarBeneficiosFixos(_pmFolha.dados);
+  DB.savePontoFolha(_pmFolha);
+  fecharModal('modal-pm-benef');
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  toastMsg('Benefícios fixos salvos e aplicados!', 'success');
+}
+
 function pmIniciar() {
   pmRenderHeads();
   const mesInput = document.getElementById('pm-mes');
@@ -7067,7 +7215,7 @@ function pmIniciar() {
 }
 
 function pmRenderHeads() {
-  const ths = PM_CAMPOS.map(c => `<th>${esc(c.label)}</th>`).join('') + '<th>Ações</th>';
+  const ths = PM_CAMPOS.map(c => `<th>${esc(c.label)}</th>`).join('') + '<th>Férias</th><th>Ações</th>';
   const s = document.getElementById('pm-head-servidores');
   const m = document.getElementById('pm-head-medicos');
   if (s) s.innerHTML = ths;
@@ -7112,6 +7260,8 @@ function pmCriarFolha(mes) {
     dados.medicos = PM_BASE_MEDICOS.map((p, i) => ({ ...p, item: p.item || (i + 1), alterados: {} }));
   }
 
+  pmAplicarBeneficiosFixos(dados);
+
   return {
     id: uid(),
     mes,
@@ -7130,6 +7280,7 @@ function pmPuxarCadastro() {
   const dados = pmServidoresDoCadastro();
   if (!dados.servidores.length && !dados.medicos.length) return toastMsg('Nenhum servidor cadastrado encontrado.', 'warning');
   if (!dados.medicos.length) dados.medicos = PM_BASE_MEDICOS.map((p, i) => ({ ...p, item: p.item || (i + 1), alterados: {} }));
+  pmAplicarBeneficiosFixos(dados);
   _pmFolha.dados = dados;
   DB.savePontoFolha(_pmFolha);
   pmRenderTabela('servidor');
@@ -7173,7 +7324,7 @@ function pmRenderTabela(tipo) {
            String(e.p.matricula || '').toLowerCase().includes(_pmBusca);
   });
   if (!entradas.length) {
-    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 1}" style="text-align:center;padding:18px;color:var(--muted)">${_pmBusca ? 'Nenhum servidor encontrado para a busca.' : 'Nenhum registro. Use "Adicionar linha".'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 2}" style="text-align:center;padding:18px;color:var(--muted)">${_pmBusca ? 'Nenhum servidor encontrado para a busca.' : 'Nenhum registro. Use "Adicionar linha".'}</td></tr>`;
     return;
   }
   tbody.innerHTML = entradas.map(({ p, idx }) => {
@@ -7183,7 +7334,8 @@ function pmRenderTabela(tipo) {
       const editavel = c.key !== 'item';
       return `<td class="pm-cell ${alt ? 'pm-alterado' : ''}"${editavel ? ` onclick="pmAbrirEdicao('${tipo}',${idx},'${c.key}')"` : ''} title="${esc(val)}">${esc(val)}</td>`;
     }).join('');
-    return `<tr>${tds}<td class="pm-acoes"><button class="btn btn-danger btn-sm" onclick="pmRemoverLinha('${tipo}',${idx})" title="Remover">🗑️</button></td></tr>`;
+    const feriasTd = `<td style="width:46px"><input type="checkbox" ${p.ferias ? 'checked' : ''} onchange="pmToggleFerias('${tipo}',${idx}, this.checked)" title="Marcar férias"></td>`;
+    return `<tr>${tds}${feriasTd}<td class="pm-acoes"><button class="btn btn-danger btn-sm" onclick="pmRemoverLinha('${tipo}',${idx})" title="Remover">🗑️</button></td></tr>`;
   }).join('');
 }
 
@@ -7404,7 +7556,9 @@ function pmTabelaPrint(lista) {
   const body = (lista || []).map(p => {
     const tds = PM_CAMPOS.map(c => {
       const alt = p.alterados && p.alterados[c.key];
-      return `<td class="${alt ? 'alt' : ''}">${esc(String(p[c.key] ?? ''))}</td>`;
+      let val = String(p[c.key] ?? '');
+      if (c.key === 'obs' && p.ferias) val = 'FÉRIAS' + (val ? ' - ' + val : '');
+      return `<td class="${alt ? 'alt' : ''}">${esc(val)}</td>`;
     }).join('');
     return `<tr>${tds}</tr>`;
   }).join('');
