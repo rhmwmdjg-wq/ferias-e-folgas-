@@ -661,6 +661,49 @@ const DB = {
     } catch (e) { /* silent */ }
   },
 
+  // =================== FECHAMENTO DE PONTO MENSAL ===================
+  pontoFolhas: () => _remoteData.pontoFolhas.length ? _remoteData.pontoFolhas : JSON.parse(localStorage.getItem('srv_ponto_folhas') || '[]'),
+  savePontoFolha: async (obj) => {
+    if (!_remoteData.pontoFolhas.length) {
+      _remoteData.pontoFolhas = JSON.parse(localStorage.getItem('srv_ponto_folhas') || '[]');
+    }
+    const arr = _remoteData.pontoFolhas;
+    const idx = arr.findIndex(f => f.id === obj.id);
+    if (idx >= 0) arr[idx] = obj; else arr.push(obj);
+    localStorage.setItem('srv_ponto_folhas', JSON.stringify(arr));
+    try {
+      const { error } = await supabaseClient.from('ponto_folhas').upsert(obj, { onConflict: 'id' });
+      if (error) {
+        if (isQuotaError(error)) saveToSyncQueue('ponto_folhas', obj);
+        else console.warn("Erro ao salvar folha de ponto:", error.message);
+      }
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('ponto_folhas', obj);
+      else console.error("Erro ao salvar folha de ponto:", e);
+    }
+  },
+  deletePontoFolha: async (id) => {
+    _remoteData.pontoFolhas = _remoteData.pontoFolhas.filter(f => f.id !== id);
+    localStorage.setItem('srv_ponto_folhas', JSON.stringify(_remoteData.pontoFolhas));
+    try { await supabaseClient.from('ponto_folhas').delete().eq('id', id); } catch (e) { /* silent */ }
+  },
+
+  pontoHistorico: () => _remoteData.pontoHistorico.length ? _remoteData.pontoHistorico : JSON.parse(localStorage.getItem('srv_ponto_historico') || '[]'),
+  addPontoHistorico: async (obj) => {
+    if (!_remoteData.pontoHistorico.length) {
+      _remoteData.pontoHistorico = JSON.parse(localStorage.getItem('srv_ponto_historico') || '[]');
+    }
+    _remoteData.pontoHistorico.push(obj);
+    localStorage.setItem('srv_ponto_historico', JSON.stringify(_remoteData.pontoHistorico));
+    try {
+      const { error } = await supabaseClient.from('ponto_historico').insert(obj);
+      if (error && !isQuotaError(error)) console.warn("Erro ao salvar histórico do ponto:", error.message);
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('ponto_historico', obj);
+      else console.error("Erro ao salvar histórico do ponto:", e);
+    }
+  },
+
 };
 
 window.DB = DB;

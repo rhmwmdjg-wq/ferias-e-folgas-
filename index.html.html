@@ -1766,10 +1766,14 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <i class="fa-solid fa-truck-fast"></i>
         <span class="tab-label">Controle de Frotas</span>
       </button>
-      <button class="tab-btn" onclick="showTab('ponto')" id="tab-ponto" style="margin-bottom:4px">
+      <button class="tab-btn" onclick="showTab('ponto')" id="tab-ponto">
         <i class="fa-solid fa-clock"></i>
         <span class="tab-label">Ponto Credenciados</span>
         <span class="badge" id="badge-ponto" style="background:var(--accent);display:none">0</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('pontomensal')" id="tab-pontomensal" style="margin-bottom:4px">
+        <i class="fa-solid fa-list-check"></i>
+        <span class="tab-label">Fechamento de Ponto</span>
       </button>
 
       <!-- ===== Documentos ===== -->
@@ -4322,6 +4326,112 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ======================= PANEL FECHAMENTO DE PONTO MENSAL ======================= -->
+<style>
+  #panel-pontomensal .pm-table { width:100%; border-collapse:collapse; table-layout:fixed; }
+  #panel-pontomensal .pm-table th,
+  #panel-pontomensal .pm-table td { border:1px solid var(--border-mid); padding:4px 3px; font-size:11px; text-align:center; vertical-align:middle; height:28px; overflow:hidden; text-overflow:ellipsis; }
+  #panel-pontomensal .pm-table th { background:var(--surface); font-weight:800; color:var(--text-mid); text-transform:uppercase; font-size:9.5px; letter-spacing:.03em; }
+  #panel-pontomensal .pm-table tbody tr:hover td { background:rgba(77,139,255,0.04); }
+  #panel-pontomensal .pm-table td:nth-child(2),
+  #panel-pontomensal .pm-table td:nth-child(4),
+  #panel-pontomensal .pm-table td:nth-child(5),
+  #panel-pontomensal .pm-table td:nth-child(15) { text-align:left; }
+  #panel-pontomensal .pm-cell { cursor:pointer; }
+  #panel-pontomensal .pm-cell:hover { background:rgba(77,139,255,0.12); }
+  #panel-pontomensal .pm-alterado { color:var(--danger) !important; font-weight:800; }
+  #panel-pontomensal .pm-acoes { width:44px; }
+  #panel-pontomensal .pm-scroll { overflow-x:auto; }
+</style>
+<div class="tab-panel" id="panel-pontomensal">
+  <div class="section-title">📋 Fechamento de Ponto Mensal</div>
+
+  <!-- Controles -->
+  <div class="card" style="margin-bottom:16px">
+    <div class="form-row cols-3">
+      <div class="field">
+        <label>Mês de Referência</label>
+        <input id="pm-mes" type="month" onchange="pmCarregarMes()">
+      </div>
+      <div class="field">
+        <label>Responsável (Coordenação)</label>
+        <input id="pm-responsavel" oninput="pmAtualizarResponsavel()">
+      </div>
+      <div class="field">
+        <label>Função</label>
+        <input id="pm-funcao" oninput="pmAtualizarResponsavel()">
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;align-items:center">
+      <span id="pm-status" class="tag tag-green">ABERTO</span>
+      <button class="btn btn-primary" onclick="pmFechar()">🔒 Fechar Ponto</button>
+      <button class="btn btn-ghost" onclick="pmReabrir()">🔓 Reabrir</button>
+      <button class="btn btn-ghost" onclick="pmImprimir()">🖨️ Imprimir</button>
+      <button class="btn btn-ghost" onclick="pmExportarCSV()">📥 Exportar CSV</button>
+      <button class="btn btn-ghost" onclick="pmReporBase()">♻️ Repor lista base</button>
+    </div>
+    <div class="info-box" style="margin-top:12px;font-size:.78rem">
+      Depois que o mês for <strong>fechado</strong>, qualquer alteração fica registrada no histórico e sai em
+      <strong style="color:var(--danger)">vermelho</strong> na impressão. Para editar uma célula, basta clicar nela.
+    </div>
+  </div>
+
+  <!-- Servidores -->
+  <div class="ev-card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <h3 style="margin:0">🧑⚕️ Servidores lotados na APS</h3>
+      <button class="btn btn-ghost btn-sm" onclick="pmAdicionarLinha('servidor')">➕ Adicionar linha</button>
+    </div>
+    <div class="pm-scroll">
+      <table class="pm-table">
+        <thead><tr id="pm-head-servidores"></tr></thead>
+        <tbody id="pm-corpo-servidores"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Médicos -->
+  <div class="ev-card" style="margin-bottom:16px">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+      <h3 style="margin:0">🩺 Médicos da ESF</h3>
+      <button class="btn btn-ghost btn-sm" onclick="pmAdicionarLinha('medico')">➕ Adicionar linha</button>
+    </div>
+    <div class="pm-scroll">
+      <table class="pm-table">
+        <thead><tr id="pm-head-medicos"></tr></thead>
+        <tbody id="pm-corpo-medicos"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Histórico -->
+  <div class="ev-card">
+    <h3>🕓 Histórico de Alterações</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Data/Hora</th><th>Funcionário</th><th>Campo</th><th>Valor anterior</th><th>Novo valor</th><th>Justificativa</th></tr></thead>
+        <tbody id="pm-historico"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ======================= MODAL EDIÇÃO PONTO MENSAL ======================= -->
+<div class="modal-bg" id="modal-pm-edicao">
+  <div class="modal">
+    <h3>✏️ Alterar lançamento</h3>
+    <div class="field" style="margin-bottom:10px"><label>Funcionário</label><input id="pm-modal-funcionario" disabled></div>
+    <div class="field" style="margin-bottom:10px"><label>Campo</label><input id="pm-modal-campo" disabled></div>
+    <div class="field" style="margin-bottom:10px"><label>Valor anterior</label><input id="pm-modal-anterior" disabled></div>
+    <div class="field" style="margin-bottom:10px"><label>Novo valor</label><input id="pm-modal-novo"></div>
+    <div class="field" style="margin-bottom:10px"><label>Justificativa da alteração</label><textarea id="pm-modal-justificativa" rows="3" placeholder="Informe o motivo da alteração..."></textarea></div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="pmSalvarAlteracao()">💾 Salvar alteração</button>
+      <button class="btn btn-ghost" onclick="fecharModal('modal-pm-edicao')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= PANEL PROTOCOLO DE ENTREGA ======================= -->
 <div class="tab-panel" id="panel-protocolo">
   <div class="section-title">📋 Protocolo de Entrega - Justificativas e Atestados</div>
@@ -4888,6 +4998,9 @@ function renderAposSync(tabelaAlterada) {
     case 'panel-ponto':
       if (typeof renderCargos === 'function') { renderCargos(); renderCredenciados(); renderFechamentos(); }
       break;
+    case 'panel-pontomensal':
+      if (typeof pmCarregarMes === 'function') pmCarregarMes();
+      break;
     case 'panel-protocolo':
       if (typeof renderProtocolos === 'function') renderProtocolos();
       break;
@@ -5080,6 +5193,8 @@ let _remoteData = {
   oficios: [],
   destinatarios: [],
   emissores: [],
+  pontoFolhas: [],
+  pontoHistorico: [],
   config: {}
 };
 
@@ -5318,6 +5433,37 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.emissores = unificados;
     localStorage.setItem('srv_emissores', JSON.stringify(unificados));
+  });
+
+  await syncTabela('ponto_folhas', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_ponto_folhas') || '[]');
+    const localMap = new Map(locais.filter(x => x.id).map(x => [x.id, x]));
+    // Recupera dados locais caso a nuvem esteja vazia no mês (evita perda da grade)
+    const merged = data.map(cloud => {
+      const local = localMap.get(cloud.id);
+      if (!local) return cloud;
+      const out = { ...cloud };
+      ['responsavel', 'funcao'].forEach(k => { if ((out[k] === null || out[k] === undefined || out[k] === '') && local[k]) out[k] = local[k]; });
+      const cDadosVazio = !out.dados || !Array.isArray(out.dados.servidores) || out.dados.servidores.length === 0;
+      if (cDadosVazio && local.dados) out.dados = local.dados;
+      return out;
+    });
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_folhas', pendentes);
+    const unificados = [...merged, ...pendentes];
+    _remoteData.pontoFolhas = unificados;
+    localStorage.setItem('srv_ponto_folhas', JSON.stringify(unificados));
+  });
+
+  await syncTabela('ponto_historico', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_ponto_historico') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_historico', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.pontoHistorico = unificados;
+    localStorage.setItem('srv_ponto_historico', JSON.stringify(unificados));
   });
 
   await syncTabela('protocolos_entrega', '*', (data) => {
@@ -6769,6 +6915,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="reports.js"></script>
 <script src="protocolo-entrega.js"></script>
 <script src="oficios.js"></script>
+<script src="ponto-mensal.js"></script>
 <script>atualizarBadgeEventos();</script>
 
 <!-- ======================= MODAL VISUALIZADOR DE PDF ======================= -->

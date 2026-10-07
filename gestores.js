@@ -18,6 +18,7 @@ const MODULOS_SISTEMA = [
   { id: 'eventos', tab: 'tab-eventos', label: 'Gerenciar Eventos' },
   { id: 'veiculos', tab: 'tab-veiculos', label: 'Controle de Frotas' },
   { id: 'ponto', tab: 'tab-ponto', label: 'Ponto Credenciados' },
+  { id: 'pontomensal', tab: 'tab-pontomensal', label: 'Fechamento de Ponto' },
   { id: 'protocolo', tab: 'tab-protocolo', label: 'Protocolo de Entrega' },
   { id: 'presenca', tab: 'tab-presenca', label: 'Lista de Presença' },
   { id: 'relatorio', tab: 'tab-relatorio', label: 'Relatório Geral' },
