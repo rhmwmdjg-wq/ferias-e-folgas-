@@ -19,6 +19,7 @@ const MODULOS_SISTEMA = [
   { id: 'veiculos', tab: 'tab-veiculos', label: 'Controle de Frotas' },
   { id: 'ponto', tab: 'tab-ponto', label: 'Ponto Credenciados' },
   { id: 'pontomensal', tab: 'tab-pontomensal', label: 'Fechamento de Ponto' },
+  { id: 'assinatura', tab: 'tab-assinatura', label: 'Assinatura Digital' },
   { id: 'protocolo', tab: 'tab-protocolo', label: 'Protocolo de Entrega' },
   { id: 'presenca', tab: 'tab-presenca', label: 'Lista de Presença' },
   { id: 'relatorio', tab: 'tab-relatorio', label: 'Relatório Geral' },

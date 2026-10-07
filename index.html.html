@@ -18,6 +18,7 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
 <script>
 // Registro do Service Worker para PWA
 if ('serviceWorker' in navigator) {
@@ -1811,6 +1812,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <button class="tab-btn" onclick="showTab('auditoria')" id="tab-auditoria" style="display:none; margin-bottom:10px">
         <i class="fa-solid fa-clipboard-list"></i>
         <span class="tab-label">Logs de Auditoria</span>
+      </button>
+
+      <!-- ===== Segurança ===== -->
+      <div class="sidebar-section-label">Segurança</div>
+      <button class="tab-btn" onclick="showTab('assinatura')" id="tab-assinatura">
+        <i class="fa-solid fa-file-signature"></i>
+        <span class="tab-label">Assinatura Digital</span>
       </button>
 
       <div style="margin-top: 20px; border-top: 1px solid var(--border); padding-top: 10px;">
@@ -7679,6 +7687,170 @@ function pmImprimir() {
     </div>
   </div>
 </div>
+
+<!-- ======================= ABA ASSINATURA DIGITAL ======================= -->
+<div class="tab-panel" id="panel-assinatura">
+  <div class="section-title">🔐 Assinatura Digital (Certificado A1 / PFX)</div>
+
+  <div class="card" style="margin-bottom:16px">
+    <h3>📜 Meu Certificado</h3>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">
+      Selecione o arquivo <strong>.pfx</strong>/<strong>.p12</strong> e informe a senha. O certificado fica <strong>apenas neste navegador</strong> (nunca é enviado para nenhum servidor).
+    </p>
+    <div class="form-row cols-2">
+      <div class="field"><label>Arquivo do Certificado (.pfx/.p12)</label><input type="file" id="ds-pfx" accept=".pfx,.p12,application/x-pkcs12"></div>
+      <div class="field"><label>Senha do Certificado</label><input type="password" id="ds-senha" placeholder="••••••••"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="dsCarregarPfx()">🔓 Carregar Certificado</button>
+      <button class="btn btn-ghost" onclick="dsLimparCert()">🗑️ Remover</button>
+    </div>
+    <div id="ds-cert-info" style="display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:12px;font-size:.82rem"></div>
+  </div>
+
+  <div class="card">
+    <h3>✍️ Assinar Documento (PDF)</h3>
+    <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">
+      Para assinar um documento do sistema: clique em <strong>Imprimir</strong> no documento e escolha <strong>"Salvar como PDF"</strong>. Depois selecione o PDF aqui para assinar. A assinatura é gerada no padrão <strong>PKCS#7 (.p7s)</strong>.
+    </p>
+    <div class="field" style="margin-bottom:12px"><label>Arquivo PDF</label><input type="file" id="ds-pdf" accept="application/pdf"></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary" onclick="dsAssinarPdf()">🔐 Assinar PDF</button>
+    </div>
+    <div id="ds-result" style="display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:12px;font-size:.8rem"></div>
+  </div>
+</div>
+
+<script>
+// ===================== ASSINATURA DIGITAL (A1 / PFX) =====================
+let _dsCert = null;
+let _dsKey = null;
+
+// Converte ArrayBuffer para string binária entendida pelo forge
+function dsBinFromArrayBuffer(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let bin = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return bin;
+}
+
+function dsLimparCert() {
+  _dsCert = null; _dsKey = null;
+  const info = document.getElementById('ds-cert-info');
+  if (info) { info.style.display = 'none'; info.innerHTML = ''; }
+  const f = document.getElementById('ds-pfx'); if (f) f.value = '';
+  const s = document.getElementById('ds-senha'); if (s) s.value = '';
+  toastMsg('Certificado removido da sessão.', 'info');
+}
+
+function dsCarregarPfx() {
+  if (typeof forge === 'undefined') return toastMsg('Biblioteca de certificado não carregou (verifique a internet).', 'error');
+  const file = document.getElementById('ds-pfx').files[0];
+  const senha = document.getElementById('ds-senha').value;
+  if (!file) return toastMsg('Selecione o arquivo .pfx.', 'warning');
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const bin = dsBinFromArrayBuffer(e.target.result);
+      const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(bin), senha);
+
+      const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+      const certArr = certBags[forge.pki.oids.certBag] || [];
+      const cert = certArr[0] && certArr[0].cert;
+
+      let key;
+      const shrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag];
+      if (shrouded && shrouded[0] && shrouded[0].key) key = shrouded[0].key;
+      if (!key) {
+        const plain = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag];
+        if (plain && plain[0] && plain[0].key) key = plain[0].key;
+      }
+      if (!cert || !key) throw new Error('Certificado ou chave privada não encontrados no arquivo.');
+
+      _dsCert = cert; _dsKey = key;
+
+      const cn = cert.subject.getField('CN') ? cert.subject.getField('CN').value : '(sem nome)';
+      const issuer = cert.issuer.getField('CN') ? cert.issuer.getField('CN').value : '';
+      const notAfter = cert.validity.notAfter;
+
+      const info = document.getElementById('ds-cert-info');
+      info.style.display = 'block';
+      info.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Certificado carregado</div>' +
+        '<div><strong>Titular:</strong> ' + esc(cn) + '</div>' +
+        '<div><strong>Emissor:</strong> ' + esc(issuer) + '</div>' +
+        '<div><strong>Válido até:</strong> ' + notAfter.toLocaleDateString('pt-BR') + '</div>';
+      toastMsg('Certificado carregado com sucesso!', 'success');
+    } catch (err) {
+      console.error(err);
+      _dsCert = null; _dsKey = null;
+      toastMsg('Erro ao ler o certificado: ' + (err.message || err) + ' (senha incorreta?)', 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function dsAssinarPdf() {
+  if (!_dsCert || !_dsKey) return toastMsg('Carregue o certificado primeiro.', 'warning');
+  const file = document.getElementById('ds-pdf').files[0];
+  if (!file) return toastMsg('Selecione o arquivo PDF.', 'warning');
+
+  const reader = new FileReader();
+  reader.onload = function (e) {
+    try {
+      const bin = dsBinFromArrayBuffer(e.target.result);
+
+      const p7 = forge.pkcs7.createSignedData();
+      p7.content = forge.util.createBuffer(bin);
+      p7.addCertificate(_dsCert);
+      p7.addSigner({
+        key: _dsKey,
+        certificate: _dsCert,
+        digestAlgorithm: forge.pki.oids.sha256,
+        authenticatedAttributes: [
+          { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
+          { type: forge.pki.oids.messageDigest },
+          { type: forge.pki.oids.signingTime, value: new Date() }
+        ]
+      });
+      p7.sign({ detached: true });
+
+      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+      const out = new Uint8Array(der.length);
+      for (let i = 0; i < der.length; i++) out[i] = der.charCodeAt(i) & 0xff;
+      const blob = new Blob([out], { type: 'application/pkcs7-signature' });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = file.name.replace(/\.pdf$/i, '') + '.pdf.p7s';
+      a.click();
+      URL.revokeObjectURL(url);
+
+      const md = forge.md.sha256.create();
+      md.update(bin);
+      const hash = md.digest().toHex();
+      const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+
+      const res = document.getElementById('ds-result');
+      res.style.display = 'block';
+      res.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Assinatura gerada (.p7s baixado)</div>' +
+        '<div><strong>Documento:</strong> ' + esc(file.name) + '</div>' +
+        '<div><strong>Assinado por:</strong> ' + esc(cn) + '</div>' +
+        '<div><strong>Data:</strong> ' + new Date().toLocaleString('pt-BR') + '</div>' +
+        '<div style="word-break:break-all"><strong>SHA-256:</strong> ' + hash + '</div>';
+      toastMsg('PDF assinado! Guarde o arquivo .p7s junto ao PDF.', 'success');
+    } catch (err) {
+      console.error(err);
+      toastMsg('Erro ao assinar: ' + (err.message || err), 'error');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+</script>
 
 </div> <!-- close content-area -->
 
