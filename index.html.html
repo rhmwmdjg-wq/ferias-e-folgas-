@@ -19,6 +19,8 @@
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/forge/1.3.1/forge.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
 <script>
 // Registro do Service Worker para PWA
 if ('serviceWorker' in navigator) {
@@ -7709,13 +7711,21 @@ function pmImprimir() {
   </div>
 
   <div class="card">
-    <h3>✍️ Assinar Documento (PDF)</h3>
+    <h3>✍️ Assinar Documento (arraste onde assinar)</h3>
     <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">
-      Para assinar um documento do sistema: clique em <strong>Imprimir</strong> no documento e escolha <strong>"Salvar como PDF"</strong>. Depois selecione o PDF aqui para assinar. A assinatura é gerada no padrão <strong>PKCS#7 (.p7s)</strong>.
+      Selecione o PDF (gerado em <strong>Imprimir → Salvar como PDF</strong>). Clique na página para posicionar a assinatura e arraste para ajustar o tamanho. O PDF sai com a assinatura visível e com o arquivo <strong>.p7s</strong>.
     </p>
-    <div class="field" style="margin-bottom:12px"><label>Arquivo PDF</label><input type="file" id="ds-pdf" accept="application/pdf"></div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn btn-primary" onclick="dsAssinarPdf()">🔐 Assinar PDF</button>
+    <div class="form-row cols-2">
+      <div class="field"><label>Arquivo PDF</label><input type="file" id="ds-pdf" accept="application/pdf" onchange="dsCarregarPdfAssinar(this)"></div>
+      <div class="field"><label>Imagem da assinatura (PNG, opcional)</label><input type="file" id="ds-img" accept="image/png" onchange="dsCarregarImagemAssinatura(this)"></div>
+    </div>
+    <div id="ds-preview-wrap" style="display:none;margin-top:14px">
+      <div style="font-size:.78rem;color:var(--muted);margin-bottom:8px">💡 Clique na página onde a assinatura deve ficar · arraste a caixa para mover · use o canto inferior direito para redimensionar.</div>
+      <div id="ds-preview" style="max-height:62vh;overflow:auto;background:#3a4450;padding:12px;border-radius:var(--r-sm)"></div>
+      <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+        <button class="btn btn-primary" onclick="dsAssinarComPosicao()">🔐 Assinar e baixar</button>
+        <button class="btn btn-ghost" onclick="dsLimparPosicao()">🧹 Limpar posição</button>
+      </div>
     </div>
     <div id="ds-result" style="display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:12px;font-size:.8rem"></div>
   </div>
@@ -7849,6 +7859,219 @@ function dsAssinarPdf() {
     }
   };
   reader.readAsArrayBuffer(file);
+}
+
+// ===================== ASSINATURA COM POSICIONAMENTO =====================
+let _dsPdfBytes = null;
+let _dsPlace = null;
+let _dsPageSizes = [];
+let _dsBoxEl = null;
+let _dsBoxWrap = null;
+let _dsImgBytes = null;
+
+if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+}
+
+function dsBaixar(blob, nome) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = nome; a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+
+async function dsCarregarPdfAssinar(input) {
+  if (!window.PDFLib) return toastMsg('Biblioteca de PDF não carregou (verifique a internet).', 'error');
+  const file = input.files[0];
+  if (!file) return;
+  _dsPdfBytes = null; _dsPlace = null; _dsBoxEl = null;
+  const buf = await file.arrayBuffer();
+  _dsPdfBytes = new Uint8Array(buf);
+  await dsRenderPreview();
+  document.getElementById('ds-preview-wrap').style.display = 'block';
+  document.getElementById('ds-result').style.display = 'none';
+}
+
+function dsCarregarImagemAssinatura(input) {
+  const file = input.files[0];
+  if (!file) { _dsImgBytes = null; return; }
+  const reader = new FileReader();
+  reader.onload = () => { _dsImgBytes = new Uint8Array(reader.result); };
+  reader.readAsArrayBuffer(file);
+}
+
+function dsLimparPosicao() {
+  _dsPlace = null;
+  if (_dsBoxEl && _dsBoxEl.parentElement) _dsBoxEl.parentElement.removeChild(_dsBoxEl);
+  _dsBoxEl = null; _dsBoxWrap = null;
+}
+
+async function dsRenderPreview() {
+  const cont = document.getElementById('ds-preview');
+  cont.innerHTML = '';
+  _dsPageSizes = [];
+  if (!window.pdfjsLib) { cont.innerHTML = '<div style="color:#fff;font-size:.8rem">pdf.js não carregou.</div>'; return; }
+  const pdf = await pdfjsLib.getDocument({ data: _dsPdfBytes.slice(0) }).promise;
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const base = page.getViewport({ scale: 1 });
+    const maxW = Math.min(880, (cont.clientWidth || 880) - 24);
+    const scale = Math.min(maxW / base.width, 1.6);
+    const vp = page.getViewport({ scale });
+    _dsPageSizes.push({ width: base.width, height: base.height, scale, vpW: vp.width, vpH: vp.height });
+
+    const wrap = document.createElement('div');
+    wrap.style.position = 'relative';
+    wrap.style.width = vp.width + 'px';
+    wrap.style.margin = '0 auto 14px';
+    wrap.style.background = '#fff';
+    wrap.style.boxShadow = '0 4px 16px rgba(0,0,0,.4)';
+    wrap.dataset.page = p;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = vp.width; canvas.height = vp.height;
+    canvas.style.display = 'block';
+    wrap.appendChild(canvas);
+    cont.appendChild(wrap);
+
+    await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+
+    wrap.addEventListener('mousedown', (ev) => {
+      if (ev.target !== wrap && ev.target !== canvas) return;
+      dsPosicionarBox(wrap, p, ev.offsetX, ev.offsetY);
+    });
+  }
+}
+
+function dsPosicionarBox(wrap, pageNum, x, y) {
+  if (_dsBoxEl && _dsBoxEl.parentElement) _dsBoxEl.parentElement.removeChild(_dsBoxEl);
+  const size = _dsPageSizes[pageNum - 1];
+  const w = Math.min(220, size.vpW * 0.5);
+  const h = w * 0.45;
+  const left = Math.max(0, Math.min(x - w / 2, size.vpW - w));
+  const top = Math.max(0, Math.min(y - h / 2, size.vpH - h));
+
+  const box = document.createElement('div');
+  box.style.position = 'absolute';
+  box.style.left = left + 'px';
+  box.style.top = top + 'px';
+  box.style.width = w + 'px';
+  box.style.height = h + 'px';
+  box.style.border = '2px solid #16a34a';
+  box.style.background = 'rgba(22,163,74,0.08)';
+  box.style.cursor = 'move';
+  box.style.boxSizing = 'border-box';
+  box.innerHTML = '<div style="font-size:9px;color:#166534;font-weight:700;padding:3px">Assinatura</div>' +
+    '<div style="position:absolute;right:-6px;bottom:-6px;width:14px;height:14px;background:#16a34a;border:2px solid #fff;border-radius:3px;cursor:nwse-resize"></div>';
+  wrap.appendChild(box);
+  _dsBoxEl = box; _dsBoxWrap = wrap;
+  const handle = box.lastChild;
+
+  box.addEventListener('mousedown', (ev) => {
+    if (ev.target === handle) return;
+    ev.preventDefault();
+    const sx = ev.clientX, sy = ev.clientY;
+    const l0 = parseFloat(box.style.left), t0 = parseFloat(box.style.top);
+    const move = (e2) => {
+      let nl = l0 + (e2.clientX - sx), nt = t0 + (e2.clientY - sy);
+      nl = Math.max(0, Math.min(nl, size.vpW - box.offsetWidth));
+      nt = Math.max(0, Math.min(nt, size.vpH - box.offsetHeight));
+      box.style.left = nl + 'px'; box.style.top = nt + 'px';
+    };
+    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); dsAtualizarPlace(); };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+
+  handle.addEventListener('mousedown', (ev) => {
+    ev.preventDefault(); ev.stopPropagation();
+    const sx = ev.clientX, sy = ev.clientY;
+    const w0 = box.offsetWidth, h0 = box.offsetHeight;
+    const move = (e2) => {
+      box.style.width = Math.max(60, w0 + (e2.clientX - sx)) + 'px';
+      box.style.height = Math.max(30, h0 + (e2.clientY - sy)) + 'px';
+    };
+    const up = () => { document.removeEventListener('mousemove', move); document.removeEventListener('mouseup', up); dsAtualizarPlace(); };
+    document.addEventListener('mousemove', move); document.addEventListener('mouseup', up);
+  });
+
+  dsAtualizarPlace();
+}
+
+function dsAtualizarPlace() {
+  if (!_dsBoxEl || !_dsBoxWrap) { _dsPlace = null; return; }
+  const pageNum = parseInt(_dsBoxWrap.dataset.page, 10);
+  const size = _dsPageSizes[pageNum - 1];
+  const s = size.scale;
+  const left = parseFloat(_dsBoxEl.style.left), top = parseFloat(_dsBoxEl.style.top);
+  const w = _dsBoxEl.offsetWidth, h = _dsBoxEl.offsetHeight;
+  _dsPlace = { page: pageNum - 1, xPt: left / s, yPt: size.height - (top + h) / s, wPt: w / s, hPt: h / s };
+}
+
+async function dsAssinarComPosicao() {
+  if (!_dsCert || !_dsKey) return toastMsg('Carregue o certificado primeiro.', 'warning');
+  if (!_dsPdfBytes) return toastMsg('Selecione o PDF.', 'warning');
+  if (!_dsPlace) return toastMsg('Clique na página para posicionar a assinatura.', 'warning');
+
+  try {
+    const buf = _dsPdfBytes.buffer.slice(_dsPdfBytes.byteOffset, _dsPdfBytes.byteOffset + _dsPdfBytes.length);
+    const bin = dsBinFromArrayBuffer(buf);
+
+    const p7 = forge.pkcs7.createSignedData();
+    p7.content = forge.util.createBuffer(bin);
+    p7.addCertificate(_dsCert);
+    p7.addSigner({
+      key: _dsKey, certificate: _dsCert, digestAlgorithm: forge.pki.oids.sha256,
+      authenticatedAttributes: [
+        { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
+        { type: forge.pki.oids.messageDigest },
+        { type: forge.pki.oids.signingTime, value: new Date() }
+      ]
+    });
+    p7.sign({ detached: true });
+    const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+    const p7s = new Uint8Array(der.length);
+    for (let i = 0; i < der.length; i++) p7s[i] = der.charCodeAt(i) & 0xff;
+
+    const { rgb, StandardFonts } = PDFLib;
+    const doc = await PDFLib.PDFDocument.load(_dsPdfBytes);
+    const page = doc.getPage(_dsPlace.page);
+    const box = { x: _dsPlace.xPt, y: _dsPlace.yPt, width: _dsPlace.wPt, height: _dsPlace.hPt };
+    page.drawRectangle({ x: box.x, y: box.y, width: box.width, height: box.height, borderColor: rgb(0.1, 0.4, 0.2), borderWidth: 1 });
+
+    if (_dsImgBytes) {
+      const png = await doc.embedPng(_dsImgBytes);
+      page.drawImage(png, { x: box.x + 2, y: box.y + 2, width: Math.max(1, box.width - 4), height: Math.max(1, box.height - 4) });
+    } else {
+      const font = await doc.embedFont(StandardFonts.Helvetica);
+      const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+      const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+      const data = new Date().toLocaleString('pt-BR');
+      const fs = Math.max(6, Math.min(9, box.height / 5));
+      page.drawText('Assinado digitalmente por:', { x: box.x + 4, y: box.y + box.height - fs - 3, size: fs, font: bold, color: rgb(0.06, 0.4, 0.2) });
+      page.drawText(cn.substring(0, 60), { x: box.x + 4, y: box.y + box.height - fs * 2.1 - 3, size: fs, font, color: rgb(0, 0, 0) });
+      page.drawText('Em ' + data, { x: box.x + 4, y: box.y + box.height - fs * 3.2 - 3, size: fs, font, color: rgb(0.2, 0.2, 0.2) });
+    }
+
+    try { await doc.attach(p7s, 'assinatura.p7s', { mimeType: 'application/pkcs7-signature', description: 'Assinatura digital PKCS#7' }); } catch (e) { console.warn(e); }
+    const out = await doc.save();
+
+    const baseName = (document.getElementById('ds-pdf').files[0].name || 'documento.pdf').replace(/\.pdf$/i, '');
+    dsBaixar(new Blob([out], { type: 'application/pdf' }), baseName + '_assinado.pdf');
+    dsBaixar(new Blob([p7s], { type: 'application/pkcs7-signature' }), baseName + '.p7s');
+
+    const md = forge.md.sha256.create(); md.update(bin);
+    const res = document.getElementById('ds-result');
+    res.style.display = 'block';
+    res.innerHTML = '<div style="color:var(--success);font-weight:700;margin-bottom:6px">✅ Documento assinado!</div>' +
+      '<div><strong>Baixados:</strong> ' + esc(baseName) + '_assinado.pdf e ' + esc(baseName) + '.p7s</div>' +
+      '<div><strong>Assinado por:</strong> ' + esc(_dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '') + '</div>' +
+      '<div><strong>Data:</strong> ' + new Date().toLocaleString('pt-BR') + '</div>' +
+      '<div style="word-break:break-all"><strong>SHA-256:</strong> ' + md.digest().toHex() + '</div>';
+    toastMsg('Assinatura aplicada! Verifique os arquivos baixados.', 'success');
+  } catch (err) {
+    console.error(err);
+    toastMsg('Erro ao assinar: ' + (err.message || err), 'error');
+  }
 }
 </script>
 
