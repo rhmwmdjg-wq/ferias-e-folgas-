@@ -327,14 +327,14 @@ function atualizarPreviewOficio() {
       </div>
 
       <!-- Protocolo de Recebimento -->
-      <div style="margin-top:70px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
-        <div style="text-align:center; width:320px; border:1px solid #cbd5e1; border-radius:6px; padding:12px 14px;">
-          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:10px;">Protocolo de Recebimento do Ofício</div>
-          <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:8px;">Recebido por: ______________________________________</div>
-          <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:4px;">Matrícula: ______________________</div>
-          <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569; margin-top:10px;">
-            <span>Data: ____/____/______</span>
-            <span>Assinatura: __________________</span>
+      <div style="margin-top:50px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+        <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
+          <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
+          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
+          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
+          <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
+            <span>Data: __/__/____</span>
+            <span>Assinatura: ________</span>
           </div>
         </div>
       </div>
@@ -681,14 +681,14 @@ async function renderOficioPublico(token) {
         </div>
 
         <!-- Protocolo de Recebimento -->
-        <div style="margin-top:70px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
-          <div style="text-align:center; width:320px; border:1px solid #cbd5e1; border-radius:6px; padding:12px 14px;">
-            <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:10px;">Protocolo de Recebimento do Ofício</div>
-            <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:8px;">Recebido por: ______________________________________</div>
-            <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:4px;">Matrícula: ______________________</div>
-            <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569; margin-top:10px;">
-              <span>Data: ____/____/______</span>
-              <span>Assinatura: __________________</span>
+        <div style="margin-top:50px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+          <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
+            <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
+            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
+            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
+              <span>Data: __/__/____</span>
+              <span>Assinatura: ________</span>
             </div>
           </div>
         </div>
