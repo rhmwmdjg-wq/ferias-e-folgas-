@@ -949,16 +949,15 @@ function atualizarPreviewNotificacao() {
         </div>
       </div>
 
-      <div style="margin-top:60px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
-        <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
-          <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
-          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
-          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
-          <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
-            <span>Data: __/__/____</span>
-            <span>Assinatura: ________</span>
-          </div>
+      <div style="margin-top:50px; border:1px solid #cbd5e1; border-radius:6px; padding:14px 16px; page-break-inside:avoid;">
+        <div style="font-size:12px; font-weight:800; text-transform:uppercase; color:#0f172a; border-bottom:1.5px solid #0f172a; padding-bottom:6px; margin-bottom:12px;">Ciência do Servidor</div>
+        <div style="font-size:12px; color:#1e293b; line-height:1.6; margin-bottom:16px;">Declaro que recebi a presente Notificação Administrativa, tomando ciência de seu conteúdo e das providências nela estabelecidas.</div>
+        <div style="display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; font-size:12px; color:#334155; margin-bottom:20px;">
+          <span>Assinatura do(a) Servidor(a): ____________________________</span>
+          <span>Data: ____/____/______</span>
         </div>
+        <div style="font-size:11px; color:#334155; font-weight:600;">Observação do(a) servidor(a), caso queira apresentar justificativa:</div>
+        <div style="border-bottom:1px solid #cbd5e1; height:42px;"></div>
       </div>
 
       <div style="position:absolute; bottom:20px; left:44px; right:44px; border-top:1px solid #e2e8f0; padding-top:8px; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
@@ -1235,16 +1234,15 @@ async function renderNotificacaoPublico(token) {
           </div>
         </div>
 
-        <div style="margin-top:60px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
-          <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
-            <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
-            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
-            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
-            <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
-              <span>Data: __/__/____</span>
-              <span>Assinatura: ________</span>
-            </div>
+        <div style="margin-top:50px; border:1px solid #cbd5e1; border-radius:6px; padding:14px 16px; page-break-inside:avoid;">
+          <div style="font-size:12px; font-weight:800; text-transform:uppercase; color:#0f172a; border-bottom:1.5px solid #0f172a; padding-bottom:6px; margin-bottom:12px;">Ciência do Servidor</div>
+          <div style="font-size:12px; color:#1e293b; line-height:1.6; margin-bottom:16px;">Declaro que recebi a presente Notificação Administrativa, tomando ciência de seu conteúdo e das providências nela estabelecidas.</div>
+          <div style="display:flex; justify-content:space-between; gap:20px; flex-wrap:wrap; font-size:12px; color:#334155; margin-bottom:20px;">
+            <span>Assinatura do(a) Servidor(a): ____________________________</span>
+            <span>Data: ____/____/______</span>
           </div>
+          <div style="font-size:11px; color:#334155; font-weight:600;">Observação do(a) servidor(a), caso queira apresentar justificativa:</div>
+          <div style="border-bottom:1px solid #cbd5e1; height:42px;"></div>
         </div>
 
         <div style="position:absolute; bottom:25px; left:50px; right:50px; border-top:1px solid #cbd5e1; padding-top:10px; display:flex; justify-content:space-between; font-size:10.5px; color:#64748b;">
