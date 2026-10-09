@@ -326,6 +326,19 @@ function atualizarPreviewOficio() {
         </div>
       </div>
 
+      <!-- Protocolo de Recebimento -->
+      <div style="margin-top:70px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+        <div style="text-align:center; width:320px; border:1px solid #cbd5e1; border-radius:6px; padding:12px 14px;">
+          <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:10px;">Protocolo de Recebimento do Ofício</div>
+          <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:8px;">Recebido por: ______________________________________</div>
+          <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:4px;">Matrícula: ______________________</div>
+          <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569; margin-top:10px;">
+            <span>Data: ____/____/______</span>
+            <span>Assinatura: __________________</span>
+          </div>
+        </div>
+      </div>
+
       <!-- Rodapé Oficial com Autenticação -->
       <div style="position:absolute; bottom:20px; left:44px; right:44px; border-top:1px solid #e2e8f0; padding-top:8px; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
         <div>Documento Oficial emitido pelo Sistema Atlas Saúde</div>
@@ -664,6 +677,19 @@ async function renderOficioPublico(token) {
           <div style="display:inline-block; border-top:1.5px solid #0f172a; padding-top:8px; min-width:300px;">
             <div style="font-weight:800; font-size:14.5px; color:#0f172a;">${esc(oficio.emissorNome || '')}</div>
             <div style="font-size:12.5px; color:#64748b;">${esc(oficio.emissorCargo || '')}</div>
+          </div>
+        </div>
+
+        <!-- Protocolo de Recebimento -->
+        <div style="margin-top:70px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+          <div style="text-align:center; width:320px; border:1px solid #cbd5e1; border-radius:6px; padding:12px 14px;">
+            <div style="font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:6px; margin-bottom:10px;">Protocolo de Recebimento do Ofício</div>
+            <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:8px;">Recebido por: ______________________________________</div>
+            <div style="font-size:11px; color:#475569; text-align:left; margin-bottom:4px;">Matrícula: ______________________</div>
+            <div style="display:flex; justify-content:space-between; font-size:11px; color:#475569; margin-top:10px;">
+              <span>Data: ____/____/______</span>
+              <span>Assinatura: __________________</span>
+            </div>
           </div>
         </div>
 
