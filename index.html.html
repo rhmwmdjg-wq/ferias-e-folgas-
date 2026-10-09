@@ -1744,6 +1744,10 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <i class="fa-solid fa-file-pen"></i>
         <span class="tab-label">Gerador de Ofícios</span>
       </button>
+      <button class="tab-btn" onclick="showTab('notificacoes')" id="tab-notificacoes">
+        <i class="fa-solid fa-triangle-exclamation"></i>
+        <span class="tab-label">Notificação Administrativa</span>
+      </button>
       <button class="tab-btn" onclick="abrirModalAutorizacao()" id="tab-emitir-aut" style="color:var(--primary)">
         <i class="fa-solid fa-file-pdf"></i>
         <span class="tab-label" style="font-weight:800">Emitir Autorização</span>
@@ -3553,6 +3557,104 @@ Coordenação de RH
   </div>
 </div>
 
+<!-- ======================= ABA NOTIFICAÇÃO ADMINISTRATIVA ======================= -->
+<div class="tab-panel" id="panel-notificacoes">
+  <div class="section-title">⚠️ Notificação Administrativa</div>
+
+  <div class="ev-grid" style="grid-template-columns: 1fr 1.1fr;">
+    <!-- Form Card -->
+    <div class="ev-card" id="card-form-notificacao">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <h3 style="margin:0;">✍️ <span id="ntf-form-title">Nova Notificação Administrativa</span></h3>
+        <button class="btn btn-ghost btn-sm" onclick="carregarNovaNotificacao()">➕ Nova Notificação</button>
+      </div>
+
+      <input type="hidden" id="ntf-id">
+      <input type="hidden" id="ntf-ano">
+
+      <div class="form-row cols-3">
+        <div class="field" style="max-width:110px;">
+          <label>Nº Sequencial</label>
+          <input type="number" id="ntf-numero" min="1" placeholder="1" oninput="atualizarNumeroNotificacaoManual(this.value)">
+        </div>
+        <div class="field">
+          <label>Código Formatado da Notificação</label>
+          <input id="ntf-codigo" placeholder="Notificação nº 001/2026 - SMS" oninput="atualizarPreviewNotificacao()">
+        </div>
+        <div class="field">
+          <label>Cidade e Data por Extenso</label>
+          <input id="ntf-cidade-data" placeholder="ITACARAMBI - MG, 06 de Outubro de 2026" oninput="atualizarPreviewNotificacao()">
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:10px;">
+        <label>Destinatário(s) da Notificação</label>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+          <select id="ntf-dest-select" style="flex:1; min-width:200px;"></select>
+          <button type="button" class="btn btn-primary btn-sm" onclick="adicionarDestinatarioNotificacao()">➕ Adicionar</button>
+        </div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">Selecione destinatários cadastrados (os mesmos do Gerador de Ofícios).</div>
+      </div>
+
+      <div id="ntf-dest-selecionados" style="margin-bottom:14px;"></div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Assunto / Ementa *</label>
+        <input id="ntf-assunto" placeholder="Ex: Notificação de ..." oninput="atualizarPreviewNotificacao()">
+      </div>
+
+      <div class="field" style="margin-bottom:14px">
+        <label>Texto da Notificação * (Separe parágrafos com Enter)</label>
+        <textarea id="ntf-texto" placeholder="Digite o conteúdo oficial da notificação..." style="min-height:160px; line-height:1.6;" oninput="atualizarPreviewNotificacao()"></textarea>
+      </div>
+
+      <div class="field" style="margin-bottom:14px;">
+        <label>Emissor / Assinante Cadastrado</label>
+        <select id="ntf-emissor-select" onchange="selecionarEmissorNotificacao(this.value)">
+          <option value="">Selecione para preencher automaticamente...</option>
+        </select>
+      </div>
+
+      <div class="form-row cols-2" style="margin-bottom:16px;">
+        <div class="field"><label>Nome do Emissor / Assinante</label><input id="ntf-emissor-nome" placeholder="Ex: Dra. Brenda Souza" oninput="atualizarPreviewNotificacao()"></div>
+        <div class="field"><label>Cargo do Emissor / Assinante</label><input id="ntf-emissor-cargo" placeholder="Ex: Coordenadora APS" oninput="atualizarPreviewNotificacao()"></div>
+      </div>
+
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn btn-primary" id="btn-salvar-notificacao" onclick="salvarNotificacao()">💾 Salvar & Emitir Notificação</button>
+        <button class="btn btn-ghost" onclick="imprimirNotificacaoAtual()">🖨️ Imprimir PDF</button>
+        <button class="btn btn-ghost" onclick="carregarNovaNotificacao()">🧹 Limpar</button>
+      </div>
+
+      <div id="ntf-link-action-box" style="display:none; background:var(--surface); border:1px solid var(--border-mid); padding:12px; border-radius:var(--r-sm); gap:8px; align-items:center; margin-top:10px;">
+        <i class="fa-solid fa-link" style="color:var(--primary); font-size:1.1rem;"></i>
+        <input type="text" id="ntf-link-input-display" readonly style="flex:1; background:rgba(0,0,0,0.2); border:1px solid var(--border); padding:6px 10px; border-radius:4px; color:var(--text); font-size:0.75rem;">
+        <button class="btn btn-primary btn-sm" onclick="copiarLinkNotificacao()">📋 Copiar Link</button>
+      </div>
+    </div>
+
+    <!-- Live Preview -->
+    <div class="ev-card">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <h3>👁️ Pré-Visualização A4</h3>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirNotificacaoAtual()">🖨️ Ampliar / Imprimir</button>
+      </div>
+      <div id="ntf-preview-container"></div>
+    </div>
+  </div>
+
+  <!-- Histórico -->
+  <div class="ev-card" style="margin-top:20px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+      <h3>📋 Histórico de Notificações Emitidas</h3>
+      <input type="text" id="ntf-busca" placeholder="🔍 Buscar por número, assunto, destinatário..." oninput="renderHistoricoNotificacoes()" style="padding:6px 10px; font-size:0.78rem; max-width:340px; flex:1;">
+    </div>
+    <div id="lista-notificacoes">
+      <div class="empty"><div class="icon">⚠️</div><p>Nenhuma notificação cadastrada.</p></div>
+    </div>
+  </div>
+</div>
+
 <!-- ======================= ABA CONTROLE DE FROTAS ======================= -->
 <div class="tab-panel" id="panel-veiculos">
   <div class="section-title">🚘 Controle de Frotas & Veículos</div>
@@ -5277,6 +5379,7 @@ let _remoteData = {
   oficios: [],
   destinatarios: [],
   emissores: [],
+  notificacoes: [],
   pontoFolhas: [],
   pontoHistorico: [],
   config: {}
@@ -5497,6 +5600,16 @@ async function syncComSupabase(silencioso = false) {
     const unificados = [...data, ...pendentes];
     _remoteData.oficios = unificados;
     localStorage.setItem('srv_oficios', JSON.stringify(unificados));
+  });
+
+  await syncTabela('notificacoes', '*', (data) => {
+    const locais = JSON.parse(localStorage.getItem('srv_notificacoes') || '[]');
+    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
+    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    if (pendentes.length > 0) migrarDadosLocaisParaNuvem('notificacoes', pendentes);
+    const unificados = [...data, ...pendentes];
+    _remoteData.notificacoes = unificados;
+    localStorage.setItem('srv_notificacoes', JSON.stringify(unificados));
   });
 
   await syncTabela('destinatarios', '*', (data) => {

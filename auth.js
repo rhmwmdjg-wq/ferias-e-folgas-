@@ -10,6 +10,12 @@ async function verificarSessao() {
     renderOficioPublico(oficioToken);
     return;
   }
+
+  const notifToken = oficioParams.get('notificacao');
+  if (notifToken) {
+    renderNotificacaoPublico(notifToken);
+    return;
+  }
   
   // Link direto e público apenas para o Gerador de Ofícios (sem login)
   if (oficioParams.get('modulo') === 'oficios') {
@@ -65,7 +71,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-oficios', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto', 'tab-pontomensal', 'tab-assinatura'];
+    const gestorTabs = ['tab-alertas', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-oficios', 'tab-notificacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto', 'tab-pontomensal', 'tab-assinatura'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);

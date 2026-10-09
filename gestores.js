@@ -12,6 +12,7 @@ const MODULOS_SISTEMA = [
   { id: 'bancohoras', tab: 'tab-bancohoras', label: 'Banco de Horas' },
   { id: 'coberturas', tab: 'tab-coberturas', label: 'Coberturas' },
   { id: 'oficios', tab: 'tab-oficios', label: 'Gerador de Ofícios' },
+  { id: 'notificacoes', tab: 'tab-notificacoes', label: 'Notificação Administrativa' },
   { id: 'emitir-aut', tab: 'tab-emitir-aut', label: 'Emitir Autorização' },
   { id: 'autorizacoes', tab: 'tab-autorizacoes', label: 'Histórico de Autorizações' },
   { id: 'solicitacoes', tab: 'tab-solicitacoes', label: 'Solicitações' },

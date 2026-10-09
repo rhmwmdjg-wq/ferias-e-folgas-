@@ -761,3 +761,497 @@ async function carregarDadosOficiosPublico() {
     }
   } catch (e) { console.warn('Modo público de ofícios: falha ao carregar logos.', e); }
 }
+
+// ===================== MÓDULO NOTIFICAÇÃO ADMINISTRATIVA =====================
+let _notificacoesData = [];
+let _ntfDestinatarios = [];
+
+function gerarTokenNotificacao() {
+  return 'ntf_' + Math.random().toString(36).substring(2, 10) + Math.random().toString(36).substring(2, 6);
+}
+
+function atualizarNumeroNotificacaoManual(val) {
+  const num = parseInt(val) || 1;
+  const ano = parseInt(document.getElementById('ntf-ano')?.value) || new Date().getFullYear();
+  const numFmt = String(num).padStart(3, '0');
+  document.getElementById('ntf-numero').value = num;
+  document.getElementById('ntf-codigo').value = `Notificação nº ${numFmt}/${ano} - SMS`;
+  atualizarPreviewNotificacao();
+}
+
+function carregarNovaNotificacao() {
+  _notificacoesData = DB.notificacoes();
+  _ntfDestinatarios = [];
+
+  const anoAtual = new Date().getFullYear();
+  const proximoNum = DB.proximoNumeroNotificacao(anoAtual);
+  const numFmt = String(proximoNum).padStart(3, '0');
+
+  document.getElementById('ntf-id').value = '';
+  document.getElementById('ntf-ano').value = anoAtual;
+  document.getElementById('ntf-numero').value = proximoNum;
+  document.getElementById('ntf-codigo').value = `Notificação nº ${numFmt}/${anoAtual} - SMS`;
+  document.getElementById('ntf-assunto').value = '';
+  document.getElementById('ntf-cidade-data').value = `ITACARAMBI - MG, ${obterDataExtenso()}`;
+  document.getElementById('ntf-texto').value = '';
+
+  const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
+  const cfg = DB.config();
+  document.getElementById('ntf-emissor-nome').value = sessao.nome || cfg.coordenadorAPS || 'Coordenação APS';
+  document.getElementById('ntf-emissor-cargo').value = sessao.cargo || (sessao.role === 'admin' ? 'Administrador do Sistema' : (cfg.subtituloSidebar || 'Coordenador(a) da Atenção Primária à Saúde'));
+  const sel = document.getElementById('ntf-emissor-select');
+  if (sel) sel.value = '';
+
+  const titleEl = document.getElementById('ntf-form-title');
+  if (titleEl) titleEl.textContent = 'Nova Notificação Administrativa';
+
+  renderSelectDestinatariosNotificacao();
+  renderSelectEmissoresNotificacao();
+  renderDestinatariosSelecionadosNotificacao();
+  atualizarPreviewNotificacao();
+}
+
+function renderSelectDestinatariosNotificacao() {
+  const sel = document.getElementById('ntf-dest-select');
+  if (!sel) return;
+  const lista = DB.destinatarios();
+  sel.innerHTML = '<option value="">Selecione um destinatário cadastrado...</option>' +
+    lista.map(d => `<option value="${esc(d.id)}">${esc(d.nome)}${d.cargo ? ' — ' + esc(d.cargo) : ''}</option>`).join('');
+}
+
+function adicionarDestinatarioNotificacao() {
+  const sel = document.getElementById('ntf-dest-select');
+  const id = sel?.value;
+  if (!id) return toastMsg('Selecione um destinatário cadastrado.', 'warning');
+  const d = DB.destinatarios().find(x => x.id === id);
+  if (!d) return;
+  _ntfDestinatarios.push({ nome: d.nome || '', cargo: d.cargo || '', orgao: d.orgao || '' });
+  sel.value = '';
+  renderDestinatariosSelecionadosNotificacao();
+  atualizarPreviewNotificacao();
+}
+
+function removerDestinatarioNotificacao(idx) {
+  _ntfDestinatarios.splice(idx, 1);
+  renderDestinatariosSelecionadosNotificacao();
+  atualizarPreviewNotificacao();
+}
+
+function atualizarDestinatarioNotificacao(idx, campo, valor) {
+  if (!_ntfDestinatarios[idx]) return;
+  _ntfDestinatarios[idx][campo] = valor;
+  atualizarPreviewNotificacao();
+}
+
+function renderDestinatariosSelecionadosNotificacao() {
+  const cont = document.getElementById('ntf-dest-selecionados');
+  if (!cont) return;
+  if (!_ntfDestinatarios.length) {
+    cont.innerHTML = '<div style="font-size:0.72rem;color:var(--muted);padding:6px 0;">Nenhum destinatário adicionado.</div>';
+    return;
+  }
+  cont.innerHTML = _ntfDestinatarios.map((d, i) => `
+    <div style="border:1px solid var(--border); border-radius:var(--r-sm); padding:10px; margin-bottom:8px; background:var(--surface);">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+        <strong style="font-size:.74rem; color:var(--primary);">Destinatário ${i + 1}</strong>
+        <button class="btn btn-danger btn-sm" onclick="removerDestinatarioNotificacao(${i})" title="Remover">🗑️</button>
+      </div>
+      <input value="${esc(d.nome)}" placeholder="Nome / Tratamento" oninput="atualizarDestinatarioNotificacao(${i}, 'nome', this.value)" style="margin-bottom:6px;">
+      <input value="${esc(d.cargo)}" placeholder="Cargo" oninput="atualizarDestinatarioNotificacao(${i}, 'cargo', this.value)" style="margin-bottom:6px;">
+      <input value="${esc(d.orgao)}" placeholder="Órgão / Secretaria / Empresa" oninput="atualizarDestinatarioNotificacao(${i}, 'orgao', this.value)">
+    </div>
+  `).join('');
+}
+
+function renderSelectEmissoresNotificacao() {
+  const sel = document.getElementById('ntf-emissor-select');
+  if (!sel) return;
+  const atual = sel.value;
+  const lista = DB.emissores();
+  sel.innerHTML = '<option value="">Selecione para preencher automaticamente...</option>' +
+    lista.map(e => `<option value="${esc(e.id)}">${esc(e.nome)}${e.cargo ? ' — ' + esc(e.cargo) : ''}</option>`).join('');
+  if (atual && lista.some(e => e.id === atual)) sel.value = atual;
+}
+
+function selecionarEmissorNotificacao(id) {
+  if (!id) return;
+  const e = DB.emissores().find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('ntf-emissor-nome').value = e.nome || '';
+  document.getElementById('ntf-emissor-cargo').value = e.cargo || '';
+  atualizarPreviewNotificacao();
+}
+
+function atualizarPreviewNotificacao() {
+  const container = document.getElementById('ntf-preview-container');
+  if (!container) return;
+
+  const logoSide = (typeof getImg === 'function' ? getImg('side') : null) || localStorage.getItem('srv_img_side') || '';
+  const logoEsq = logoSide || (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
+  const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
+
+  const codigo = document.getElementById('ntf-codigo')?.value || 'Notificação nº 001/2026 - SMS';
+  const cidadeData = document.getElementById('ntf-cidade-data')?.value || `ITACARAMBI - MG, ${obterDataExtenso()}`;
+  const assunto = document.getElementById('ntf-assunto')?.value || 'Assunto da notificação';
+  const texto = document.getElementById('ntf-texto')?.value || 'Digite aqui o texto oficial da notificação...';
+  const emissorNome = document.getElementById('ntf-emissor-nome')?.value || 'Nome do Emissor';
+  const emissorCargo = document.getElementById('ntf-emissor-cargo')?.value || 'Cargo do Emissor';
+
+  const paragrafosHtml = texto.split('\n').filter(p => p.trim()).map(p =>
+    `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:14px;">${esc(p)}</p>`
+  ).join('');
+
+  const dests = (_ntfDestinatarios || []).filter(d => (d.nome || '').trim() || (d.cargo || '').trim() || (d.orgao || '').trim());
+  const destsHtml = dests.length ? dests.map(d => `
+    <div style="margin-bottom:12px;">
+      <div><strong>${esc(d.nome || '')}</strong></div>
+      ${d.cargo ? `<div>${esc(d.cargo)}</div>` : ''}
+      ${d.orgao ? `<div style="color:#475569;">${esc(d.orgao)}</div>` : ''}
+    </div>
+  `).join('') : '<div><strong>À Sua Senhoria o(a) Senhor(a) Destinatário(a)</strong></div>';
+
+  const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:60px; max-width:140px; object-fit:contain;">` : '<div style="font-size:24px;">🏛️</div>';
+  const logoDirHtml = logoDir ? `<img src="${logoDir}" style="max-height:60px; max-width:140px; object-fit:contain;">` : (logoPrint ? `<img src="${logoPrint}" style="max-height:60px; max-width:140px; object-fit:contain;">` : '<div style="font-size:24px;">🌴</div>');
+
+  container.innerHTML = `
+    <div style="background:#fff; color:#111; padding:48px 44px; border-radius:8px; box-shadow:0 8px 30px rgba(0,0,0,0.3); font-family:'Sora','Times New Roman',serif; min-height:750px; position:relative;">
+      <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2px solid #222; padding-bottom:14px; margin-bottom:18px;">
+        <div style="width:140px; text-align:left;">${logoEsqHtml}</div>
+        <div style="text-align:center; flex:1; padding:0 10px;">${oficioHeaderHtml(1)}</div>
+        <div style="width:140px; text-align:right;">${logoDirHtml}</div>
+      </div>
+
+      <div style="text-align:center; margin-bottom:22px;">
+        <div style="font-size:15px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a; border-bottom:1.5px solid #0f172a; display:inline-block; padding-bottom:4px;">Notificação Administrativa</div>
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:28px;">
+        <div style="font-weight:700; font-size:14px; color:#0f172a;">${esc(codigo)}</div>
+        <div style="font-size:13px; color:#334155; font-weight:500;">${esc(cidadeData)}</div>
+      </div>
+
+      <div style="margin-bottom:24px; line-height:1.5; font-size:13.5px; color:#1e293b;">${destsHtml}</div>
+
+      <div style="margin-bottom:28px; background:#f8fafc; padding:10px 14px; border-left:4px solid #b45309; font-size:13.5px;">
+        <strong>Assunto:</strong> ${esc(assunto)}
+      </div>
+
+      <div style="min-height:220px; color:#0f172a;">
+        ${paragrafosHtml || '<p style="color:#94a3b8; font-style:italic;">Digite o texto no formulário ao lado...</p>'}
+      </div>
+
+      <div style="margin-top:40px; text-align:center; page-break-inside:avoid;">
+        <div style="margin-bottom:45px; font-size:14px; color:#334155;">Atenciosamente,</div>
+        <div style="display:inline-block; border-top:1.5px solid #0f172a; padding-top:8px; min-width:280px;">
+          <div style="font-weight:700; font-size:14px; color:#0f172a;">${esc(emissorNome)}</div>
+          <div style="font-size:12px; color:#64748b;">${esc(emissorCargo)}</div>
+        </div>
+      </div>
+
+      <div style="margin-top:60px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+        <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
+          <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
+          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
+          <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
+          <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
+            <span>Data: __/__/____</span>
+            <span>Assinatura: ________</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="position:absolute; bottom:20px; left:44px; right:44px; border-top:1px solid #e2e8f0; padding-top:8px; display:flex; justify-content:space-between; font-size:10px; color:#94a3b8;">
+        <div>Documento Oficial emitido pelo Sistema Atlas Saúde</div>
+        <div>Código de Autenticidade: VERIFICADO</div>
+      </div>
+    </div>
+  `;
+}
+
+async function salvarNotificacao() {
+  const id = document.getElementById('ntf-id').value;
+  const ano = parseInt(document.getElementById('ntf-ano').value) || new Date().getFullYear();
+  const numero = parseInt(document.getElementById('ntf-numero').value) || DB.proximoNumeroNotificacao(ano);
+  const codigo = document.getElementById('ntf-codigo').value.trim();
+  const assunto = document.getElementById('ntf-assunto').value.trim();
+  const texto = document.getElementById('ntf-texto').value.trim();
+
+  if (!assunto) return toastMsg('Informe o assunto da notificação.', 'warning');
+  if (!texto) return toastMsg('Informe o texto do corpo da notificação.', 'warning');
+
+  const btnSalvar = document.getElementById('btn-salvar-notificacao');
+  if (btnSalvar) { btnSalvar.disabled = true; btnSalvar.textContent = '⏳ Salvando...'; }
+
+  try {
+    _notificacoesData = DB.notificacoes();
+    let token = '';
+    if (id) { const antigo = _notificacoesData.find(o => o.id === id); token = antigo ? antigo.token : gerarTokenNotificacao(); }
+    else token = gerarTokenNotificacao();
+
+    const dests = (_ntfDestinatarios || [])
+      .map(d => ({ nome: (d.nome || '').trim(), cargo: (d.cargo || '').trim(), orgao: (d.orgao || '').trim() }))
+      .filter(d => d.nome || d.cargo || d.orgao);
+    const primeiro = dests[0] || {};
+
+    const dados = {
+      id: id || uidOficio(),
+      numero, ano,
+      codigo: codigo || `Notificação nº ${String(numero).padStart(3, '0')}/${ano} - SMS`,
+      assunto,
+      destinatarios: dests,
+      destinatario: primeiro.nome || '',
+      cargoDestinatario: primeiro.cargo || '',
+      orgaoDestinatario: primeiro.orgao || '',
+      cidadeData: document.getElementById('ntf-cidade-data').value.trim() || `ITACARAMBI - MG, ${obterDataExtenso()}`,
+      texto,
+      emissorNome: document.getElementById('ntf-emissor-nome').value.trim(),
+      emissorCargo: document.getElementById('ntf-emissor-cargo').value.trim(),
+      token,
+      criadoEm: new Date().toISOString()
+    };
+
+    if (id) { const idx = _notificacoesData.findIndex(o => o.id === id); if (idx >= 0) _notificacoesData[idx] = dados; }
+    else _notificacoesData.push(dados);
+
+    await DB.saveNotificacoes(_notificacoesData);
+    toastMsg('Notificação emitida e salva com sucesso!', 'success');
+    renderHistoricoNotificacoes();
+
+    const linkPublico = `${window.location.origin}${window.location.pathname}?notificacao=${token}`;
+    document.getElementById('ntf-id').value = dados.id;
+    const actionBox = document.getElementById('ntf-link-action-box');
+    if (actionBox) { document.getElementById('ntf-link-input-display').value = linkPublico; actionBox.style.display = 'flex'; }
+  } catch (err) {
+    console.error("Erro ao salvar notificação:", err);
+    toastMsg('Erro ao salvar notificação: ' + err.message, 'error');
+  } finally {
+    if (btnSalvar) { btnSalvar.disabled = false; btnSalvar.textContent = '💾 Salvar & Emitir Notificação'; }
+  }
+}
+
+function copiarLinkNotificacao(token) {
+  const tok = token || (_notificacoesData.find(o => o.id === document.getElementById('ntf-id').value)?.token);
+  if (!tok) return toastMsg('Nenhuma notificação selecionada.', 'warning');
+  const url = `${window.location.origin}${window.location.pathname}?notificacao=${tok}`;
+  navigator.clipboard.writeText(url).then(() => toastMsg('🔗 Link público copiado!', 'success')).catch(() => {
+    const input = document.getElementById('ntf-link-input-display');
+    if (input) { input.value = url; input.select(); document.execCommand('copy'); toastMsg('🔗 Link público copiado!', 'success'); }
+  });
+}
+
+function imprimirNotificacaoAtual() {
+  const container = document.getElementById('ntf-preview-container');
+  if (!container || !container.innerHTML) return toastMsg('Preencha a notificação para imprimir.', 'warning');
+  const win = window.open('', '_blank');
+  win.document.write(`<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Impressão de Notificação Administrativa</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Sora', sans-serif; background: #fff; margin: 0; padding: 20px; }
+    @media print { body { padding: 0; } .no-print { display: none; } }
+  </style>
+</head>
+<body>
+  <div class="no-print" style="text-align:right; margin-bottom:15px;">
+    <button onclick="window.print()" style="padding:10px 20px; background:#2563eb; color:#fff; border:none; border-radius:6px; font-weight:bold; cursor:pointer;">🖨️ Imprimir Notificação</button>
+  </div>
+  ${container.innerHTML}
+</body>
+</html>`);
+  win.document.close();
+}
+
+function renderHistoricoNotificacoes() {
+  _notificacoesData = DB.notificacoes();
+  const container = document.getElementById('lista-notificacoes');
+  if (!container) return;
+  const busca = (document.getElementById('ntf-busca')?.value || '').toLowerCase().trim();
+  let lista = _notificacoesData;
+  const destsNomes = (o) => (o.destinatarios && o.destinatarios.length ? o.destinatarios.map(d => d.nome).filter(Boolean).join('; ') : (o.destinatario || ''));
+  if (busca) {
+    lista = lista.filter(o =>
+      (o.codigo || '').toLowerCase().includes(busca) ||
+      (o.assunto || '').toLowerCase().includes(busca) ||
+      destsNomes(o).toLowerCase().includes(busca) ||
+      (o.emissorNome || '').toLowerCase().includes(busca)
+    );
+  }
+  lista.sort((a, b) => new Date(b.criadoEm || 0) - new Date(a.criadoEm || 0));
+  if (lista.length === 0) { container.innerHTML = '<div class="empty"><div class="icon">⚠️</div><p>Nenhuma notificação emitida ainda.</p></div>'; return; }
+  container.innerHTML = lista.map(o => `
+    <div class="ev-list-item completo" style="margin-bottom:10px">
+      <div class="ev-list-header">
+        <div style="flex:1; min-width:0;">
+          <div class="ev-list-nome" style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <span>⚠️ ${esc(o.codigo)}</span>
+            <span class="tag tag-purple">${esc(o.assunto)}</span>
+          </div>
+          <div class="ev-list-meta" style="margin-top:4px; font-size:0.75rem;">
+            <span>👤 <strong>Destinatário:</strong> ${esc(destsNomes(o) || '-')}</span>
+            <span>✍️ <strong>Emissor:</strong> ${esc(o.emissorNome || '-')}</span>
+            <span>📅 ${o.criadoEm ? new Date(o.criadoEm).toLocaleDateString('pt-BR') : '-'}</span>
+          </div>
+        </div>
+        <div class="ev-list-actions" style="display:flex; gap:6px;">
+          <button class="btn btn-ghost btn-sm" onclick="copiarLinkNotificacao('${o.token}')" title="Copiar Link Público">🔗 Link</button>
+          <button class="btn btn-ghost btn-sm" onclick="carregarNotificacaoParaEditar('${o.id}')" title="Editar">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="excluirNotificacao('${o.id}')" title="Excluir">🗑️</button>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function carregarNotificacaoParaEditar(id) {
+  const o = _notificacoesData.find(x => x.id === id);
+  if (!o) return;
+  document.getElementById('ntf-id').value = o.id;
+  document.getElementById('ntf-ano').value = o.ano || new Date().getFullYear();
+  document.getElementById('ntf-numero').value = o.numero || 1;
+  document.getElementById('ntf-codigo').value = o.codigo || '';
+  document.getElementById('ntf-assunto').value = o.assunto || '';
+  document.getElementById('ntf-cidade-data').value = o.cidadeData || '';
+  document.getElementById('ntf-texto').value = o.texto || '';
+  document.getElementById('ntf-emissor-nome').value = o.emissorNome || '';
+  document.getElementById('ntf-emissor-cargo').value = o.emissorCargo || '';
+
+  if (Array.isArray(o.destinatarios) && o.destinatarios.length) {
+    _ntfDestinatarios = o.destinatarios.map(d => ({ nome: d.nome || '', cargo: d.cargo || '', orgao: d.orgao || '' }));
+  } else if (o.destinatario || o.cargoDestinatario || o.orgaoDestinatario) {
+    _ntfDestinatarios = [{ nome: o.destinatario || '', cargo: o.cargoDestinatario || '', orgao: o.orgaoDestinatario || '' }];
+  } else _ntfDestinatarios = [];
+
+  const titleEl = document.getElementById('ntf-form-title');
+  if (titleEl) titleEl.textContent = 'Editar Notificação - ' + o.codigo;
+  renderDestinatariosSelecionadosNotificacao();
+  atualizarPreviewNotificacao();
+  const cardForm = document.getElementById('card-form-notificacao');
+  if (cardForm) cardForm.scrollIntoView({ behavior: 'smooth' });
+}
+
+async function excluirNotificacao(id) {
+  const o = _notificacoesData.find(x => x.id === id);
+  if (!confirm(`Deseja realmente excluir a ${o ? o.codigo : 'notificação'}?`)) return;
+  _notificacoesData = _notificacoesData.filter(x => x.id !== id);
+  await DB.deleteNotificacao(id);
+  renderHistoricoNotificacoes();
+  toastMsg('Notificação excluída com sucesso.', 'info');
+}
+
+async function renderNotificacaoPublico(token) {
+  const appContainer = document.querySelector('.app-container');
+  const loginScreen = document.getElementById('login-screen');
+  if (appContainer) appContainer.style.display = 'none';
+  if (loginScreen) loginScreen.style.display = 'none';
+
+  let notif = DB.notificacoes().find(o => o.token === token);
+  if (!notif) {
+    try {
+      const { data } = await supabaseClient.from('notificacoes').select('*').eq('token', token).single();
+      if (data) notif = normalizarCamposObjeto(data);
+    } catch (e) { console.warn("Erro ao buscar notificação pública:", e); }
+  }
+
+  if (!notif) {
+    document.body.innerHTML = `
+      <div style="min-height:100vh; background:#060b14; color:#fff; display:flex; align-items:center; justify-content:center; flex-direction:column; padding:20px; font-family:sans-serif;">
+        <div style="font-size:48px; margin-bottom:16px;">⚠️</div>
+        <h2 style="font-size:22px; margin-bottom:8px;">Notificação não encontrada ou inválida</h2>
+        <p style="color:#94a3b8; font-size:14px; margin-bottom:24px;">O documento solicitado não foi localizado no sistema.</p>
+        <a href="index.html.html" style="padding:10px 20px; background:#3b82f6; color:#fff; text-decoration:none; border-radius:8px; font-weight:bold;">Acessar o Sistema Atlas Saúde</a>
+      </div>`;
+    return;
+  }
+
+  const logoSide = (typeof getImg === 'function' ? getImg('side') : null) || localStorage.getItem('srv_img_side') || '';
+  const logoEsq = logoSide || (typeof getImg === 'function' ? getImg('esq') : null) || localStorage.getItem('srv_img_esq') || '';
+  const logoDir = (typeof getImg === 'function' ? getImg('dir') : null) || localStorage.getItem('srv_img_dir') || '';
+  const logoPrint = (typeof getImg === 'function' ? getImg('print') : null) || localStorage.getItem('srv_img_print') || '';
+
+  const paragrafosHtml = (notif.texto || '').split('\n').filter(p => p.trim()).map(p =>
+    `<p style="text-align:justify; text-indent:2.5em; margin-bottom:14px; line-height:1.7; font-size:15px;">${esc(p)}</p>`
+  ).join('');
+
+  const dests = (Array.isArray(notif.destinatarios) && notif.destinatarios.length)
+    ? notif.destinatarios
+    : ((notif.destinatario || notif.cargoDestinatario || notif.orgaoDestinatario) ? [{ nome: notif.destinatario, cargo: notif.cargoDestinatario, orgao: notif.orgaoDestinatario }] : []);
+  const destsHtml = dests.length ? dests.map(d => `
+    <div style="margin-bottom:12px;">
+      <div><strong>${esc(d.nome || '')}</strong></div>
+      ${d.cargo ? `<div>${esc(d.cargo)}</div>` : ''}
+      ${d.orgao ? `<div style="color:#475569;">${esc(d.orgao)}</div>` : ''}
+    </div>
+  `).join('') : '';
+
+  const logoEsqHtml = logoEsq ? `<img src="${logoEsq}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🏛️</div>';
+  const logoDirHtml = logoDir ? `<img src="${logoDir}" style="max-height:65px; max-width:150px; object-fit:contain;">` : (logoPrint ? `<img src="${logoPrint}" style="max-height:65px; max-width:150px; object-fit:contain;">` : '<div style="font-size:28px;">🌴</div>');
+
+  document.body.innerHTML = `
+    <div style="min-height:100vh; background:#0f172a; padding:30px 15px; font-family:'Sora', sans-serif; display:flex; flex-direction:column; align-items:center;">
+      <div style="width:100%; max-width:800px; display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; color:#fff;" class="no-print">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <span style="font-size:20px;">⚠️</span>
+          <div>
+            <div style="font-weight:700; font-size:15px;">Documento Oficial Autêntico</div>
+            <div style="font-size:12px; color:#94a3b8;">Atlas Saúde · Notificação Administrativa</div>
+          </div>
+        </div>
+        <button onclick="window.print()" style="padding:10px 18px; background:#3b82f6; color:#fff; border:none; border-radius:8px; font-weight:700; cursor:pointer; font-family:'Sora', sans-serif;">🖨️ Imprimir / Salvar PDF</button>
+      </div>
+
+      <div style="background:#fff; color:#111; width:100%; max-width:800px; padding:60px 50px; border-radius:12px; box-shadow:0 20px 60px rgba(0,0,0,0.5); min-height:950px; position:relative;">
+        <div style="display:flex; align-items:center; justify-content:space-between; border-bottom:2.5px solid #1e293b; padding-bottom:16px; margin-bottom:26px;">
+          <div style="width:150px; text-align:left;">${logoEsqHtml}</div>
+          <div style="text-align:center; flex:1; padding:0 15px;">${oficioHeaderHtml(2)}</div>
+          <div style="width:150px; text-align:right;">${logoDirHtml}</div>
+        </div>
+
+        <div style="text-align:center; margin-bottom:26px;">
+          <div style="font-size:16px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#0f172a; border-bottom:1.5px solid #0f172a; display:inline-block; padding-bottom:4px;">Notificação Administrativa</div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px;">
+          <div style="font-weight:800; font-size:15px; color:#0f172a;">${esc(notif.codigo)}</div>
+          <div style="font-size:13.5px; color:#334155; font-weight:600;">${esc(notif.cidadeData)}</div>
+        </div>
+
+        <div style="margin-bottom:28px; line-height:1.6; font-size:14px; color:#1e293b;">${destsHtml}</div>
+
+        <div style="margin-bottom:32px; background:#f1f5f9; padding:12px 16px; border-left:4px solid #b45309; font-size:14px; border-radius:0 6px 6px 0;">
+          <strong>Assunto:</strong> ${esc(notif.assunto || '')}
+        </div>
+
+        <div style="min-height:300px; color:#0f172a;">${paragrafosHtml}</div>
+
+        <div style="margin-top:60px; text-align:center;">
+          <div style="margin-bottom:50px; font-size:14px; color:#334155;">Atenciosamente,</div>
+          <div style="display:inline-block; border-top:1.5px solid #0f172a; padding-top:8px; min-width:300px;">
+            <div style="font-weight:800; font-size:14.5px; color:#0f172a;">${esc(notif.emissorNome || '')}</div>
+            <div style="font-size:12.5px; color:#64748b;">${esc(notif.emissorCargo || '')}</div>
+          </div>
+        </div>
+
+        <div style="margin-top:60px; display:flex; justify-content:flex-end; page-break-inside:avoid;">
+          <div style="text-align:center; width:230px; border:1px solid #cbd5e1; border-radius:5px; padding:8px 10px;">
+            <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.03em; color:#334155; border-bottom:1px solid #e2e8f0; padding-bottom:4px; margin-bottom:6px;">Protocolo de Recebimento</div>
+            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:5px;">Recebido por: ____________________</div>
+            <div style="font-size:9px; color:#475569; text-align:left; margin-bottom:2px;">Matrícula: ______________</div>
+            <div style="display:flex; justify-content:space-between; font-size:9px; color:#475569; margin-top:6px;">
+              <span>Data: __/__/____</span>
+              <span>Assinatura: ________</span>
+            </div>
+          </div>
+        </div>
+
+        <div style="position:absolute; bottom:25px; left:50px; right:50px; border-top:1px solid #cbd5e1; padding-top:10px; display:flex; justify-content:space-between; font-size:10.5px; color:#64748b;">
+          <div>Documento Oficial · emitido em ${notif.criadoEm ? new Date(notif.criadoEm).toLocaleDateString('pt-BR') : '-'}</div>
+          <div>Autenticidade Verificada pela Secretaria Municipal de Saúde</div>
+        </div>
+      </div>
+    </div>
+  `;
+}

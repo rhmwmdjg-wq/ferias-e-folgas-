@@ -601,6 +601,46 @@ const DB = {
     return max + 1;
   },
 
+  // =================== NOTIFICAÇÃO ADMINISTRATIVA ===================
+  notificacoes: () => _remoteData.notificacoes.length ? _remoteData.notificacoes : JSON.parse(localStorage.getItem('srv_notificacoes') || '[]'),
+  saveNotificacoes: async (d) => {
+    _remoteData.notificacoes = d;
+    localStorage.setItem('srv_notificacoes', JSON.stringify(d));
+    if (!d || !d.length) return;
+    try {
+      const { error } = await supabaseClient.from('notificacoes').upsert(d, { onConflict: 'id' });
+      if (error) {
+        if (isQuotaError(error)) saveToSyncQueue('notificacoes', d);
+        else {
+          const msg = (error.message || '').toLowerCase();
+          if (msg.includes('destinatarios')) {
+            const safe = d.map(o => { const c = { ...o }; delete c.destinatarios; return c; });
+            const { error: err2 } = await supabaseClient.from('notificacoes').upsert(safe, { onConflict: 'id' });
+            if (err2 && !isQuotaError(err2)) console.warn("Aviso notificacoes (modo compatível):", err2.message);
+          } else console.warn("Erro ao salvar notificações:", error.message);
+        }
+      }
+    } catch (e) {
+      if (isQuotaError(e)) saveToSyncQueue('notificacoes', d);
+      else console.error("Erro ao salvar notificações:", e);
+    }
+  },
+  deleteNotificacao: async (id) => {
+    _remoteData.notificacoes = _remoteData.notificacoes.filter(o => o.id !== id);
+    localStorage.setItem('srv_notificacoes', JSON.stringify(_remoteData.notificacoes));
+    try {
+      const { error } = await supabaseClient.from('notificacoes').delete().eq('id', id);
+      if (error && !isQuotaError(error)) console.warn("Aviso ao deletar notificação:", error.message);
+    } catch (e) { console.error("Erro ao deletar notificação:", e); }
+  },
+  proximoNumeroNotificacao: (ano) => {
+    const todos = DB.notificacoes();
+    const anoRef = ano || new Date().getFullYear();
+    const doAno = todos.filter(n => (n.ano === anoRef || parseInt(n.ano) === anoRef));
+    if (!doAno.length) return 1;
+    return Math.max(1, ...doAno.map(n => parseInt(n.numero) || 0)) + 1;
+  },
+
   // =================== CADASTRO DE DESTINATÁRIOS ===================
   destinatarios: () => _remoteData.destinatarios.length ? _remoteData.destinatarios : JSON.parse(localStorage.getItem('srv_destinatarios') || '[]'),
   saveDestinatarios: async (d) => {

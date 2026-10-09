@@ -36,6 +36,7 @@ function showTab(tab) {
   if (tab === 'pontomensal' && typeof pmIniciar === 'function') pmIniciar();
   if (tab === 'protocolo') { renderProtocolos(); }
   if (tab === 'oficios') { carregarNovoOficio(); renderHistoricoOficios(); }
+  if (tab === 'notificacoes') { carregarNovaNotificacao(); renderHistoricoNotificacoes(); }
   currentPage = 1;
 }
 
