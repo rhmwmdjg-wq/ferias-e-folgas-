@@ -1,6 +1,13 @@
 // Módulo de relatórios e impressões.
 // Mantém as regras e layouts de impressão existentes separados do HTML principal.
 
+// Primeira data de uma folga (AAAA-MM-DD), usada para ordenar.
+// Usufrutos guardam várias datas em "data" ("2026-01-02, 2026-01-03"), que não ordenavam corretamente.
+function chaveDataFolga(f) {
+  if (f.dataItems && f.dataItems.length) return f.dataItems.map(di => di.data).sort()[0];
+  return String(f.data || '').split(',')[0].trim();
+}
+
 function popularSelectCredRelatorio() {
   const dados = DB.credenciados();
   const sel = document.getElementById('pt-rel-credenciado');
@@ -394,6 +401,9 @@ function renderRelatorio() {
     return; 
   }
 
+  // Ordena a lista inteira ANTES de paginar (antes cada página era ordenada isoladamente)
+  progs.sort((a, b) => String(a.inicio || '').localeCompare(String(b.inicio || '')));
+
   // Paginação
   const totalPages = Math.ceil(progs.length / rowsPerPage);
   if (currentPage > totalPages) currentPage = totalPages || 1;
@@ -403,7 +413,6 @@ function renderRelatorio() {
   
   renderPaginacao('paginacao-relatorio', totalPages, 'renderRelatorio');
 
-  paginados.sort((a, b) => new Date(a.inicio) - new Date(b.inicio));
   tbody.innerHTML = paginados.map(p => {
     const srv = servidores.find(s => s.id === p.srvId);
     const diff = diffDays(p.inicio);
@@ -794,13 +803,16 @@ function imprimirRelatorio(tipo) {
     const servidoresFolgas = servidores.filter(s => folgasFiltradas.some(f => f.srvId === s.id));
 
     htmlTabela = servidoresFolgas.length ? servidoresFolgas.map(s => {
-      const srvFolgas = folgasFiltradas.filter(f => f.srvId === s.id).sort((a,b) => new Date(b.data) - new Date(a.data));
-      const saldo = srvFolgas.reduce((acc, f) => acc + (f.tipo === 'credito' ? f.qtd : -f.qtd), 0);
+      const srvFolgas = folgasFiltradas.filter(f => f.srvId === s.id).sort((a,b) => chaveDataFolga(b).localeCompare(chaveDataFolga(a)));
+      // Movimento do período filtrado x saldo real do servidor (antes só o movimento era mostrado como "saldo")
+      const movPeriodo = srvFolgas.reduce((acc, f) => acc + (f.tipo === 'credito' ? f.qtd : -f.qtd), 0);
+      const saldo = saldoFolgas(s.id);
+      const temFiltroPeriodo = fgMes !== '' || fgAno !== '';
       return `
         <div class="group-block">
           <div class="group-header">
             <span>👤 ${s.nome} &nbsp;·&nbsp; Mat. ${s.matricula} &nbsp;·&nbsp; ${s.setor || '-'}</span>
-            <span class="${saldo < 0 ? 'saldo-neg' : 'saldo-pos'}">SALDO: ${saldo > 0 ? '+' : ''}${saldo} DIA(S)</span>
+            <span class="${saldo < 0 ? 'saldo-neg' : 'saldo-pos'}">${temFiltroPeriodo ? `MOVIMENTO NO PERÍODO: ${movPeriodo > 0 ? '+' : ''}${movPeriodo} · ` : ''}SALDO ATUAL: ${saldo > 0 ? '+' : ''}${saldo} DIA(S)</span>
           </div>
           <table style="margin:0">
             <thead><tr>
@@ -877,7 +889,7 @@ function imprimirRelatorioIndividual(srvId, tipo) {
   const srv = DB.servidores().find(s => s.id === srvId);
   if (!srv) return;
   const win = window.open('', '_blank');
-  const folgas = DB.folgas().filter(f => f.srvId === srvId).sort((a,b) => new Date(b.data) - new Date(a.data));
+  const folgas = DB.folgas().filter(f => f.srvId === srvId).sort((a,b) => chaveDataFolga(b).localeCompare(chaveDataFolga(a)));
   const hoje = new Date();
   const imgPrint = getImg('print');
   
@@ -1101,18 +1113,20 @@ function imprimirRelatorioBancoHoras() {
   const meses = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 
   const filtMesBH = document.getElementById('bh-rel-mes')?.value || '';
-  const filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+  let filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+  // Mês sem ano misturava anos diferentes: assume o ano atual
+  if (filtMesBH !== '' && !filtAnoBH) filtAnoBH = String(hoje.getFullYear());
 
   let registros = DB.bancoHoras().filter(r => r.srvId === srvId);
   if (filtMesBH !== '') registros = registros.filter(r => String(r.mes) === filtMesBH);
   if (filtAnoBH !== '') registros = registros.filter(r => String(r.ano) === filtAnoBH);
-  registros.sort((a, b) => a.ano - b.ano || a.mes - b.mes);
+  registros.sort(ordemBancoHoras);
 
   let saldoAnterior = 0;
   let linhasTabela = '';
 
   if (registros.length && (filtMesBH !== '' || filtAnoBH !== '')) {
-    saldoAnterior = calcularSaldoAnteriorBancoHoras(srvId, registros[0].mes, registros[0].ano);
+    saldoAnterior = saldoAntesDoRegistroBH(registros[0]);
   }
 
   registros.forEach((r, i) => {
@@ -1120,11 +1134,11 @@ function imprimirRelatorioBancoHoras() {
     const saldoRem = totalDisp - (r.horasPagas || 0);
     linhasTabela += `<tr>
       <td style="text-align:center">${meses[r.mes] || '?'}/${r.ano}</td>
-      <td style="text-align:center">${saldoAnterior.toFixed(1)}h</td>
-      <td style="text-align:center">${(r.horasGeradas || 0).toFixed(1)}h</td>
-      <td style="text-align:center;font-weight:700">${totalDisp.toFixed(1)}h</td>
-      <td style="text-align:center;color:${(r.horasPagas || 0) > 0 ? '#16a34a' : '#666'}">${(r.horasPagas || 0).toFixed(1)}h</td>
-      <td style="text-align:center;font-weight:700;color:${saldoRem >= 0 ? '#16a34a' : '#dc2626'}">${saldoRem.toFixed(1)}h</td>
+      <td style="text-align:center">${fmtHoras(saldoAnterior)}</td>
+      <td style="text-align:center">${fmtHoras(r.horasGeradas || 0)}</td>
+      <td style="text-align:center;font-weight:700">${fmtHoras(totalDisp)}</td>
+      <td style="text-align:center;color:${(r.horasPagas || 0) > 0 ? '#16a34a' : '#666'}">${fmtHoras(r.horasPagas || 0)}</td>
+      <td style="text-align:center;font-weight:700;color:${saldoRem >= 0 ? '#16a34a' : '#dc2626'}">${fmtHoras(saldoRem)}</td>
       <td style="font-size:9px">${r.autorizadoPor || '-'}</td>
       <td style="font-size:9px">${r.obs || '-'}</td>
     </tr>`;
@@ -1179,7 +1193,7 @@ function imprimirRelatorioBancoHoras() {
         ${linhasTabela}
         <tr style="font-weight:800;background:#f0fdf4">
           <td colspan="2" style="text-align:right;text-transform:uppercase;font-size:9px">Saldo Final</td>
-          <td style="text-align:center;font-weight:800">${saldoFinal >= 0 ? '+' : ''}${saldoFinal.toFixed(1)}h</td>
+          <td style="text-align:center;font-weight:800">${saldoFinal >= 0 ? '+' : ''}${fmtHoras(saldoFinal)}</td>
           <td colspan="5"></td>
         </tr>
       </tbody>
@@ -1261,7 +1275,8 @@ function imprimirRelatorioBancoHoras() {
 function imprimirRelatorioBancoHorasGeral() {
   const filtSetorBH = document.getElementById('bh-rel-setor')?.value || '';
   const filtMesBH = document.getElementById('bh-rel-mes')?.value || '';
-  const filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+  let filtAnoBH = document.getElementById('bh-rel-ano')?.value || '';
+  if (filtMesBH !== '' && !filtAnoBH) filtAnoBH = String(new Date().getFullYear());
   const mesesBH = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
   const periodoBH = (filtMesBH !== '' || filtAnoBH !== '')
     ? 'Período: ' + (filtMesBH !== '' ? mesesBH[parseInt(filtMesBH)] : '') + (filtMesBH !== '' && filtAnoBH !== '' ? '/' : '') + (filtAnoBH || '')
@@ -1313,13 +1328,15 @@ function imprimirRelatorioBancoHorasGeral() {
       totalPagas += r.horasPagas || 0;
     });
     saldo = totalGeradas - totalPagas;
+    const saldoAtual = DB.bancoHoras().filter(r => r.srvId === srv.id).reduce((a, r) => a + (r.horasGeradas || 0) - (r.horasPagas || 0), 0);
     linhas += `<tr>
       <td>${srv.nome}</td>
       <td>${srv.matricula}</td>
       <td>${srv.setor || '-'}</td>
-      <td style="text-align:center">${totalGeradas.toFixed(1)}h</td>
-      <td style="text-align:center">${totalPagas.toFixed(1)}h</td>
-      <td style="text-align:center;font-weight:700;color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${saldo >= 0 ? '+' : ''}${saldo.toFixed(1)}h</td>
+      <td style="text-align:center">${fmtHoras(totalGeradas)}</td>
+      <td style="text-align:center">${fmtHoras(totalPagas)}</td>
+      <td style="text-align:center;font-weight:700;color:${saldo >= 0 ? '#16a34a' : '#dc2626'}">${saldo >= 0 ? '+' : ''}${fmtHoras(saldo)}</td>
+      <td style="text-align:center;font-weight:700;color:${saldoAtual >= 0 ? '#16a34a' : '#dc2626'}">${saldoAtual >= 0 ? '+' : ''}${fmtHoras(saldoAtual)}</td>
     </tr>`;
   });
 
@@ -1336,13 +1353,14 @@ function imprimirRelatorioBancoHorasGeral() {
         <th>Setor</th>
         <th>Total Horas Geradas</th>
         <th>Total Horas Pagas</th>
-        <th>Saldo Remanescente</th>
+        <th>${filtMesBH !== '' || filtAnoBH !== '' ? 'Saldo do Período' : 'Saldo Remanescente'}</th>
+        <th>Saldo Atual (Total)</th>
       </tr></thead>
       <tbody>
         ${linhas}
         <tr style="font-weight:800;background:#f0fdf4">
           <td colspan="3" style="text-align:right;text-transform:uppercase;font-size:9px">Saldo Geral</td>
-          <td colspan="3" style="text-align:center;font-weight:800">${totalGeral >= 0 ? '+' : ''}${totalGeral.toFixed(1)}h</td>
+          <td colspan="4" style="text-align:center;font-weight:800">${totalGeral >= 0 ? '+' : ''}${fmtHoras(totalGeral)}</td>
         </tr>
       </tbody>
     </table>
@@ -1444,20 +1462,23 @@ function exportarCSV(tipo) {
     const fgSetor = document.getElementById('folgas-rel-setor')?.value || '';
     const fgMes = document.getElementById('folgas-rel-mes')?.value || '';
     const fgAno = document.getElementById('folgas-rel-ano')?.value || '';
-    csv += 'Servidor;Matrícula;Setor;Data;Tipo;Quantidade;Motivo/Justificativa\n';
+    csv += 'Servidor;Matrícula;Setor;Data;Tipo;Quantidade;Motivo/Justificativa;Substituto;Lançado Por;Saldo Atual\n';
     folgas.filter(f => {
       const srv = servidores.find(s => s.id === f.srvId);
       if (!srv) return false;
       if (fgSetor && srv.setor !== fgSetor) return false;
       return folgaNoPeriodo(f, fgMes, fgAno);
-    }).sort((a,b) => new Date(a.data) - new Date(b.data)).forEach(f => {
+    }).sort((a,b) => chaveDataFolga(a).localeCompare(chaveDataFolga(b))).forEach(f => {
       const srv = servidores.find(s => s.id === f.srvId);
       csv += [
         srv?.nome || '', srv?.matricula || '', srv?.setor || '',
         descreverDatasFolga(f),
         f.tipo === 'credito' ? 'Crédito' : 'Usufruto',
         f.qtd,
-        f.tipo === 'credito' ? (f.motivo || '') : (f.obs || '')
+        f.tipo === 'credito' ? (f.motivo || '') : (parseFolgaObs(f.obs).obs || ''),
+        f.tipo === 'credito' ? '' : (parseFolgaObs(f.obs).coberturaNome || ''),
+        f.lancadoPor || '',
+        saldoFolgas(f.srvId)
       ].map(v => `"${String(v).replace(/"/g,'""')}"`).join(';') + '\n';
     });
   }
