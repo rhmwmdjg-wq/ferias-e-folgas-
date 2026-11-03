@@ -500,11 +500,19 @@ async function executarResolucaoSolicitacao(id, novoStatus, coberturaId, cobertu
         await DB.saveProgramacoes(progs);
       } else {
          const folgas = DB.folgas();
+         // tipo 'debito' (antes 'gozo'): o restante do sistema só reconhece 'debito' como usufruto
+         const itensSol = (sol.dataItems && sol.dataItems.length)
+           ? sol.dataItems.map(di => ({ data: di.data, peso: di.peso || 1, turno: (di.peso === 0.5 ? (di.turno || 'Manhã') : 'Integral') }))
+           : [{ data: sol.inicio, peso: 1, turno: 'Integral' }];
+         const sessaoAut = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
          const novaFolga = {
-            id: uid(), srvId: sol.srvId, solId: sol.id, tipo: 'gozo', 
-            data: sol.inicio, 
-            dataItems: sol.dataItems || [{ data: sol.inicio, peso: 1 }],
-            qtd: sol.qtd || 1,
+            id: uid(), srvId: sol.srvId, solId: sol.id, tipo: 'debito',
+            data: itensSol.map(di => di.data).join(', '),
+            dataItems: itensSol,
+            qtd: sol.qtd || itensSol.reduce((a, di) => a + di.peso, 0),
+            negativo: (saldoFolgas(sol.srvId) - (sol.qtd || 1)) < 0,
+            lancadoPor: sessaoAut.nome || '',
+            coberturaId: coberturaId || null,
             obs: prefix + `Folga autorizada via Solicitação. ${sol.obs || ''}`,
             criadoEm: new Date().toISOString()
          };
@@ -542,12 +550,19 @@ async function excluirSolicitacao(id) {
        await DB.saveServidores(srvs);
     }
 
+    // Exclui de fato na nuvem (antes só regravava a lista, e o registro voltava na próxima sincronização)
     if (sol.tipo.includes('ferias')) {
-      const progs = DB.programacoes().filter(p => p.solId !== id);
-      await DB.saveProgramacoes(progs);
+      const vinculadas = DB.programacoes().filter(p => p.solId === id);
+      for (const p of vinculadas) {
+        await DB.deleteProgramacao(p.id);
+        DB.saveLog('Exclusão Programação', `Excluiu programação vinculada à solicitação ${id}`, 'programacoes', p.id);
+      }
     } else {
-      const folgas = DB.folgas().filter(f => f.solId !== id);
-      await DB.saveFolgas(folgas);
+      const vinculadas = DB.folgas().filter(f => f.solId === id);
+      for (const f of vinculadas) {
+        await DB.deleteFolga(f.id);
+        DB.saveLog('Exclusão Folga', `Excluiu folga vinculada à solicitação ${id}`, 'folgas', f.id);
+      }
       renderDashboard();
     }
     atualizarBadge();

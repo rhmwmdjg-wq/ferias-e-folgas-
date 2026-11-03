@@ -93,6 +93,41 @@ function limparDatasUsufruto() {
   renderSelectedDatesList();
 }
 
+// Lista de datas (AAAA-MM-DD) com o peso de cada uma (1 = dia inteiro, 0.5 = meio período).
+function itensDaFolga(f) {
+  if (f.dataItems && f.dataItems.length) return f.dataItems.map(di => ({ data: di.data, peso: di.peso || 1 }));
+  if (f.data) {
+    const datas = String(f.data).split(',').map(x => x.trim()).filter(Boolean);
+    const peso = datas.length ? (f.qtd || datas.length) / datas.length : 1;
+    return datas.map(d => ({ data: d, peso }));
+  }
+  return [];
+}
+
+// Retorna as datas em que o servidor já teria mais de um dia de folga lançado
+// (ex.: mesma data lançada duas vezes). Manhã + Tarde na mesma data é permitido.
+function datasDuplicadasFolga(srvId, novosItens, ignorarId) {
+  const somaPorData = {};
+  DB.folgas().forEach(f => {
+    if (f.srvId !== srvId || f.tipo === 'credito' || f.id === ignorarId) return;
+    itensDaFolga(f).forEach(it => { somaPorData[it.data] = (somaPorData[it.data] || 0) + it.peso; });
+  });
+  return novosItens
+    .filter(it => (somaPorData[it.data] || 0) + it.peso > 1)
+    .map(it => it.data)
+    .sort();
+}
+
+// Total de dias de folga usufruídos pelo servidor em cada mês (AAAA-MM), contando dia a dia.
+function totalFolgasPorMes(srvId, ignorarId) {
+  const porMes = {};
+  DB.folgas().forEach(f => {
+    if (f.srvId !== srvId || f.tipo === 'credito' || f.id === ignorarId) return;
+    itensDaFolga(f).forEach(it => { const m = it.data.substring(0, 7); porMes[m] = (porMes[m] || 0) + it.peso; });
+  });
+  return porMes;
+}
+
 function saldoFolgas(srvId) {
   return DB.folgas()
     .filter(f => f.srvId === srvId)
@@ -240,7 +275,8 @@ async function adicionarFolga() {
   if (!motivo) return toastMsg('O motivo é obrigatório!', 'error');
 
   const folgas = DB.folgas();
-  const novoCredito = { id: uid(), srvId, tipo: 'credito', data, qtd: qtdReal, motivo, criadoEm: new Date().toISOString() };
+  const sessaoCred = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
+  const novoCredito = { id: uid(), srvId, tipo: 'credito', data, qtd: qtdReal, motivo, lancadoPor: sessaoCred.nome || '', criadoEm: new Date().toISOString() };
   folgas.push(novoCredito);
   await DB.saveFolgas(folgas, [novoCredito]);
 
@@ -274,6 +310,12 @@ async function registrarUsufrutoFolga() {
 
   const dataString = dataItems.map(di => di.data).join(', ');
   const qtd = qtdTotal;
+
+  // ==== BLOQUEIO DE DATA REPETIDA ====
+  const repetidas = datasDuplicadasFolga(srvId, dataItems);
+  if (repetidas.length) {
+    return toastMsg('Já existe folga lançada para este servidor em: ' + repetidas.map(fmtDate).join(', '), 'error');
+  }
 
   // ==== DETECTOR DE CONFLITOS (USUFRUTO FOLGA) ====
   const conflitos = verificarConflitosSetorFuncao(srvId, dataItems.map(di => ({ inicio: di.data, fim: di.data })));
@@ -311,16 +353,18 @@ async function registrarUsufrutoFolga() {
   }
 
   if (maxMes > 0) {
-    const mesAno = datasOrdenadas[0].substring(0, 7);
-    const folgasNoMes = DB.folgas().filter(f =>
-      f.srvId === srvId && f.tipo === 'debito' && f.dataItems &&
-      f.dataItems.some(di => di.data.startsWith(mesAno))
-    );
-    const totalNoMes = folgasNoMes.reduce((acc, f) => acc + f.qtd, 0) + qtd;
-    if (totalNoMes > maxMes) {
+    // Verifica cada mês envolvido (antes só o mês da primeira data era verificado)
+    const jaNoMes = totalFolgasPorMes(srvId);
+    const novosPorMes = {};
+    dataItems.forEach(di => { const m = di.data.substring(0, 7); novosPorMes[m] = (novosPorMes[m] || 0) + di.peso; });
+    const excedidos = Object.keys(novosPorMes).sort()
+      .map(m => ({ m, total: (jaNoMes[m] || 0) + novosPorMes[m] }))
+      .filter(x => x.total > maxMes);
+    if (excedidos.length) {
       const msg = `⚠️ LIMITE MENSAL DE FOLGAS EXCEDIDO\n\n` +
-                  `Máximo permitido: ${maxMes} dias no mês ${mesAno}.\n` +
-                  `Com este registro, o total será de ${totalNoMes} dias.\n\nDeseja registrar mesmo assim?`;
+                  `Máximo permitido: ${maxMes} dias por mês.\n` +
+                  excedidos.map(x => `• ${x.m.substring(5, 7)}/${x.m.substring(0, 4)}: total ficará em ${x.total} dia(s)`).join('\n') +
+                  `\n\nDeseja registrar mesmo assim?`;
       if (!confirm(msg)) return;
     }
   }
@@ -328,17 +372,20 @@ async function registrarUsufrutoFolga() {
 
   const cobSel = document.getElementById('fg-cobertura-deb');
   let finalObs = obs;
+  let coberturaId = null;
   if (cobSel && cobSel.value) {
     const srvCob = DB.servidores().find(s => s.id === cobSel.value);
     if (srvCob) {
+      coberturaId = srvCob.id;
       finalObs = `[Cobertura: ${srvCob.nome} (ID: ${srvCob.id})] ${obs}`;
     }
   }
+  const sessaoDeb = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
 
   const saldo = saldoFolgas(srvId);
   const negativo = saldo - qtd < 0;
   const folgas = DB.folgas();
-  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId.length ? refId : null, obs: finalObs, criadoEm: new Date().toISOString() };
+  let novaFolga = { id: uid(), srvId, tipo: 'debito', data: dataString, dataItems, qtd, refId: refId.length ? refId : null, obs: finalObs, coberturaId, lancadoPor: sessaoDeb.nome || '', criadoEm: new Date().toISOString() };
 
   if (saldo <= 0 || negativo) {
     const descPag = document.getElementById('fg-pag-desc').value.trim();
@@ -440,13 +487,8 @@ function renderHistoricoFolgas() {
 async function excluirFolga(id) {
   if (!confirm('Excluir este lançamento de folga?')) return;
 
-  // 1. Apaga do Supabase
+  // Apaga na nuvem e neste navegador
   await DB.deleteFolga(id);
-
-  // 2. Apaga localmente
-  const novaLista = DB.folgas().filter(f => f.id !== id);
-  _remoteData.folgas = novaLista;
-  localStorage.setItem('srv_folgas', JSON.stringify(novaLista));
 
   renderHistoricoFolgas();
   atualizarSaldoDisplay();
@@ -473,19 +515,76 @@ function abrirModalEditarFolga(id) {
   document.getElementById('ef-obs-group').style.display = isCred ? 'none' : '';
   document.getElementById('ef-titulo').textContent = isCred ? '✏️ Editar Crédito' : '✏️ Editar Usufruto';
 
+  const qtdEl = document.getElementById('ef-qtd');
+  qtdEl.readOnly = !isCred;
   if (isCred) {
     document.getElementById('ef-data').value = f.data || '';
     document.getElementById('ef-motivo').value = f.motivo || '';
   } else {
-    const datas = f.dataItems
-      ? f.dataItems.map(di => `${fmtDate(di.data)} (${di.peso === 1 ? 'Integral' : `${di.turno}`})`).join(', ')
-      : f.data || '';
-    document.getElementById('ef-datas').value = datas;
+    // Datas do usufruto agora são editáveis; a quantidade é recalculada a partir delas
+    _editGozoItens = {};
+    (f.dataItems && f.dataItems.length ? f.dataItems : itensDaFolga(f)).forEach(di => {
+      _editGozoItens[di.data] = { peso: di.peso || 1, turno: di.peso === 0.5 ? (di.turno || 'Manhã') : 'Integral' };
+    });
+    iniciarEdicaoDatasFolga();
     const parsed = parseFolgaObs(f.obs);
     document.getElementById('ef-obs').value = parsed.obs || '';
   }
 
   document.getElementById('modal-editar-folga').classList.add('open');
+}
+
+let _editGozoItens = {};
+let _fpEditGozo = null;
+
+function iniciarEdicaoDatasFolga() {
+  const el = document.getElementById('ef-datas');
+  if (!el) return;
+  el.disabled = false;
+  const datas = Object.keys(_editGozoItens).sort();
+  if (typeof flatpickr !== 'undefined') {
+    if (_fpEditGozo) _fpEditGozo.destroy();
+    _fpEditGozo = flatpickr(el, {
+      mode: 'multiple', dateFormat: 'Y-m-d', locale: flatpickr.l10ns.pt, defaultDate: datas,
+      onChange: function(selected) {
+        const novo = {};
+        selected.forEach(d => {
+          const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+          novo[iso] = _editGozoItens[iso] || { peso: 1, turno: 'Integral' };
+        });
+        _editGozoItens = novo;
+        renderEdicaoDatasFolga();
+      }
+    });
+  }
+  renderEdicaoDatasFolga();
+}
+
+function setTurnoEdicaoFolga(data, peso, turno) {
+  _editGozoItens[data] = { peso, turno };
+  renderEdicaoDatasFolga();
+}
+
+function renderEdicaoDatasFolga() {
+  const entradas = Object.entries(_editGozoItens).sort((a, b) => a[0].localeCompare(b[0]));
+  let lista = document.getElementById('ef-datas-lista');
+  if (!lista) {
+    lista = document.createElement('div');
+    lista.id = 'ef-datas-lista';
+    lista.style.cssText = 'display:flex;flex-direction:column;gap:4px;margin-top:6px';
+    document.getElementById('ef-datas').insertAdjacentElement('afterend', lista);
+  }
+  lista.innerHTML = entradas.map(([data, o]) => `
+    <div style="display:flex;justify-content:space-between;align-items:center;font-size:.78rem;background:var(--surface);padding:4px 8px;border-radius:6px;border:1px solid var(--border)">
+      <span>${fmtDate(data)}</span>
+      <span style="display:flex;gap:2px">
+        <button type="button" class="btn btn-sm ${o.peso === 1 ? 'btn-primary' : 'btn-ghost'}" style="font-size:.6rem;padding:1px 6px" onclick="setTurnoEdicaoFolga('${data}',1,'Integral')">Inteiro</button>
+        <button type="button" class="btn btn-sm ${o.peso === 0.5 && o.turno === 'Manhã' ? 'btn-warn' : 'btn-ghost'}" style="font-size:.6rem;padding:1px 6px" onclick="setTurnoEdicaoFolga('${data}',0.5,'Manhã')">Manhã</button>
+        <button type="button" class="btn btn-sm ${o.peso === 0.5 && o.turno === 'Tarde' ? 'btn-warn' : 'btn-ghost'}" style="font-size:.6rem;padding:1px 6px" onclick="setTurnoEdicaoFolga('${data}',0.5,'Tarde')">Tarde</button>
+      </span>
+    </div>`).join('');
+  const total = entradas.reduce((a, [, o]) => a + o.peso, 0);
+  document.getElementById('ef-qtd').value = total;
 }
 
 async function salvarEdicaoFolga() {
@@ -510,7 +609,15 @@ async function salvarEdicaoFolga() {
     f.motivo = motivo;
   } else {
     const obs = document.getElementById('ef-obs').value.trim();
-    f.qtd = qtd;
+    const itens = Object.entries(_editGozoItens)
+      .map(([data, o]) => ({ data, peso: o.peso, turno: o.peso === 0.5 ? o.turno : 'Integral' }))
+      .sort((a, b) => a.data.localeCompare(b.data));
+    if (!itens.length) return toastMsg('Selecione ao menos uma data!', 'error');
+    const repetidas = datasDuplicadasFolga(f.srvId, itens, f.id);
+    if (repetidas.length) return toastMsg('Já existe outra folga lançada em: ' + repetidas.map(fmtDate).join(', '), 'error');
+    f.dataItems = itens;
+    f.data = itens.map(di => di.data).join(', ');
+    f.qtd = itens.reduce((a, di) => a + di.peso, 0);
     const parsed = parseFolgaObs(f.obs);
     f.obs = parsed.coberturaNome
       ? `[Cobertura: ${parsed.coberturaNome} (ID: ${parsed.coberturaId})] ${obs}`

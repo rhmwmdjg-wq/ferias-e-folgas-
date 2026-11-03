@@ -1,32 +1,130 @@
 // Módulo de acesso a dados.
 // Mantém bridge Supabase/localStorage existente sem alterar tabelas ou dados.
 
+// ===================== CONTROLE DE CONSISTÊNCIA ENTRE COMPUTADORES =====================
+// Guarda, por tabela, os IDs que já foram confirmados na nuvem. Assim, quando um
+// registro some da nuvem (foi excluído em outro computador), ele também é removido
+// deste navegador em vez de ser reenviado ("ressuscitado").
+const IdsNuvem = {
+  _key: (t) => 'srv_ids_nuvem_' + t,
+  get(t) {
+    try { return new Set(JSON.parse(localStorage.getItem(this._key(t)) || '[]')); }
+    catch (e) { return new Set(); }
+  },
+  set(t, ids) {
+    try { localStorage.setItem(this._key(t), JSON.stringify([...ids])); } catch (e) { /* cota do navegador */ }
+  },
+  add(t, regs) {
+    const lista = Array.isArray(regs) ? regs : [regs];
+    if (!lista.length) return;
+    const s = this.get(t);
+    lista.forEach(r => { if (r && r.id) s.add(r.id); });
+    this.set(t, s);
+  },
+  remove(t, id) {
+    const s = this.get(t);
+    if (s.delete(id)) this.set(t, s);
+  }
+};
+window.IdsNuvem = IdsNuvem;
+
+// Última configuração conhecida da nuvem (chave -> valor em texto).
+function lerSnapshotConfigNuvem() {
+  try { const v = localStorage.getItem('srv_config_nuvem'); return v ? JSON.parse(v) : null; } catch (e) { return null; }
+}
+function gravarSnapshotConfigNuvem(obj) {
+  try { localStorage.setItem('srv_config_nuvem', JSON.stringify(obj || {})); } catch (e) { /* cota */ }
+}
+window.lerSnapshotConfigNuvem = lerSnapshotConfigNuvem;
+window.gravarSnapshotConfigNuvem = gravarSnapshotConfigNuvem;
+
+// IDs excluídos registrados no log (carregados uma vez por sessão).
+let _idsExcluidosLog = null;
+
+// Separa registros locais que ainda não estão na nuvem em:
+//  - pendentes: criados neste computador e nunca enviados -> devem subir
+//  - removidos: já estiveram na nuvem e sumiram (excluídos em outro computador) -> descartar
+function separarPendentesLocais(tabela, dadosNuvem, locais) {
+  const idsNuvem = new Set((dadosNuvem || []).map(x => x && x.id).filter(Boolean));
+  const conhecidos = IdsNuvem.get(tabela);
+  const excluidosLog = _idsExcluidosLog || new Set();
+  const pendentes = [];
+  const removidos = [];
+  (locais || []).forEach(x => {
+    if (!x || !x.id || idsNuvem.has(x.id)) return;
+    if (conhecidos.has(x.id) || excluidosLog.has(x.id)) removidos.push(x);
+    else pendentes.push(x);
+  });
+  IdsNuvem.set(tabela, idsNuvem);
+  if (removidos.length) console.log(`🧹 [${tabela}] ${removidos.length} registro(s) excluído(s) em outro computador removido(s) deste navegador.`);
+  return { pendentes, removidos };
+}
+window.separarPendentesLocais = separarPendentesLocais;
+
+async function carregarIdsExcluidosDoLog() {
+  if (_idsExcluidosLog) return _idsExcluidosLog;
+  _idsExcluidosLog = new Set();
+  try {
+    const { data, error } = await supabaseClient.from('logs').select('*').ilike('acao', 'Exclus%').limit(5000);
+    if (!error && Array.isArray(data)) {
+      data.forEach(l => { const id = l.registroId || l.registroid; if (id) _idsExcluidosLog.add(id); });
+    }
+  } catch (e) { /* best effort */ }
+  return _idsExcluidosLog;
+}
+window.carregarIdsExcluidosDoLog = carregarIdsExcluidosDoLog;
+
+// Upsert tolerante: se a nuvem ainda não tiver alguma coluna nova (ex.: refId,
+// coberturaId, lancadoPor), remove só essa coluna e tenta de novo, sem perder o registro.
+// Em caso de sucesso, marca os IDs como confirmados na nuvem.
+async function upsertNuvem(tabela, payload) {
+  let dados = Array.isArray(payload) ? payload : [payload];
+  if (!dados.length) return { error: null };
+  for (let tentativa = 0; tentativa < 8; tentativa++) {
+    const { error } = await supabaseClient.from(tabela).upsert(dados);
+    if (!error) { IdsNuvem.add(tabela, dados); return { error: null }; }
+    if (isQuotaError(error)) return { error };
+    const m = /Could not find the '([^']+)' column/i.exec(error.message || '');
+    if (m && m[1]) {
+      const col = m[1];
+      console.warn(`Coluna '${col}' ausente em ${tabela}. Rode o arquivo sql_melhorias_folgas_banco_horas.sql no Supabase. Enviando sem ela...`);
+      dados = dados.map(r => { const c = { ...r }; delete c[col]; return c; });
+      continue;
+    }
+    return { error };
+  }
+  return { error: { message: 'Muitas colunas ausentes em ' + tabela } };
+}
+window.upsertNuvem = upsertNuvem;
+
+// Salva lote em uma tabela; qualquer falha (cota, rede ou erro) vai para a fila de reenvio.
+async function salvarComFila(tabela, paraSubir, rotulo) {
+  try {
+    const { error } = await upsertNuvem(tabela, paraSubir);
+    if (!error) return true;
+    saveToSyncQueue(tabela, paraSubir);
+    if (isQuotaError(error)) toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
+    else {
+      console.error(`Erro Supabase (${tabela}):`, error);
+      toastMsg(`⚠️ ${rotulo}: salvo neste computador, mas a nuvem recusou (${error.message}). Nova tentativa automática a cada minuto.`, "warning");
+    }
+  } catch (e) {
+    saveToSyncQueue(tabela, paraSubir);
+    toastMsg("⚠️ Sem conexão com a nuvem. Salvo localmente; será enviado automaticamente.", "warning");
+  }
+  return false;
+}
+window.salvarComFila = salvarComFila;
+
 const DB = {
   servidores: () => _remoteData.servidores.length ? _remoteData.servidores : JSON.parse(localStorage.getItem('srv_servidores') || '[]'),
-  saveServidores: async (d) => {
+  saveServidores: async (d, apenasNovos) => {
     _remoteData.servidores = d;
     localStorage.setItem('srv_servidores', JSON.stringify(d));
-    try {
-      const { error } = await supabaseClient.from('servidores').upsert(d);
-      if (error) {
-        if (isQuotaError(error)) {
-          saveToSyncQueue('servidores', d);
-          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-        } else {
-          console.error("Erro Supabase (servidores):", error);
-          toastMsg("Erro ao salvar servidores na nuvem: " + error.message, "error");
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) {
-        saveToSyncQueue('servidores', d);
-        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-      } else {
-        throw e;
-      }
-    }
+    await salvarComFila('servidores', apenasNovos || d, 'Servidores');
   },
   deleteServidor: async (id) => {
+    IdsNuvem.remove('servidores', id);
     const { error } = await supabaseClient.from('servidores').delete().eq('id', id);
     if (error) {
       if (!isQuotaError(error)) {
@@ -36,37 +134,22 @@ const DB = {
   },
 
   programacoes: () => _remoteData.programacoes.length ? _remoteData.programacoes : JSON.parse(localStorage.getItem('srv_programacoes') || '[]'),
-  saveProgramacoes: async (d) => {
+  saveProgramacoes: async (d, apenasNovos) => {
     _remoteData.programacoes = d;
     localStorage.setItem('srv_programacoes', JSON.stringify(d));
-    try {
-      const { error } = await supabaseClient.from('programacoes').upsert(d);
-      if (error) {
-        if (isQuotaError(error)) {
-          saveToSyncQueue('programacoes', d);
-          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-        } else {
-          console.error("Erro Supabase (programacoes):", error);
-          saveToSyncQueue('programacoes', d);
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) {
-        saveToSyncQueue('programacoes', d);
-        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-      } else {
-        console.warn("Rede indisponível para sync de programações. Dados salvos localmente.", e);
-        saveToSyncQueue('programacoes', d);
-      }
-    }
+    await salvarComFila('programacoes', apenasNovos || d, 'Programação de férias');
   },
   deleteProgramacao: async (id) => {
-    const { error } = await supabaseClient.from('programacoes').delete().eq('id', id);
-    if (error) {
-      if (!isQuotaError(error)) {
-        toastMsg("Erro ao excluir programação na nuvem: " + error.message, "error");
+    IdsNuvem.remove('programacoes', id);
+    _remoteData.programacoes = DB.programacoes().filter(p => p.id !== id);
+    localStorage.setItem('srv_programacoes', JSON.stringify(_remoteData.programacoes));
+    try {
+      const { error } = await supabaseClient.from('programacoes').delete().eq('id', id);
+      if (error) {
+        if (isQuotaError(error)) registrarPendenteExclusao('programacoes', id);
+        else toastMsg("Erro ao excluir programação na nuvem: " + error.message, "error");
       }
-    }
+    } catch (e) { registrarPendenteExclusao('programacoes', id); }
   },
 
   config: () => {
@@ -76,16 +159,29 @@ const DB = {
   saveConfig: async (d) => {
     _remoteData.config = d;
     localStorage.setItem('srv_config', JSON.stringify(d));
+    // Envia SÓ as chaves que mudaram em relação ao que está na nuvem.
+    // Antes, cada salvamento (inclusive a troca automática de cor ao abrir o sistema)
+    // regravava a configuração inteira deste computador e desfazia alterações feitas em outro.
+    const snapshot = lerSnapshotConfigNuvem();
     const configArray = Object.entries(d)
       .filter(([key]) => !key.startsWith('img_'))
       .map(([key, value]) => ({
         chave: key,
         valor: typeof value === 'string' ? value : JSON.stringify(value)
-      }));
-    
+      }))
+      .filter(item => snapshot && snapshot[item.chave] !== item.valor);
+    if (!snapshot) {
+      // Ainda não leu a configuração da nuvem neste computador: não sobrescreve nada.
+      console.log('Config salva localmente; envio à nuvem após a primeira sincronização.');
+    }
+
     if (configArray.length > 0) {
       try {
         const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
+        if (!error) {
+          configArray.forEach(item => { snapshot[item.chave] = item.valor; });
+          gravarSnapshotConfigNuvem(snapshot);
+        }
         if (error) {
           if (isQuotaError(error)) {
             saveToSyncQueue('configuracoes', d);
@@ -109,72 +205,38 @@ const DB = {
   saveFolgas: async (d, apenasNovos) => {
     _remoteData.folgas = d;
     localStorage.setItem('srv_folgas', JSON.stringify(d));
-    const paraSubir = (apenasNovos || d);
-    try {
-      const { error } = await supabaseClient.from('folgas').upsert(paraSubir);
-      if (error) {
-        if (isQuotaError(error)) {
-          saveToSyncQueue('folgas', d);
-          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-        } else {
-          console.error("Erro Supabase (folgas):", error);
-          toastMsg("Erro ao salvar folgas na nuvem: " + error.message, "error");
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) {
-        saveToSyncQueue('folgas', d);
-        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-      } else {
-        throw e;
-      }
-    }
+    await salvarComFila('folgas', apenasNovos || d, 'Folga');
   },
   deleteFolga: async (id) => {
-    const { error } = await supabaseClient.from('folgas').delete().eq('id', id);
-    if (error) {
-      if (isQuotaError(error)) {
-        registrarPendenteExclusao('folgas', id);
-      } else {
-        toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
+    IdsNuvem.remove('folgas', id);
+    _remoteData.folgas = DB.folgas().filter(f => f.id !== id);
+    localStorage.setItem('srv_folgas', JSON.stringify(_remoteData.folgas));
+    try {
+      const { error } = await supabaseClient.from('folgas').delete().eq('id', id);
+      if (error) {
+        if (isQuotaError(error)) registrarPendenteExclusao('folgas', id);
+        else toastMsg("Erro ao excluir folga na nuvem: " + error.message, "error");
       }
-    }
+    } catch (e) { registrarPendenteExclusao('folgas', id); }
   },
 
   bancoHoras: () => _remoteData.bancoHoras.length ? _remoteData.bancoHoras : JSON.parse(localStorage.getItem('srv_banco_horas') || '[]'),
   saveBancoHoras: async (d, apenasNovos) => {
     _remoteData.bancoHoras = d;
     localStorage.setItem('srv_banco_horas', JSON.stringify(d));
-    const paraSubir = apenasNovos || d;
-    try {
-      const { error } = await supabaseClient.from('banco_horas').upsert(paraSubir);
-      if (error) {
-        if (isQuotaError(error)) {
-          saveToSyncQueue('banco_horas', d);
-          toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-        } else {
-          console.error("Erro Supabase (banco_horas):", error);
-          toastMsg("Erro ao salvar banco de horas na nuvem: " + error.message, "error");
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) {
-        saveToSyncQueue('banco_horas', d);
-        toastMsg("⚠️ Salvo localmente. Sync automático quando conexão restaurar.", "warning");
-      } else {
-        throw e;
-      }
-    }
+    await salvarComFila('banco_horas', apenasNovos || d, 'Banco de horas');
   },
   deleteBancoHoras: async (id) => {
-    const { error } = await supabaseClient.from('banco_horas').delete().eq('id', id);
-    if (error) {
-      if (isQuotaError(error)) {
-        registrarPendenteExclusao('bancoHoras', id);
-      } else {
-        toastMsg("Erro ao excluir banco de horas na nuvem: " + error.message, "error");
+    IdsNuvem.remove('banco_horas', id);
+    _remoteData.bancoHoras = DB.bancoHoras().filter(r => r.id !== id);
+    localStorage.setItem('srv_banco_horas', JSON.stringify(_remoteData.bancoHoras));
+    try {
+      const { error } = await supabaseClient.from('banco_horas').delete().eq('id', id);
+      if (error) {
+        if (isQuotaError(error)) registrarPendenteExclusao('bancoHoras', id);
+        else toastMsg("Erro ao excluir banco de horas na nuvem: " + error.message, "error");
       }
-    }
+    } catch (e) { registrarPendenteExclusao('bancoHoras', id); }
   },
 
   gestores: () => {

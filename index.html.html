@@ -2011,8 +2011,8 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     </div>
     <!-- Campo datas (débito — read-only) -->
     <div class="field" id="ef-datas-group" style="margin-bottom:12px;display:none">
-      <label>Datas do Usufruto</label>
-      <input id="ef-datas" type="text" disabled style="background:var(--surface);opacity:.7">
+      <label>Datas do Usufruto <small style="color:var(--muted)">(clique para alterar)</small></label>
+      <input id="ef-datas" type="text" placeholder="Selecione as datas">
     </div>
     <div class="field" style="margin-bottom:12px">
       <label>Quantidade (dias)</label>
@@ -2081,14 +2081,14 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
           <input id="bh-ano" type="number" min="2020" max="2099" step="1">
         </div>
         <div class="field">
-          <label>Horas Geradas no Mês *</label>
-          <input id="bh-horas-geradas" type="number" min="0" step="0.5" value="0" placeholder="Ex: 40">
+          <label>Horas Geradas no Mês * <small style="color:var(--muted)">(h:mm)</small></label>
+          <input id="bh-horas-geradas" type="text" inputmode="numeric" value="0:00" placeholder="Ex: 40:00 ou 1:30" title="Use horas:minutos — ex.: 1:30 = uma hora e trinta minutos">
         </div>
       </div>
       <div class="form-row cols-2" style="margin-bottom:12px">
         <div class="field">
-          <label>Horas Pagas no Mês</label>
-          <input id="bh-horas-pagas" type="number" min="0" step="0.5" value="0" placeholder="Ex: 20">
+          <label>Horas Pagas no Mês <small style="color:var(--muted)">(h:mm)</small></label>
+          <input id="bh-horas-pagas" type="text" inputmode="numeric" value="0:00" placeholder="Ex: 20:00" title="Use horas:minutos — ex.: 1:30">
         </div>
         <div class="field">
           <label>Autorizado Por</label>
@@ -2129,8 +2129,23 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
           </select>
         </div>
         <div class="field">
-          <label>Quantidade de Horas *</label>
-          <input id="bh-ajuste-horas" type="number" min="0.5" step="0.5" value="1" placeholder="Ex: 2">
+          <label>Quantidade de Horas * <small style="color:var(--muted)">(h:mm)</small></label>
+          <input id="bh-ajuste-horas" type="text" inputmode="numeric" value="1:00" placeholder="Ex: 2:30">
+        </div>
+      </div>
+      <div class="form-row cols-2" style="margin-bottom:12px">
+        <div class="field">
+          <label>Mês de Referência *</label>
+          <select id="bh-ajuste-mes">
+            <option value="0">Janeiro</option><option value="1">Fevereiro</option><option value="2">Março</option>
+            <option value="3">Abril</option><option value="4">Maio</option><option value="5">Junho</option>
+            <option value="6">Julho</option><option value="7">Agosto</option><option value="8">Setembro</option>
+            <option value="9">Outubro</option><option value="10">Novembro</option><option value="11">Dezembro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Ano de Referência *</label>
+          <input id="bh-ajuste-ano" type="number" min="2020" max="2099" step="1">
         </div>
       </div>
       <div class="field" style="margin-bottom:12px">
@@ -2200,6 +2215,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       </div>
       <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorioBancoHoras()" style="align-self:flex-end" title="Relatório individual do servidor selecionado">🖨️ Relatório Individual</button>
       <button class="btn btn-primary btn-sm" onclick="imprimirRelatorioBancoHorasGeral()" style="align-self:flex-end">📋 Relatório Geral</button>
+      <button class="btn btn-ghost btn-sm" style="color:var(--success);border-color:rgba(16,185,129,0.3);align-self:flex-end" onclick="exportarCSVBancoHoras()" title="Exportar banco de horas para Excel">💾 BancoHoras.csv</button>
     </div>
   </div>
 
@@ -2265,13 +2281,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         </div>
         <div class="field">
           <label>Horas Geradas</label>
-          <input id="ebh-horas-geradas" type="number" min="0" step="0.5">
+          <input id="ebh-horas-geradas" type="text" inputmode="numeric" placeholder="h:mm">
         </div>
       </div>
       <div class="form-row cols-2" style="margin-bottom:12px">
         <div class="field">
           <label>Horas Pagas</label>
-          <input id="ebh-horas-pagas" type="number" min="0" step="0.5">
+          <input id="ebh-horas-pagas" type="text" inputmode="numeric" placeholder="h:mm">
         </div>
         <div class="field">
           <label>Autorizado Por</label>
@@ -4823,8 +4839,8 @@ async function processSyncQueue() {
           console.error(`Erro ao sync ${tabela}:`, error);
         }
       } else {
-        const dadosLimpos = (tabela === 'folgas' && Array.isArray(dados)) ? dados.map(f => { const { refId, ...resto } = f; return resto; }) : dados;
-        const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
+        // upsertNuvem mantém o vínculo refId (crédito usado) e só remove colunas que a nuvem não tiver
+        const { error } = await upsertNuvem(tabela, dados);
         if (error) {
           if (isQuotaError(error)) throw error;
           console.error(`Erro ao sync ${tabela}:`, error);
@@ -4928,7 +4944,8 @@ async function aplicarExclusoesPendentes() {
         localStorage.setItem('srv_banco_horas', JSON.stringify(arr));
       }
       // Tenta deletar do Supabase novamente
-      const { error } = await supabaseClient.from(p.tabela).delete().eq('id', p.id);
+      const tabelaNuvem = p.tabela === 'bancoHoras' ? 'banco_horas' : p.tabela;
+      const { error } = await supabaseClient.from(tabelaNuvem).delete().eq('id', p.id);
       if (error) {
         if (isQuotaError(error)) {
           aindaPendentes.push(p);
@@ -5342,7 +5359,7 @@ async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
         chunks.push(pendentes.slice(i, i + chunkSize));
       }
       for (const chunk of chunks) {
-        let dadosLimpos = (tabela === 'folgas') ? chunk.map(f => { const { refId, ...resto } = f; return resto; }) : chunk;
+        let dadosLimpos = chunk;
         if (tabela === 'eventos') {
           dadosLimpos = dadosLimpos.map(function(ev) {
             const e = { ...ev };
@@ -5351,10 +5368,11 @@ async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
             return e;
           });
         }
-        const { error } = await supabaseClient.from(tabela).upsert(dadosLimpos);
+        const { error } = await upsertNuvem(tabela, dadosLimpos);
         if (error) throw error;
       }
     }
+    if (typeof IdsNuvem !== 'undefined') IdsNuvem.add(tabela, pendentes);
     console.log(`✅ ${pendentes.length} registros locais de [${tabela}] sincronizados com sucesso na nuvem!`);
   } catch (e) {
     console.warn(`⚠️ Erro ao enviar registros locais de [${tabela}]:`, e.message || e);
@@ -5398,11 +5416,25 @@ async function syncComSupabase(silencioso = false) {
   let erros = 0;
   let sucessos = 0;
 
+  // IDs excluídos registrados no log (evita reenviar registros apagados em outro computador)
+  await carregarIdsExcluidosDoLog();
+
   // Função auxiliar para sincronizar uma tabela individualmente
   const syncTabela = async (tabela, colunas, processarDados) => {
     try {
-      const query = supabaseClient.from(tabela).select(colunas);
-      const { data, error } = await query;
+      // Busca paginada: o Supabase devolve no máximo 1000 linhas por consulta.
+      // Sem isso, em outro computador apareceriam só os 1000 primeiros registros.
+      const PAGINA = 1000;
+      const ordem = tabela === 'configuracoes' ? 'chave' : 'id';
+      let data = [];
+      let error = null;
+      for (let de = 0; ; de += PAGINA) {
+        const resp = await supabaseClient.from(tabela).select(colunas).order(ordem, { ascending: true }).range(de, de + PAGINA - 1);
+        if (resp.error) { error = resp.error; break; }
+        const lote = resp.data || [];
+        data = data.concat(lote);
+        if (lote.length < PAGINA) break;
+      }
       
       if (error) {
         console.error(`❌ Erro ao buscar ${tabela}:`, error.message || error);
@@ -5430,8 +5462,7 @@ async function syncComSupabase(silencioso = false) {
   // Sincroniza cada tabela individualmente para evitar que um erro bloqueie todas
   await syncTabela('servidores', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_servidores') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('servidores', data, locais);
     
     if (pendentes.length > 0) {
       migrarDadosLocaisParaNuvem('servidores', pendentes);
@@ -5451,8 +5482,7 @@ async function syncComSupabase(silencioso = false) {
         if (local.autorizadoPor) d.autorizadoPor = local.autorizadoPor;
       }
     });
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('programacoes', data, locais);
     
     if (pendentes.length > 0) {
       migrarDadosLocaisParaNuvem('programacoes', pendentes);
@@ -5467,10 +5497,20 @@ async function syncComSupabase(silencioso = false) {
     // Preservar refId dos registros locais que já existem na nuvem
     data.forEach(d => {
       const local = locais.find(l => l.id === d.id);
-      if (local && local.refId) d.refId = local.refId;
+      if (local && local.refId && !d.refId) d.refId = local.refId;
     });
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    // Padroniza usufrutos antigos gravados como 'gozo'/'usufruto' (vindos de Solicitações)
+    // para 'debito', para aparecerem no painel, mapa de ausências, relatórios e conflitos.
+    const corrigidos = [];
+    data.forEach(d => {
+      if (d.tipo === 'gozo' || d.tipo === 'usufruto') { d.tipo = 'debito'; corrigidos.push(d); }
+    });
+    if (corrigidos.length) {
+      console.log(`🔧 Corrigindo ${corrigidos.length} folga(s) com tipo antigo para 'debito'...`);
+      upsertNuvem('folgas', corrigidos).catch(() => {});
+    }
+    locais.forEach(l => { if (l.tipo === 'gozo' || l.tipo === 'usufruto') l.tipo = 'debito'; });
+    const { pendentes } = separarPendentesLocais('folgas', data, locais);
     
     if (pendentes.length > 0) {
       migrarDadosLocaisParaNuvem('folgas', pendentes);
@@ -5485,20 +5525,19 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('banco_horas', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_banco_horas') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('banco_horas', data, locais);
     if (pendentes.length > 0) {
       migrarDadosLocaisParaNuvem('banco_horas', pendentes);
     }
-    const unificados = [...data, ...pendentes];
+    const idsExcluirBH = new Set(_pendingDeletions.filter(p => p.tabela === 'bancoHoras').map(p => p.id));
+    const unificados = [...data, ...pendentes].filter(x => !idsExcluirBH.has(x.id));
     _remoteData.bancoHoras = unificados;
     localStorage.setItem('srv_banco_horas', JSON.stringify(unificados));
   });
 
   await syncTabela('solicitacoes', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_solicitacoes') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('solicitacoes', data, locais);
     
     if (pendentes.length > 0) {
       migrarDadosLocaisParaNuvem('solicitacoes', pendentes);
@@ -5515,8 +5554,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('autorizacoes', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_autorizacoes') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('autorizacoes', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('autorizacoes', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.autorizacoes = unificados;
@@ -5525,8 +5563,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('eventos', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_eventos') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('eventos', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('eventos', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.eventos = unificados;
@@ -5553,8 +5590,7 @@ async function syncComSupabase(silencioso = false) {
       if (alterou) recuperados.push(out);
       return out;
     });
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('veiculos', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('veiculos', pendentes);
     if (recuperados.length > 0) migrarDadosLocaisParaNuvem('veiculos', recuperados);
     const unificados = [...merged, ...pendentes];
@@ -5564,8 +5600,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('cargos', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_cargos') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('cargos', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('cargos', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.cargos = unificados;
@@ -5574,8 +5609,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('credenciados', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_credenciados') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('credenciados', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('credenciados', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.credenciados = unificados;
@@ -5584,8 +5618,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('ponto_mensal', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_ponto_mensal') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('ponto_mensal', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_mensal', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.pontoMensal = unificados;
@@ -5594,8 +5627,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('oficios', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_oficios') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('oficios', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('oficios', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.oficios = unificados;
@@ -5604,8 +5636,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('notificacoes', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_notificacoes') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('notificacoes', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('notificacoes', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.notificacoes = unificados;
@@ -5614,8 +5645,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('destinatarios', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_destinatarios') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('destinatarios', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('destinatarios', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.destinatarios = unificados;
@@ -5624,8 +5654,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('emissores', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_emissores') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('emissores', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('emissores', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.emissores = unificados;
@@ -5645,8 +5674,7 @@ async function syncComSupabase(silencioso = false) {
       if (cDadosVazio && local.dados) out.dados = local.dados;
       return out;
     });
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('ponto_folhas', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_folhas', pendentes);
     const unificados = [...merged, ...pendentes];
     _remoteData.pontoFolhas = unificados;
@@ -5655,8 +5683,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('ponto_historico', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_ponto_historico') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('ponto_historico', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('ponto_historico', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.pontoHistorico = unificados;
@@ -5665,8 +5692,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('protocolos_entrega', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_protocolos') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('protocolos_entrega', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('protocolos_entrega', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.protocolos = unificados;
@@ -5675,8 +5701,7 @@ async function syncComSupabase(silencioso = false) {
 
   await syncTabela('itens_protocolo', '*', (data) => {
     const locais = JSON.parse(localStorage.getItem('srv_itens_protocolo') || '[]');
-    const idsNuvem = new Set(data.map(x => x.id).filter(Boolean));
-    const pendentes = locais.filter(x => x.id && !idsNuvem.has(x.id));
+    const { pendentes } = separarPendentesLocais('itens_protocolo', data, locais);
     if (pendentes.length > 0) migrarDadosLocaisParaNuvem('itens_protocolo', pendentes);
     const unificados = [...data, ...pendentes];
     _remoteData.itensProtocolo = unificados;
@@ -5694,7 +5719,10 @@ async function syncComSupabase(silencioso = false) {
         if (typeof v === 'string' && (v.startsWith('http') || v.startsWith('data:image'))) imgCloud[item.chave] = v;
         return;
       }
-      if (!(item.chave in localCfg)) {
+      // A nuvem é a fonte da verdade. Só mantém o valor local se houver uma
+      // alteração de configuração deste computador ainda aguardando envio.
+      const configPendente = _syncQueue.some(q => q.tabela === 'configuracoes');
+      if (!configPendente || !(item.chave in localCfg)) {
         let val = item.valor;
         if (typeof val === 'string' && (val.startsWith('[') || val.startsWith('{'))) {
           try {
@@ -5707,6 +5735,10 @@ async function syncComSupabase(silencioso = false) {
       }
     });
     _remoteData.config = { ...configObj, ...imgCloud };
+    // Guarda o retrato da configuração da nuvem (usado para enviar só o que mudar)
+    const snapCfg = {};
+    data.forEach(item => { if (item && item.chave && !item.chave.startsWith('img_')) snapCfg[item.chave] = typeof item.valor === 'string' ? item.valor : JSON.stringify(item.valor); });
+    gravarSnapshotConfigNuvem(snapCfg);
     // Não persistir base64 no localStorage (economia de espaço); apenas URLs públicas.
     const persist = { ...configObj };
     Object.keys(persist).forEach(k => { if (k.startsWith('img_') && String(persist[k]).startsWith('data:')) delete persist[k]; });
@@ -6675,10 +6707,19 @@ async function desativarBackupAutomatico() {
 
 // ===================== EXPORTAÇÃO MANUAL =====================
 function exportarBackup() {
+  // Backup completo: todas as tabelas do sistema (antes só servidores, férias, folgas e config).
   const dados = {
-    versao: '1.0', exportadoEm: new Date().toISOString(),
+    versao: '2.0', exportadoEm: new Date().toISOString(),
     servidores: DB.servidores(), programacoes: DB.programacoes(),
-    folgas: DB.folgas(), config: DB.config(),
+    folgas: DB.folgas(), bancoHoras: DB.bancoHoras(),
+    solicitacoes: DB.solicitacoes(), autorizacoes: DB.autorizacoes(),
+    eventos: DB.eventos(), veiculos: DB.veiculos(),
+    cargos: DB.cargos(), credenciados: DB.credenciados(), pontoMensal: DB.pontoMensal(),
+    pontoFolhas: DB.pontoFolhas(), pontoHistorico: DB.pontoHistorico(),
+    protocolos: DB.protocolos(), itensProtocolo: DB.itensProtocolo(),
+    oficios: DB.oficios(), notificacoes: DB.notificacoes(),
+    destinatarios: DB.destinatarios(), emissores: DB.emissores(),
+    config: DB.config(),
     img_esq: getImg('esq') || null,
     img_dir: getImg('dir') || null,
     img_print: getImg('print') || null
@@ -6690,28 +6731,43 @@ function exportarBackup() {
   a.href = url;
   a.download = `backup-ferias-${new Date().toLocaleDateString('pt-BR').replace(/\//g,'-')}.json`;
   a.click();
-  toastMsg('Backup manual exportado!');
+  toastMsg('Backup manual exportado (todas as tabelas)!');
 }
 
 function importarBackup(input) {
   const file = input.files[0];
   if (!file) return;
   const reader = new FileReader();
-  reader.onload = e => {
+  reader.onload = async e => {
     try {
       const d = JSON.parse(e.target.result);
       if (!d.servidores || !d.folgas) throw new Error();
-      if (!confirm('Deseja substituir todos os dados atuais pelos dados deste backup?')) return;
-      DB.saveServidores(d.servidores);
-      DB.saveProgramacoes(d.programacoes || []);
-      DB.saveFolgas(d.folgas);
-      if (d.config) DB.saveConfig(d.config);
+      if (!confirm('Restaurar os dados deste backup?\n\nOs registros do backup serão gravados (os que já existem com o mesmo ID serão atualizados). Registros criados depois do backup NÃO são apagados.')) return;
+      await DB.saveServidores(d.servidores);
+      if (d.programacoes && d.programacoes.length) await DB.saveProgramacoes(d.programacoes);
+      await DB.saveFolgas(d.folgas);
+      if (d.bancoHoras && d.bancoHoras.length) await DB.saveBancoHoras(d.bancoHoras);
+      if (d.solicitacoes && d.solicitacoes.length) await DB.saveSolicitacoes(d.solicitacoes);
+      if (d.autorizacoes) for (const a of d.autorizacoes) await DB.saveAutorizacao(a);
+      if (d.eventos && d.eventos.length) await DB.saveEventos(d.eventos);
+      if (d.veiculos && d.veiculos.length) await DB.saveVeiculos(d.veiculos);
+      if (d.cargos && d.cargos.length) await DB.saveCargos(d.cargos);
+      if (d.credenciados && d.credenciados.length) await DB.saveCredenciados(d.credenciados);
+      if (d.pontoMensal && d.pontoMensal.length) await DB.savePontoMensal(d.pontoMensal);
+      if (d.pontoFolhas) for (const f of d.pontoFolhas) await DB.savePontoFolha(f);
+      if (d.protocolos && d.protocolos.length) await DB.saveProtocolos(d.protocolos);
+      if (d.itensProtocolo && d.itensProtocolo.length) await DB.saveItensProtocolo(d.itensProtocolo);
+      if (d.oficios && d.oficios.length) await DB.saveOficios(d.oficios);
+      if (d.notificacoes && d.notificacoes.length) await DB.saveNotificacoes(d.notificacoes);
+      if (d.destinatarios && d.destinatarios.length) await DB.saveDestinatarios(d.destinatarios);
+      if (d.emissores && d.emissores.length) await DB.saveEmissores(d.emissores);
+      if (d.config) await DB.saveConfig(d.config);
       if (d.img_esq) localStorage.setItem('srv_img_esq', d.img_esq);
       if (d.img_dir) localStorage.setItem('srv_img_dir', d.img_dir);
       if (d.img_print) localStorage.setItem('srv_img_print', d.img_print);
       toastMsg('Backup importado com sucesso!');
-      setTimeout(() => location.reload(), 500);
-    } catch(err) { toastMsg('Arquivo de backup inválido!', 'error'); }
+      setTimeout(() => location.reload(), 800);
+    } catch(err) { console.error(err); toastMsg('Arquivo de backup inválido!', 'error'); }
   };
   reader.readAsText(file);
 }
