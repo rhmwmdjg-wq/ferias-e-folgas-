@@ -4,12 +4,14 @@
 // Registro dos módulos (abas) que podem ser liberados por gestor.
 const MODULOS_SISTEMA = [
   { id: 'alertas', tab: 'tab-alertas', label: 'Dashboard' },
+  { id: 'pendencias', tab: 'tab-pendencias', label: 'Central de Pendências' },
   { id: 'servidores', tab: 'tab-servidores', label: 'Servidores' },
   { id: 'aniversariantes', tab: 'tab-aniversariantes', label: 'Aniversariantes' },
   { id: 'ferias', tab: 'tab-ferias', label: 'Programar Férias' },
   { id: 'calendario', tab: 'tab-calendario', label: 'Calendário Visual' },
   { id: 'folgas', tab: 'tab-folgas', label: 'Banco de Folgas' },
   { id: 'bancohoras', tab: 'tab-bancohoras', label: 'Banco de Horas' },
+  { id: 'saldos', tab: 'tab-saldos', label: 'Painel de Saldos' },
   { id: 'coberturas', tab: 'tab-coberturas', label: 'Coberturas' },
   { id: 'oficios', tab: 'tab-oficios', label: 'Gerador de Ofícios' },
   { id: 'notificacoes', tab: 'tab-notificacoes', label: 'Notificação Administrativa' },

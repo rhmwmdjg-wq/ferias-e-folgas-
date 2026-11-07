@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+<link rel="stylesheet" href="melhorias.css">
 <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -1854,7 +1855,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
           <i class="fa-solid fa-key"></i> Trocar Senha
         </button>
         <div style="display:flex;align-items:center;gap:6px">
-          <div class="status-dot">v2.1</div>
+          <div class="status-dot">v2.2</div>
           <div id="realtime-badge" title="Sincronização em tempo real ativa" style="width:8px;height:8px;border-radius:50%;background:var(--success);box-shadow:0 0 6px var(--success);opacity:0;transition:opacity 0.4s;flex-shrink:0;"></div>
           <div id="sync-pending-badge" title="Dados pendentes de sincronização" style="display:none;cursor:pointer;width:8px;height:8px;border-radius:50%;background:var(--warning);box-shadow:0 0 6px var(--warning);flex-shrink:0;" onclick="forcarSyncCompleto()"></div>
         </div>
@@ -1872,6 +1873,9 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       </div>
       <div class="header-center" id="display-org-name-header">Coordenação da Atenção Primária à Saúde</div>
       <div class="header-right">
+        <button class="mx-search-trigger" id="mx-search-trigger" onclick="MX.abrirBusca()" title="Busca rápida (Ctrl+K)" aria-label="Busca rápida">
+          <i class="fa-solid fa-magnifying-glass"></i><span class="mx-st-label">Buscar</span><kbd>Ctrl K</kbd>
+        </button>
         <img id="header-img-dir" class="header-img" alt="Logo direita">
       </div>
     </header>
@@ -1980,14 +1984,18 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
   <!-- HISTÓRICO -->
   <div class="section-title">Histórico de Folgas</div>
   <div class="search-bar">
-    <select id="fg-hist-srv" onchange="renderHistoricoFolgas()"><option value="">Todos os Servidores</option></select>
-    <select id="fg-hist-tipo" onchange="renderHistoricoFolgas()">
+    <input id="fg-hist-busca" type="text" placeholder="Buscar por nome, matrícula, motivo ou observação..." oninput="_fgHistPagina=1;renderHistoricoFolgas()">
+    <select id="fg-hist-srv" onchange="_fgHistPagina=1;renderHistoricoFolgas()"><option value="">Todos os Servidores</option></select>
+    <input id="fg-hist-mes" type="month" title="Filtrar por mês" onchange="_fgHistPagina=1;renderHistoricoFolgas()" style="flex:0 0 auto;min-width:150px">
+    <select id="fg-hist-tipo" onchange="_fgHistPagina=1;renderHistoricoFolgas()">
       <option value="">Todos os Tipos</option>
       <option value="credito">Créditos (Banco)</option>
       <option value="debito">Usufrutos (Uso)</option>
     </select>
   </div>
+  <div class="mx-count" id="fg-hist-contagem"></div>
   <div id="fg-historico"><div class="empty"><div class="icon">🏖️</div><p>Nenhuma movimentação registrada.</p></div></div>
+  <div class="mx-pager" id="fg-hist-paginacao"></div>
 </div>
 
 <!-- ===================== MODAL EDITAR FOLGA ===================== -->
@@ -2383,11 +2391,15 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
 <div class="tab-panel" id="panel-servidores">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:6px">
     <div class="section-title" style="margin:0">👥 Cadastro de Servidores</div>
-    <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('servidores')">🖨️ Imprimir Lista</button>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-primary btn-sm" onclick="novoServidor()">➕ Novo Servidor</button>
+      <button class="btn btn-ghost btn-sm" onclick="MX.exportarServidores()">📊 Exportar Excel</button>
+      <button class="btn btn-ghost btn-sm" onclick="imprimirRelatorio('servidores')">🖨️ Imprimir Lista</button>
+    </div>
   </div>
 
-  <div class="card" style="margin-bottom:24px">
-    <h3><span class="icon">➕</span> Novo Servidor</h3>
+  <div class="card mx-closed" id="card-novo-servidor" style="margin-bottom:24px">
+    <h3 id="srv-form-titulo"><span class="icon">➕</span> Novo Servidor</h3>
     <div class="form-row cols-3">
       <div class="field"><label>Matrícula *</label><input id="f-matricula" type="text" placeholder="Ex: 123456"></div>
       <div class="field"><label>Nome Completo *</label><input id="f-nome" type="text" placeholder="Nome do servidor"></div>
@@ -2433,6 +2445,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     <div style="display:flex;gap:10px;margin-top:6px">
       <button class="btn btn-primary" onclick="salvarServidor()">💾 Salvar Servidor</button>
       <button class="btn btn-ghost" onclick="limparFormServidor()">🗑️ Limpar</button>
+      <button class="btn btn-ghost" onclick="fecharFormServidor()">✖ Fechar</button>
     </div>
   </div>
 
@@ -2440,6 +2453,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     <input id="busca-servidor" type="text" placeholder="🔍 Buscar por nome, matrícula ou setor..." oninput="renderTabela()">
     <select id="filtro-setor" onchange="renderTabela()"><option value="">Todos os Setores</option></select>
   </div>
+  <div class="mx-count" id="srv-contagem"></div>
 
   <div class="table-wrap card" style="padding:0">
     <table id="tabela-servidores">
@@ -2592,7 +2606,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <button class="btn btn-ghost btn-sm" onclick="imprimirPlanilhaProgramacao()" title="Imprimir planilha em branco com todos os servidores">📊 Planilha</button>
         <button class="btn btn-ghost btn-sm" onclick="imprimirFormularioFeriasEmBranco()" title="Imprimir formulário em branco para preenchimento manual">📄 Em Branco</button>
         <div class="input-wrap" style="flex:1; min-width:180px; max-width:280px">
-          <input type="text" id="fp-busca-nome" placeholder="🔍 Pesquisar servidor..." oninput="renderProgramacoes()" style="padding:8px 12px 8px 35px; font-size:0.82rem">
+          <input type="text" id="fp-busca-nome" placeholder="Pesquisar servidor..." oninput="renderProgramacoes()" style="padding:8px 12px 8px 35px; font-size:0.82rem">
           <i class="fa-solid fa-magnifying-glass field-icon" style="left:12px"></i>
         </div>
       </div>
@@ -8692,6 +8706,9 @@ async function dsAssinarPades() {
 <div id="toast-container" class="toast-container"></div>
 
 </div> <!-- close app-container -->
+
+<!-- Melhorias v2.2: busca global, menu recolhível, Ficha 360°, Saldos, Pendências, Backup -->
+<script src="melhorias.js"></script>
 
 </body>
 </html>

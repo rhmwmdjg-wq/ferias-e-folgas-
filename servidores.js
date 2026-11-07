@@ -34,6 +34,26 @@ function limparFormServidor() {
   document.getElementById('f-foto-base64').value = '';
   document.getElementById('f-foto-preview').innerHTML = '<span style="font-size:24px">📷</span><span>Adicionar foto</span>';
   delete document.getElementById('f-matricula').dataset.editId;
+  const tit = document.getElementById('srv-form-titulo');
+  if (tit) tit.innerHTML = '<span class="icon">➕</span> Novo Servidor';
+}
+
+// Abre/fecha o formulário de cadastro (a lista de servidores aparece primeiro).
+function abrirFormServidor(focar) {
+  const card = document.getElementById('card-novo-servidor');
+  if (!card) return;
+  card.classList.remove('mx-closed');
+  card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  if (focar !== false) setTimeout(function() { const el = document.getElementById('f-matricula'); if (el) el.focus(); }, 250);
+}
+function fecharFormServidor() {
+  limparFormServidor();
+  const card = document.getElementById('card-novo-servidor');
+  if (card) card.classList.add('mx-closed');
+}
+function novoServidor() {
+  limparFormServidor();
+  abrirFormServidor();
 }
 
 async function salvarServidor() {
@@ -51,7 +71,8 @@ async function salvarServidor() {
   if (editId) {
     const idx = lista.findIndex(function(s) { return s.id === editId; });
     if (idx >= 0) {
-      lista[idx] = {
+      // Mantém os campos que não estão no formulário (ex.: senha personalizada do servidor).
+      lista[idx] = Object.assign({}, lista[idx], {
         id: editId,
         matricula: matricula,
         nome: nome,
@@ -66,7 +87,7 @@ async function salvarServidor() {
         feriasReg: parseInt(document.getElementById('f-ferias-reg').value) || 0,
         feriasPrem: parseInt(document.getElementById('f-ferias-prem').value) || 0,
         foto: document.getElementById('f-foto-base64').value || lista[idx].foto || ''
-      };
+      });
     }
   } else {
     if (lista.some(function(s) { return s.matricula === matricula; })) {
@@ -90,7 +111,7 @@ async function salvarServidor() {
     });
   }
   await DB.saveServidores(lista);
-  limparFormServidor();
+  fecharFormServidor();
   renderTabela();
   atualizarSelectsSetores();
   toastMsg(editId ? 'Servidor atualizado.' : 'Servidor cadastrado.');
@@ -116,7 +137,9 @@ function editarServidor(id) {
     document.getElementById('f-foto-preview').innerHTML = '<img src="' + s.foto + '" style="width:100%;height:100%;object-fit:cover;border-radius:50%">';
   }
   document.getElementById('f-matricula').dataset.editId = id;
-  document.getElementById('panel-servidores').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const tit = document.getElementById('srv-form-titulo');
+  if (tit) tit.innerHTML = '<span class="icon">✏️</span> Editar Servidor — ' + esc(s.nome);
+  abrirFormServidor(false);
 }
 
 async function deletarServidor(id) {
@@ -148,6 +171,8 @@ function renderTabela() {
   if (!tbody) return;
   if (!filtrados.length) {
     tbody.innerHTML = '<tr><td colspan="10" style="text-align:center;color:var(--muted);padding:40px">Nenhum servidor encontrado.</td></tr>';
+    const contVazio = document.getElementById('srv-contagem');
+    if (contVazio) contVazio.textContent = '0 servidor(es)';
     const pagEl = document.getElementById('paginacao-servidores');
     if (pagEl) pagEl.innerHTML = '';
     return;
@@ -157,8 +182,10 @@ function renderTabela() {
   const inicio = (currentPage - 1) * rowsPerPage;
   const paginados = filtrados.slice(inicio, inicio + rowsPerPage);
   renderPaginacao('paginacao-servidores', totalPages, 'renderTabela');
+  const contEl = document.getElementById('srv-contagem');
+  if (contEl) contEl.textContent = filtrados.length + ' servidor(es)' + (filtrados.length !== servidores.length ? ' de ' + servidores.length : '') + ' — clique no nome para abrir a ficha completa';
   tbody.innerHTML = paginados.map(function(s) {
     const fotoHtml = getAvatarHtml(s.foto, s.nome, 40, '', '');
-    return '<tr><td>' + fotoHtml + '</td><td>' + esc(s.matricula) + '</td><td><strong>' + esc(s.nome) + '</strong></td><td>' + fmtDate(s.nascimento) + '</td><td>' + fmtDate(s.admissao) + '</td><td>' + esc(s.setor || '-') + '</td><td>' + esc(s.cargo || '-') + '</td><td>' + (s.feriasReg || 0) + '</td><td>' + (s.feriasPrem || 0) + '</td><td><button class="btn btn-ghost btn-sm" onclick="editarServidor(\'' + s.id + '\')">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarServidor(\'' + s.id + '\')">🗑️</button></td></tr>';
+    return '<tr><td>' + fotoHtml + '</td><td>' + esc(s.matricula) + '</td><td><strong class="mx-srv-name" onclick="abrirFicha360(\'' + s.id + '\')" title="Abrir ficha completa">' + esc(s.nome) + '</strong></td><td>' + fmtDate(s.nascimento) + '</td><td>' + fmtDate(s.admissao) + '</td><td>' + esc(s.setor || '-') + '</td><td>' + esc(s.cargo || '-') + '</td><td>' + (s.feriasReg || 0) + '</td><td>' + (s.feriasPrem || 0) + '</td><td style="white-space:nowrap"><button class="btn btn-ghost btn-sm" onclick="abrirFicha360(\'' + s.id + '\')" title="Ficha 360°">👁️</button> <button class="btn btn-ghost btn-sm" onclick="editarServidor(\'' + s.id + '\')" title="Editar">✏️</button> <button class="btn btn-danger btn-sm" onclick="deletarServidor(\'' + s.id + '\')">🗑️</button></td></tr>';
   }).join('');
 }

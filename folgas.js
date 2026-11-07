@@ -427,25 +427,68 @@ function limparFormUsufruto() {
   if (cobSel) cobSel.innerHTML = '<option value="">Selecione o servidor primeiro...</option>';
 }
 
+// Paginação e filtros do histórico de folgas
+var _fgHistPagina = 1;
+const FG_HIST_POR_PAGINA = 20;
+
+function _fgNorm(t) { return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(); }
+
 function renderHistoricoFolgas() {
   const filtSrv = document.getElementById('fg-hist-srv')?.value || '';
   const filtTipo = document.getElementById('fg-hist-tipo')?.value || '';
-  const servidores = DB.servidores();
-
-  const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
-  const isAdmin = sessao.role === 'admin';
-  const isGestor = sessao.role === 'gestor';
-  
-  let lista = getFolgasAcessiveis().filter(f =>
-    (!filtSrv || f.srvId === filtSrv) && (!filtTipo || f.tipo === filtTipo)
-  ).sort((a, b) => new Date(b.criadoEm) - new Date(a.criadoEm));
-
-  const cont = document.getElementById('fg-historico');
-  if (!lista.length) { cont.innerHTML = '<div class="empty"><div class="icon">🏖️</div><p>Nenhuma movimentação registrada.</p></div>'; return; }
+  const filtMes = document.getElementById('fg-hist-mes')?.value || '';
+  const busca = _fgNorm(document.getElementById('fg-hist-busca')?.value || '').trim();
 
   const servidoresAcessiveis = getServidoresAcessiveis();
+  const mapaSrv = new Map(servidoresAcessiveis.map(s => [s.id, s]));
+
+  // Mês: crédito usa a data; usufruto usa qualquer um dos dias usufruídos
+  const noMes = (f) => {
+    if (!filtMes) return true;
+    if (f.tipo !== 'credito' && Array.isArray(f.dataItems) && f.dataItems.length) return f.dataItems.some(di => String(di.data || '').startsWith(filtMes));
+    return String(f.data || '').startsWith(filtMes);
+  };
+  const casaBusca = (f) => {
+    if (!busca) return true;
+    const srv = mapaSrv.get(f.srvId) || {};
+    return _fgNorm([srv.nome, srv.matricula, srv.setor, f.motivo, f.obs, f.descPagamento, f.lancadoPor].join(' ')).includes(busca);
+  };
+
+  let lista = getFolgasAcessiveis().filter(f =>
+    (!filtSrv || f.srvId === filtSrv) && (!filtTipo || f.tipo === filtTipo) && noMes(f) && casaBusca(f)
+  ).sort((a, b) => new Date(b.criadoEm || b.data) - new Date(a.criadoEm || a.data));
+
+  const cont = document.getElementById('fg-historico');
+  const contagem = document.getElementById('fg-hist-contagem');
+  const pag = document.getElementById('fg-hist-paginacao');
+  if (!lista.length) {
+    cont.innerHTML = '<div class="empty"><div class="icon">🏖️</div><p>Nenhuma movimentação encontrada.</p></div>';
+    if (contagem) contagem.textContent = '';
+    if (pag) pag.innerHTML = '';
+    return;
+  }
+
+  // Totais do filtro atual
+  const totCred = lista.filter(f => f.tipo === 'credito').reduce((a, f) => a + (f.qtd || 0), 0);
+  const totDeb = lista.filter(f => f.tipo !== 'credito').reduce((a, f) => a + (f.qtd || 0), 0);
+  const totalPaginas = Math.max(1, Math.ceil(lista.length / FG_HIST_POR_PAGINA));
+  if (_fgHistPagina > totalPaginas) _fgHistPagina = totalPaginas;
+  if (_fgHistPagina < 1) _fgHistPagina = 1;
+  const ini = (_fgHistPagina - 1) * FG_HIST_POR_PAGINA;
+  const fmtN = n => String(Math.round(n * 10) / 10).replace('.', ',');
+  if (contagem) contagem.innerHTML = `${lista.length} lançamento(s) · <span class="mx-pos">+${fmtN(totCred)} crédito(s)</span> · <span class="mx-neg">−${fmtN(totDeb)} usufruto(s)</span> · mostrando ${ini + 1}–${Math.min(ini + FG_HIST_POR_PAGINA, lista.length)}`;
+  if (pag) {
+    pag.innerHTML = totalPaginas <= 1 ? '' :
+      `<button class="btn btn-ghost btn-sm" ${_fgHistPagina === 1 ? 'disabled' : ''} onclick="_fgHistPagina=1;renderHistoricoFolgas()">«</button>` +
+      `<button class="btn btn-ghost btn-sm" ${_fgHistPagina === 1 ? 'disabled' : ''} onclick="_fgHistPagina--;renderHistoricoFolgas()">‹ Anterior</button>` +
+      `<span class="mx-pg-info">Página ${_fgHistPagina} de ${totalPaginas}</span>` +
+      `<button class="btn btn-ghost btn-sm" ${_fgHistPagina === totalPaginas ? 'disabled' : ''} onclick="_fgHistPagina++;renderHistoricoFolgas()">Próxima ›</button>` +
+      `<button class="btn btn-ghost btn-sm" ${_fgHistPagina === totalPaginas ? 'disabled' : ''} onclick="_fgHistPagina=${totalPaginas};renderHistoricoFolgas()">»</button>`;
+  }
+  lista = lista.slice(ini, ini + FG_HIST_POR_PAGINA);
+
   cont.innerHTML = lista.map(f => {
-    const srv = servidoresAcessiveis.find(s => s.id === f.srvId);
+    const srv = mapaSrv.get(f.srvId);
     const cls = f.tipo === 'credito' ? 'credito' : f.negativo ? 'debito-neg' : 'debito';
     const icone = f.tipo === 'credito' ? '➕' : f.negativo ? '⚠️' : '➖';
     const qtdLabel = f.qtd === 0.5 ? 'Meio dia' : `${f.qtd.toString().replace('.',',')} dia(s)`;
@@ -454,7 +497,7 @@ function renderHistoricoFolgas() {
     
     let datasDesc = '';
     if (f.tipo === 'credito') {
-      datasDesc = `📅 ${fmtDate(f.data)} &nbsp;|&nbsp; 📝 Motivo: <em>${f.motivo}</em>`;
+      datasDesc = `📅 ${fmtDate(f.data)} &nbsp;|&nbsp; 📝 Motivo: <em>${esc(f.motivo)}</em>`;
     } else {
       const parsed = parseFolgaObs(f.obs);
       const tagCob = parsed.coberturaNome ? ` <span class="tag tag-purple">👥 Substituto (Cobertura): ${esc(parsed.coberturaNome)}</span>` : '';
@@ -465,7 +508,7 @@ function renderHistoricoFolgas() {
       <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
         <div>
           <strong>${icone} ${f.tipo === 'credito' ? 'Crédito adicionado' : f.negativo ? 'Usufruto (Registrado c/ Saldo Negativo)' : 'Usufruto registrado'}</strong>
-          <span style="margin-left:10px;font-size:.8rem;color:var(--muted)">${esc(srv?.nome || '-')}</span>
+          ${srv ? `<button class="mx-link" style="margin-left:10px;font-size:.8rem;font-weight:600;color:var(--text-mid)" onclick="abrirFicha360('${srv.id}')" title="Abrir ficha do servidor">${esc(srv.nome)}</button>` : '<span style="margin-left:10px;font-size:.8rem;color:var(--muted)">-</span>'}
           ${f.negativo ? '<span style="margin-left:6px; font-size:10px; background:var(--danger); color:white; padding:2px 6px; border-radius:4px; font-weight:700;">SALDO NEGATIVO</span>' : ''}
         </div>
         <div style="display:flex;align-items:center;gap:10px">
