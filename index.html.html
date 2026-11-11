@@ -2479,7 +2479,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     <div class="form-row cols-3">
       <div class="field"><label>Nome do Gestor *</label><input id="g-nome" type="text" placeholder="Nome Completo"></div>
       <div class="field"><label>Usuário de Login *</label><input id="g-usuario" type="text" placeholder="Ex: gestoraps"></div>
-      <div class="field"><label>Senha *</label><input id="g-senha" type="password" placeholder="••••••••"></div>
+      <div class="field"><label>Senha provisória <span id="g-senha-dica" style="font-weight:400;color:var(--muted)">(mín. 6 caracteres)</span></label><input id="g-senha" type="password" autocomplete="new-password" placeholder="••••••••"></div>
     </div>
 
     <div class="field" style="margin-top:10px">
@@ -4197,11 +4197,11 @@ Coordenação de RH
     <p style="font-size:.78rem;color:var(--muted);margin-bottom:16px">Defina uma nova senha para seu acesso.</p>
     <div class="field" style="margin-bottom:12px">
       <label>Nova Senha</label>
-      <input type="password" id="mn-nova-senha" placeholder="Mínimo 4 caracteres">
+      <input type="password" id="mn-nova-senha" autocomplete="new-password" placeholder="Mínimo 6 caracteres">
     </div>
     <div class="field" style="margin-bottom:20px">
       <label>Confirmar Nova Senha</label>
-      <input type="password" id="mn-conf-senha" placeholder="Repita a senha">
+      <input type="password" id="mn-conf-senha" autocomplete="new-password" placeholder="Repita a senha">
     </div>
     <div class="modal-footer">
       <button class="btn btn-ghost" onclick="fecharModal('modal-alterar-senha')">Cancelar</button>
@@ -4782,7 +4782,11 @@ const ESTILOS_BASE = {
 // ===================== CONFIGURAÇÃO SUPABASE =====================
 const SB_URL = "https://svzsdaaidmdmyitsrjau.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN2enNkYWFpZG1kbXlpdHNyamF1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMzc1NDAsImV4cCI6MjA5MDkxMzU0MH0.g2ZklKFxXzko7mGvgjuXpepACqLmGUBEUJiDoi9GC1Y";
-const supabaseClient = supabase.createClient(SB_URL, SB_KEY);
+// A sessão de login fica no sessionStorage: fechar a aba/navegador encerra o acesso
+// (importante em computadores compartilhados das unidades).
+const supabaseClient = supabase.createClient(SB_URL, SB_KEY, {
+  auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: false }
+});
 
 // ===================== SUPABASE REALTIME =====================
 let _realtimeChannel = null;
@@ -5482,6 +5486,7 @@ async function syncComSupabase(silencioso = false) {
       migrarDadosLocaisParaNuvem('servidores', pendentes);
     }
     const unificados = [...data, ...pendentes];
+    unificados.forEach(x => { if (x) delete x.senha; }); // senha nunca fica guardada no navegador
     _remoteData.servidores = unificados;
     localStorage.setItem('srv_servidores', JSON.stringify(unificados));
   });
@@ -5562,6 +5567,7 @@ async function syncComSupabase(silencioso = false) {
   });
 
   await syncTabela('gestores', '*', (data) => {
+    data.forEach(g => { if (g) delete g.senha; }); // senha nunca fica guardada no navegador
     _remoteData.gestores = data;
     if (data.length > 0) localStorage.setItem('srv_gestores', JSON.stringify(data));
   });
@@ -6449,11 +6455,12 @@ function importarExcelDireto(input) {
       if (!confirm(`Deseja importar/atualizar ${novos.length} servidores?`)) return;
       let atuais = DB.servidores();
       let ok=0, att=0;
-      // Hashear senhas antes de salvar (importação)
+      // Senhas não são mais gravadas no cadastro. Se o arquivo trouxer uma senha para um
+      // servidor NOVO, ela vira senha provisória (troca obrigatória no primeiro acesso).
+      const senhasNovas = [];
       for (const n of novos) {
         const idx = atuais.findIndex(s => s.matricula === n.matricula);
-        const senhaPlain = n.senha || '123456';
-        const senhaFinal = isSenhaHash(senhaPlain) ? senhaPlain : await hashSenha(senhaPlain);
+        const semSenha = { ...n }; delete semSenha.senha;
         if (idx >= 0) {
           atuais[idx] = {
             ...atuais[idx], 
@@ -6462,19 +6469,25 @@ function importarExcelDireto(input) {
             setor: n.setor || atuais[idx].setor || '', 
             admissao: n.admissao || atuais[idx].admissao || '', 
             cargo: n.cargo || atuais[idx].cargo || '',
-            nome: n.nome || atuais[idx].nome,
-            senha: isSenhaHash(atuais[idx].senha || '') ? atuais[idx].senha : senhaFinal
+            nome: n.nome || atuais[idx].nome
           };
+          delete atuais[idx].senha;
           att++;
         } else {
-          atuais.push({...n, id: uid(), senha: senhaFinal});
+          const novoId = uid();
+          atuais.push({...semSenha, id: novoId});
+          if (n.senha && !isSenhaHash(n.senha) && String(n.senha).length >= 6) senhasNovas.push({ id: novoId, senha: String(n.senha) });
           ok++;
         }
       }
       await DB.saveServidores(atuais);
+      let senhasOk = 0;
+      for (const sn of senhasNovas) {
+        if (await definirSenhaDeAcesso('servidores', sn.id, sn.senha, true)) senhasOk++;
+      }
       input.value = '';
       renderTabela();
-      toastMsg(`✅ ${ok} novos importados, ${att} atualizados!`);
+      toastMsg(`✅ ${ok} novos importados, ${att} atualizados!` + (senhasNovas.length ? ` ${senhasOk} senha(s) provisória(s) criada(s).` : ' Defina a senha de acesso pelo botão 🔑 na lista.'));
     } catch(err) { 
       console.error('❌ Erro na importação:', err);
       toastMsg('❌ Erro: ' + err.message, 'error'); 

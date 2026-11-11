@@ -1,0 +1,5 @@
+seguranca/
+*.sql
+*.py
+test_all.js
+check_syntax.js

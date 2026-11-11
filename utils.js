@@ -40,11 +40,14 @@ function showTab(tab) {
   currentPage = 1;
 }
 
-function sairSistema() {
+async function sairSistema() {
   if (confirm('Deseja realmente sair do sistema?')) {
     teardownRealtime();
+    try { await supabaseClient.auth.signOut(); } catch (e) { /* segue mesmo offline */ }
     sessionStorage.removeItem('ferias_sessao');
-    verificarSessao();
+    // Remove os dados pessoais deste navegador e recarrega (limpa também a memória da página).
+    if (typeof limparCacheLocal === 'function') limparCacheLocal();
+    location.reload();
   }
 }
 

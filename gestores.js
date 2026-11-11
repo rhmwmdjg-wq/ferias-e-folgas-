@@ -39,6 +39,7 @@ function limparFormGestor() {
   document.getElementById('g-nome').value = '';
   document.getElementById('g-usuario').value = '';
   document.getElementById('g-senha').value = '';
+  document.getElementById('g-senha').placeholder = '••••••••';
   const cargoEl = document.getElementById('g-cargo');
   if (cargoEl) cargoEl.value = '';
   document.getElementById('g-form-title').textContent = 'Novo Gestor';
@@ -97,8 +98,12 @@ async function salvarGestor() {
   const usuario = document.getElementById('g-usuario').value.trim();
   const senha = document.getElementById('g-senha').value;
   const cargo = (document.getElementById('g-cargo')?.value || '').trim();
-  if (!nome || !usuario || !senha) {
+  const editandoGestor = !!document.getElementById('g-id').value;
+  if (!nome || !usuario || (!senha && !editandoGestor)) {
     toastMsg('Preencha nome, usuário e senha.', 'error'); return;
+  }
+  if (senha && senha.length < 6) {
+    toastMsg('A senha provisória precisa ter pelo menos 6 caracteres.', 'error'); return;
   }
   const checks = document.querySelectorAll('#g-setores-check input[type=checkbox]:checked');
   const setores = Array.from(checks).map(function(c) { return c.value; });
@@ -110,6 +115,7 @@ async function salvarGestor() {
     toastMsg('Selecione ao menos um módulo de acesso.', 'error'); return;
   }
   const editId = document.getElementById('g-id').value;
+  let novoGestorId = '';
   let lista = DB.gestores();
   if (editId) {
     const idx = lista.findIndex(function(g) { return g.id === editId; });
@@ -117,15 +123,22 @@ async function salvarGestor() {
       if (lista[idx].usuario !== usuario && lista.some(function(g) { return g.usuario === usuario && g.id !== editId; })) {
         toastMsg('Usuário de login já existe.', 'error'); return;
       }
-      lista[idx] = Object.assign({}, lista[idx], { id: editId, nome: nome, usuario: usuario, senha: senha, cargo: cargo, setores: setores, modulos: modulos });
+      lista[idx] = Object.assign({}, lista[idx], { id: editId, nome: nome, usuario: usuario, cargo: cargo, setores: setores, modulos: modulos });
+      delete lista[idx].senha;
     }
   } else {
     if (lista.some(function(g) { return g.usuario === usuario; })) {
       toastMsg('Usuário de login já existe.', 'error'); return;
     }
-    lista.push({ id: uid(12), nome: nome, usuario: usuario, senha: senha, cargo: cargo, setores: setores, modulos: modulos });
+    novoGestorId = uid(12);
+    lista.push({ id: novoGestorId, nome: nome, usuario: usuario, cargo: cargo, setores: setores, modulos: modulos });
   }
   await DB.saveGestores(lista);
+  // A senha vai direto para o login do Supabase (criptografada); o gestor troca no primeiro acesso.
+  if (senha) {
+    const okSenha = await definirSenhaDeAcesso('gestores', editId || novoGestorId, senha, true);
+    if (!okSenha) toastMsg('Gestor salvo, mas a senha NÃO foi definida. Edite o gestor e informe a senha de novo.', 'warning');
+  }
   limparFormGestor();
   renderGestores();
   toastMsg(editId ? 'Gestor atualizado.' : 'Gestor cadastrado.');
@@ -137,7 +150,8 @@ function editarGestor(id) {
   document.getElementById('g-id').value = g.id;
   document.getElementById('g-nome').value = g.nome;
   document.getElementById('g-usuario').value = g.usuario;
-  document.getElementById('g-senha').value = g.senha;
+  document.getElementById('g-senha').value = '';
+  document.getElementById('g-senha').placeholder = 'Deixe em branco para manter a senha atual';
   const cargoEl = document.getElementById('g-cargo');
   if (cargoEl) cargoEl.value = g.cargo || '';
   document.getElementById('g-form-title').textContent = '✏️ Editando Gestor';
