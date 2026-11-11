@@ -172,10 +172,10 @@
     const opcoes = () => Array.from(sel.options).filter(o => o.value !== '');
     const vazia = () => Array.from(sel.options).find(o => o.value === '');
 
-    function sincronizar() {
+    function sincronizar(forcar) {
       const o = sel.options[sel.selectedIndex];
       const temValor = !!(o && o.value !== '');
-      if (document.activeElement !== input) input.value = temValor ? o.textContent.trim() : '';
+      if (forcar === true || document.activeElement !== input) input.value = temValor ? o.textContent.trim() : '';
       const v = vazia();
       input.placeholder = (v && v.textContent.trim() && !/^selecione/i.test(v.textContent.trim())) ? v.textContent.trim() + ' — digite para buscar' : 'Digite o nome ou a matrícula...';
       wrap.classList.toggle('tem-valor', temValor);
@@ -185,7 +185,7 @@
     function escolher(valor) {
       descValue.set.call(sel, valor);
       fechar();
-      sincronizar();
+      sincronizar(true);
       sel.dispatchEvent(new Event('change', { bubbles: true }));
     }
 
@@ -277,9 +277,9 @@
     Object.defineProperty(sel, 'value', {
       configurable: true,
       get() { return descValue.get.call(this); },
-      set(v) { descValue.set.call(this, v); sincronizar(); }
+      set(v) { descValue.set.call(this, v); sincronizar(true); }
     });
-    sel.addEventListener('change', sincronizar);
+    sel.addEventListener('change', () => sincronizar());
     new MutationObserver(() => { sincronizar(); if (lista.classList.contains('open')) desenhar(); })
       .observe(sel, { childList: true, attributes: true, attributeFilter: ['disabled'] });
     sincronizar();
