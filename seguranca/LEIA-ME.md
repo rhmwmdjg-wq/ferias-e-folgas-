@@ -15,9 +15,8 @@ com o mesmo usuário/matrícula e a mesma senha de hoje.
 | 5 | Dias depois: rodar `C_apagar_senhas_antigas.sql` | Supabase > SQL Editor | Apaga as senhas antigas das tabelas. Sem volta. |
 
 Entre as etapas 1 e 3, evite trocar senhas ou cadastrar gestores no sistema
-antigo: a mudança não chegaria às contas novas. Se acontecer, rode a Parte A
-de novo só depois de excluir a conta antiga da pessoa, ou redefina a senha
-dela pelo sistema novo.
+antigo: a mudança não chegaria às contas novas. Se acontecer, redefina a
+senha da pessoa pelo sistema novo.
 
 Se, depois da etapa 4, o sistema parar e for preciso voltar a trabalhar na
 hora, `Z_emergencia_reabrir.sql` reabre o banco como era antes. É um remendo:
