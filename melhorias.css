@@ -280,17 +280,26 @@ td.mx-num, th.mx-num { text-align: right; font-family: var(--mono); white-space:
   font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
   color: var(--warning); margin: 10px 12px 4px; display: flex; align-items: center; gap: 6px;
 }
+.tab-btn { position: relative; }
+/* A estrela aparece ao passar o mouse, por cima do canto direito do item,
+   para não roubar espaço do nome nem do contador. */
 .ux-star {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
   display: inline-flex; align-items: center; justify-content: center;
-  width: 22px; height: 22px; margin-left: 4px; border-radius: 6px; flex-shrink: 0;
-  font-size: .62rem; color: var(--muted); opacity: 0; cursor: pointer;
-  transition: opacity .15s, color .15s, background .15s;
+  width: 24px; height: 24px; border-radius: 7px;
+  font-size: .64rem; color: var(--muted); opacity: 0; cursor: pointer;
+  background: var(--bg); box-shadow: 0 0 0 1px var(--border);
+  transition: opacity .15s, color .15s;
 }
-.tab-btn:hover .ux-star, .ux-star:focus-visible { opacity: .75; }
-.ux-star:hover { opacity: 1 !important; background: var(--primary-dim); }
-.ux-star.on { opacity: 1; color: var(--warning); }
+.tab-btn:hover .ux-star, .ux-star:focus-visible { opacity: 1; }
+.ux-star:hover { color: var(--text); }
+.ux-star.on, .ux-star.on:hover { color: var(--warning); }
 .ux-star i { margin: 0 !important; width: auto !important; font-size: inherit !important; color: inherit !important; }
-@media (hover: none) { .ux-star { opacity: .45; } }
+.ux-fav-btn .ux-star { display: none; }
+@media (hover: none) {
+  .ux-star { position: static; transform: none; opacity: .5; background: transparent; box-shadow: none; margin-left: 4px; flex-shrink: 0; }
+  .ux-star.on { opacity: 1; }
+}
 
 /* ---- Campo de servidor com busca ---- */
 .ux-combo { position: relative; display: block; }
@@ -304,7 +313,7 @@ td.mx-num, th.mx-num { text-align: right; font-family: var(--mono); white-space:
 .ux-combo.tem-valor .ux-combo-clear { display: block; }
 .ux-combo-clear:hover { background: var(--primary-dim); color: var(--text); }
 .ux-combo-list {
-  display: none; position: fixed; z-index: 10060; max-height: 280px; overflow-y: auto;
+  display: none; position: fixed; z-index: 10060; max-height: 280px; overflow-y: auto; min-width: min(320px, calc(100vw - 16px));
   background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
   box-shadow: 0 12px 34px rgba(0,0,0,.3); padding: 4px;
 }
@@ -316,7 +325,8 @@ td.mx-num, th.mx-num { text-align: right; font-family: var(--mono); white-space:
 .ux-combo-vazio, .ux-combo-mais { padding: 10px; font-size: .76rem; color: var(--muted); text-align: center; }
 
 /* ---- Banco de Horas: colunas que não espremem os campos ---- */
-.grid-3.ux-grid-largo { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+.grid-3.ux-grid-largo { grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); }
+@media (max-width: 600px) { .grid-3.ux-grid-largo { grid-template-columns: 1fr; } }
 
 /* ---- Pendências: seleção e ação em lote ---- */
 .mx-pi-chk { display: flex; align-items: center; padding: 4px 2px 4px 0; cursor: pointer; }

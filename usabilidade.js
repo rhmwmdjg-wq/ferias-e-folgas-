@@ -192,8 +192,9 @@
     function posicionar() {
       const r = input.getBoundingClientRect();
       const abaixo = window.innerHeight - r.bottom;
-      lista.style.left = r.left + 'px';
-      lista.style.width = r.width + 'px';
+      const larg = Math.max(r.width, Math.min(320, window.innerWidth - 16));
+      lista.style.width = larg + 'px';
+      lista.style.left = Math.max(8, Math.min(r.left, window.innerWidth - larg - 8)) + 'px';
       if (abaixo < 220 && r.top > abaixo) { lista.style.top = ''; lista.style.bottom = (window.innerHeight - r.top + 4) + 'px'; }
       else { lista.style.bottom = ''; lista.style.top = (r.bottom + 4) + 'px'; }
     }
@@ -224,7 +225,7 @@
       if (selIdx >= itens.length) selIdx = 0;
       lista.innerHTML = itens.length
         ? itens.map((x, i) => '<div class="ux-combo-item' + (i === selIdx ? ' sel' : '') + '" role="option" id="' + lista.id + '-' + i + '" data-i="' + i + '" aria-selected="' + (i === selIdx) + '">' +
-            '<div class="ux-ci-nome">' + esc(x.texto) + '</div>' +
+            '<div class="ux-ci-nome">' + esc((x.s && x.s.nome) || x.texto) + '</div>' +
             (x.s && (x.s.matricula || x.s.setor) ? '<div class="ux-ci-sub">' + esc([x.s.matricula ? 'Mat. ' + x.s.matricula : '', x.s.setor || '', x.s.cargo || ''].filter(Boolean).join(' · ')) + '</div>' : '') +
             '</div>').join('') + (total > itens.length ? '<div class="ux-combo-mais">Mostrando 60 de ' + total + '. Continue digitando para refinar.</div>' : '')
         : '<div class="ux-combo-vazio">Nenhum servidor encontrado' + (opcoes().length ? '' : ' nesta lista') + '.</div>';
