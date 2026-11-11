@@ -262,7 +262,7 @@
       if (ev.key === 'ArrowDown') { ev.preventDefault(); if (!aberta) abrir(); else { selIdx = Math.min(itens.length - 1, selIdx + 1); marcar(); } }
       else if (ev.key === 'ArrowUp') { ev.preventDefault(); selIdx = Math.max(0, selIdx - 1); marcar(); }
       else if (ev.key === 'Enter') { if (aberta && itens[selIdx]) { ev.preventDefault(); ev.stopPropagation(); escolher(itens[selIdx].o.value); } }
-      else if (ev.key === 'Escape') { if (aberta) { ev.preventDefault(); ev.stopPropagation(); fechar(); sincronizar(); input.select(); } }
+      else if (ev.key === 'Escape') { if (aberta) { ev.preventDefault(); ev.stopPropagation(); fechar(); sincronizar(true); input.select(); } }
       else if (ev.key === 'Tab') { fechar(); }
     });
     input.addEventListener('blur', () => { setTimeout(() => { if (document.activeElement !== input) { fechar(); sincronizar(); } }, 150); });
