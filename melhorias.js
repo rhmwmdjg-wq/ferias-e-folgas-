@@ -221,7 +221,7 @@
             <button class="btn btn-primary" onclick="MX.baixarBackupJSON()">💾 Baixar backup completo (.json)</button>
             <button class="btn btn-success" onclick="MX.exportarTudoExcel()">📊 Exportar tudo para Excel</button>
           </div>
-          <div class="mx-note warn" style="margin:0">O arquivo .json contém <strong>todos</strong> os dados, inclusive senhas de acesso. Guarde-o em local seguro (pen drive ou pasta protegida) e não envie por WhatsApp/e-mail. A planilha Excel não inclui senhas.</div>
+          <div class="mx-note warn" style="margin:0">O arquivo .json contém <strong>todos</strong> os dados pessoais dos servidores. Guarde-o em local seguro (pen drive ou pasta protegida) e não envie por WhatsApp/e-mail. A planilha Excel não inclui senhas.</div>
         </div>
         <div class="card">
           <h3><span class="icon">♻️</span> Restaurar backup</h3>

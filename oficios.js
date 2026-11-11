@@ -585,7 +585,7 @@ async function renderOficioPublico(token) {
 
   if (!oficio) {
     try {
-      const { data } = await supabaseClient.from('oficios').select('*').eq('token', token).single();
+      const { data } = await supabaseClient.rpc('atlas_oficio_publico', { p_token: token });
       if (data) oficio = normalizarCamposObjeto(data);
     } catch (e) { console.warn("Erro ao buscar ofício público:", e); }
   }
@@ -704,7 +704,7 @@ async function renderOficioPublico(token) {
 }
 
 // ===================== MODO PÚBLICO: APENAS GERADOR DE OFÍCIOS =====================
-// Acesso via ?modulo=oficios (sem login). Oculta os demais módulos e carrega os dados da nuvem.
+// Acesso via ?modulo=oficios (exige login da gestão). Oculta os demais módulos e carrega os dados da nuvem.
 async function renderOficiosPublico() {
   _oficiosModoPublico = true;
   const appContainer = document.querySelector('.app-container');
@@ -1150,7 +1150,7 @@ async function renderNotificacaoPublico(token) {
   let notif = DB.notificacoes().find(o => o.token === token);
   if (!notif) {
     try {
-      const { data } = await supabaseClient.from('notificacoes').select('*').eq('token', token).single();
+      const { data } = await supabaseClient.rpc('atlas_notificacao_publica', { p_token: token });
       if (data) notif = normalizarCamposObjeto(data);
     } catch (e) { console.warn("Erro ao buscar notificação pública:", e); }
   }

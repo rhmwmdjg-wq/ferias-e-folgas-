@@ -119,6 +119,9 @@ window.salvarComFila = salvarComFila;
 const DB = {
   servidores: () => _remoteData.servidores.length ? _remoteData.servidores : JSON.parse(localStorage.getItem('srv_servidores') || '[]'),
   saveServidores: async (d, apenasNovos) => {
+    // Senha não é gravada no cadastro (fica só no login do Supabase).
+    (d || []).forEach(x => { if (x) delete x.senha; });
+    (apenasNovos || []).forEach(x => { if (x) delete x.senha; });
     _remoteData.servidores = d;
     localStorage.setItem('srv_servidores', JSON.stringify(d));
     await salvarComFila('servidores', apenasNovos || d, 'Servidores');
@@ -175,7 +178,12 @@ const DB = {
       console.log('Config salva localmente; envio à nuvem após a primeira sincronização.');
     }
 
-    if (configArray.length > 0) {
+    // Só a gestão grava configurações na nuvem (o banco recusa as demais).
+    let _roleCfg = '';
+    try { _roleCfg = (JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}').role) || ''; } catch (e) { _roleCfg = ''; }
+    const podeGravarCfg = _roleCfg === 'admin' || _roleCfg === 'gestor';
+
+    if (configArray.length > 0 && podeGravarCfg) {
       try {
         const { error } = await supabaseClient.from('configuracoes').upsert(configArray);
         if (!error) {
@@ -244,10 +252,23 @@ const DB = {
     return JSON.parse(localStorage.getItem('srv_gestores') || '[]');
   },
   saveGestores: async (d) => {
+    // A senha não é mais gravada nesta tabela (fica só no login do Supabase, criptografada).
+    d = (d || []).map(g => { const c = { ...g }; delete c.senha; return c; });
     _remoteData.gestores = d;
     localStorage.setItem('srv_gestores', JSON.stringify(d));
     try {
-      const { error } = await supabaseClient.from('gestores').upsert(d);
+      let { error } = await supabaseClient.from('gestores').upsert(d);
+      if (error && error.code === '23502' && /senha/i.test(error.message || '')) {
+        // Banco antigo ainda exige a coluna "senha" preenchida nos cadastros novos:
+        // envia vazia SOMENTE para os gestores que ainda não existem na nuvem.
+        const { data: existentes } = await supabaseClient.from('gestores').select('id');
+        const ids = new Set((existentes || []).map(x => x.id));
+        const novos = d.filter(g => !ids.has(g.id)).map(g => ({ ...g, senha: '' }));
+        const antigos = d.filter(g => ids.has(g.id));
+        error = null;
+        if (novos.length) ({ error } = await supabaseClient.from('gestores').upsert(novos));
+        if (!error && antigos.length) ({ error } = await supabaseClient.from('gestores').upsert(antigos));
+      }
       if (error) {
         if (isQuotaError(error)) {
           saveToSyncQueue('gestores', d);

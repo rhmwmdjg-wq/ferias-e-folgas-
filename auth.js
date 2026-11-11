@@ -1,43 +1,147 @@
 // Módulo Auth.
-// Verificação de sessão, login, hash de senha e migração de dados.
+// Verificação de sessão, login (Supabase Auth), troca de senha e migração de dados.
 
 // ===================== SEGURANÇA E NAVEGAÇÃO =====================
+// O login é feito pelo Supabase Auth. O perfil (admin/gestor/servidor) vem
+// assinado dentro do token e é conferido pelo banco em cada consulta (RLS).
+// O objeto "ferias_sessao" do sessionStorage serve apenas para montar a tela.
+
+const ATLAS_TABELAS_CACHE = ['servidores', 'programacoes', 'folgas', 'banco_horas', 'solicitacoes',
+  'gestores', 'autorizacoes', 'eventos', 'veiculos', 'cargos', 'credenciados', 'ponto_mensal',
+  'protocolos', 'itens_protocolo', 'oficios', 'destinatarios', 'emissores', 'notificacoes',
+  'ponto_folhas', 'ponto_historico', 'logs'];
+
+// Apaga deste navegador os dados pessoais guardados em cache (computador compartilhado).
+// Mantém aparência (logos/tema) e a fila de envios pendentes.
+function limparCacheLocal() {
+  try {
+    ATLAS_TABELAS_CACHE.forEach(t => localStorage.removeItem('srv_' + t));
+    Object.keys(localStorage).forEach(k => { if (k.indexOf('srv_ids_nuvem_') === 0) localStorage.removeItem(k); });
+    localStorage.removeItem('ferias_credenciais');
+  } catch (e) { /* ignora */ }
+}
+
+// Logos, título e cores para a tela de login e para os links públicos (sem dados pessoais).
+async function carregarAparenciaPublica() {
+  try {
+    const { data, error } = await supabaseClient.rpc('atlas_config_publica');
+    if (error || !Array.isArray(data) || !data.length) return;
+    let cfg = {};
+    try { cfg = JSON.parse(localStorage.getItem('srv_config') || '{}'); } catch (e) { cfg = {}; }
+    data.forEach(item => {
+      if (!item || !item.chave) return;
+      let v = item.valor;
+      if (item.chave.indexOf('img_') !== 0) { try { v = JSON.parse(item.valor); } catch (e) { v = item.valor; } }
+      cfg[item.chave] = v;
+    });
+    _remoteData.config = Object.assign({}, _remoteData.config || {}, cfg);
+    try { localStorage.setItem('srv_config', JSON.stringify(cfg)); } catch (e) { /* cota */ }
+    if (typeof aplicarConfiguracoesSalvas === 'function') aplicarConfiguracoesSalvas();
+  } catch (e) { /* aparência é opcional */ }
+}
+
+// Monta os dados de tela do usuário a partir da conta autenticada.
+async function montarSessaoAtlas(authUser) {
+  const meta = (authUser && authUser.app_metadata) || {};
+  const role = meta.atlas_role;
+  const id = meta.atlas_id;
+  if (!role || !id) return null;
+  const base = { id: id, role: role, loginAt: new Date().toISOString() };
+  try {
+    if (role === 'admin' || role === 'gestor') {
+      const { data } = await supabaseClient.from('gestores').select('*').eq('id', id).maybeSingle();
+      if (!data) return null;
+      return Object.assign(base, {
+        usuario: data.usuario,
+        nome: data.nome || (role === 'admin' ? 'Administrador' : 'Gestor'),
+        cargo: data.cargo || '',
+        setores: data.setores || [],
+        modulos: data.modulos || []
+      });
+    }
+    const { data } = await supabaseClient.from('servidores').select('*').eq('id', id).maybeSingle();
+    if (!data) return null;
+    return Object.assign(base, { usuario: data.matricula, nome: data.nome });
+  } catch (e) {
+    console.warn('Falha ao carregar o cadastro do usuário:', e);
+    return null;
+  }
+}
+
 async function verificarSessao() {
   // Se for link de comprovante, renderiza direto sem login
   const oficioParams = new URLSearchParams(window.location.search);
   const oficioToken = oficioParams.get('oficio');
   if (oficioToken) {
+    await carregarAparenciaPublica();
     renderOficioPublico(oficioToken);
     return;
   }
 
   const notifToken = oficioParams.get('notificacao');
   if (notifToken) {
+    await carregarAparenciaPublica();
     renderNotificacaoPublico(notifToken);
     return;
   }
-  
-  // Link direto e público apenas para o Gerador de Ofícios (sem login)
-  if (oficioParams.get('modulo') === 'oficios') {
-    renderOficiosPublico();
+
+  const compToken = oficioParams.get('comp');
+  if (compToken) {
+    document.querySelector('.app-container').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
+    let comp = null;
+    try {
+      const { data } = await supabaseClient.rpc('atlas_comprovante_publico', { p_token: compToken });
+      comp = data;
+    } catch (e) { console.warn('Erro ao buscar comprovante:', e); }
+    if (comp && comp.folga && comp.servidor) {
+      await carregarAparenciaPublica();
+      _remoteData.folgas = [normalizarCamposObjeto(comp.folga)];
+      _remoteData.servidores = [comp.servidor];
+      renderComprovanteOnline(comp.folga.id);
+      return;
+    }
+    document.body.innerHTML = '<div style="text-align:center;padding:60px;font-family:sans-serif"><h2>Link inválido ou expirado</h2><p>Este comprovante não está mais disponível.</p><p style="font-size:14px;color:#888;margin-top:20px">Peça ao administrador para gerar um novo link.</p></div>';
     return;
   }
 
-  const compParams = new URLSearchParams(window.location.search);
-  const compToken = compParams.get('comp');
-  if (compToken) {
-    const cfg = JSON.parse(localStorage.getItem('srv_config') || '{}');
-    const folgaId = cfg.comprovantes ? cfg.comprovantes[compToken] : null;
-    if (folgaId) {
-      document.querySelector('.app-container').style.display = 'none';
-      document.getElementById('login-screen').style.display = 'none';
-      renderComprovanteOnline(folgaId);
+  // Confere a sessão real (Supabase Auth). Sem ela, não há acesso.
+  let sbSession = null;
+  try {
+    const { data } = await supabaseClient.auth.getSession();
+    sbSession = data && data.session ? data.session : null;
+  } catch (e) { sbSession = null; }
+
+  const semInternet = (typeof navigator !== 'undefined' && navigator.onLine === false);
+  if (sbSession) {
+    const meta = sbSession.user.app_metadata || {};
+    let sessaoTela = null;
+    try { sessaoTela = JSON.parse(sessionStorage.getItem('ferias_sessao') || 'null'); } catch (e) { sessaoTela = null; }
+    if (!meta.atlas_role) {
+      sessaoTela = null;
+    } else if (!sessaoTela || sessaoTela.id !== meta.atlas_id) {
+      sessaoTela = await montarSessaoAtlas(sbSession.user);
+    } else {
+      sessaoTela.role = meta.atlas_role; // o perfil vale o que está no token, não o que está no navegador
+    }
+    if (sessaoTela) sessionStorage.setItem('ferias_sessao', JSON.stringify(sessaoTela));
+    else {
+      sessionStorage.removeItem('ferias_sessao');
+      try { await supabaseClient.auth.signOut(); } catch (e) { /* ignora */ }
+    }
+  } else if (!semInternet) {
+    // Sem sessão válida: derruba a sessão de tela (offline, mantém o que já estava aberto).
+    sessionStorage.removeItem('ferias_sessao');
+  }
+
+  // Gerador de Ofícios em tela cheia (?modulo=oficios): agora exige login da gestão.
+  if (oficioParams.get('modulo') === 'oficios') {
+    let s = null;
+    try { s = JSON.parse(sessionStorage.getItem('ferias_sessao') || 'null'); } catch (e) { s = null; }
+    if (s && (s.role === 'admin' || s.role === 'gestor')) {
+      renderOficiosPublico();
       return;
     }
-    document.querySelector('.app-container').style.display = 'none';
-    document.getElementById('login-screen').style.display = 'none';
-    document.body.innerHTML = '<div style="text-align:center;padding:60px;font-family:sans-serif"><h2>Link inválido ou expirado</h2><p>Este comprovante não está mais disponível.</p><p style="font-size:14px;color:#888;margin-top:20px">Peça ao administrador para gerar um novo link.</p></div>';
-    return;
   }
 
   const sessaoStr = sessionStorage.getItem('ferias_sessao');
@@ -152,6 +256,11 @@ async function verificarSessao() {
     };
     tentarSyncComRetry();
 
+    // Senha provisória/antiga: obriga a troca antes de usar o sistema.
+    if (sbSession && sbSession.user && sbSession.user.app_metadata && sbSession.user.app_metadata.trocar_senha) {
+      abrirModalAlterarSenha(true);
+    }
+
   } else {
     // Exibe tela de login instantaneamente
     if (appContainer) appContainer.style.display = 'none';
@@ -163,8 +272,9 @@ async function verificarSessao() {
     document.getElementById('inputPass').value = '';
     document.getElementById('inputUser').focus();
 
-    // Inicia a sincronização das credenciais em background para o login ser instantâneo
-    syncComSupabase(true);
+    // Nada de dados pessoais antes do login: limpa o cache e carrega só a aparência.
+    limparCacheLocal();
+    carregarAparenciaPublica();
   }
 }
 
@@ -179,21 +289,7 @@ function isSenhaHash(s) {
   return typeof s === 'string' && /^[a-f0-9]{64}$/.test(s);
 }
 
-// Migra uma senha plain-text para hash no banco (gestores ou servidores) 
-async function migrarSenhaParaHash(tipo, id, senhaPlain) {
-  try {
-    const hashed = await hashSenha(senhaPlain);
-    await supabaseClient.from(tipo).update({ senha: hashed }).eq('id', id);
-    return hashed;
-  } catch(e) {
-    console.warn('⚠️ Falha ao migrar senha para hash:', e);
-    return null;
-  }
-}
-
-// ===================== LOGIN LOGIC =====================
-const CREDENCIAIS_PADRAO = [{ usuario: 'admin', senha: 'admin123', nome: 'Administrador' }];
-
+// ===================== LOGIN =====================
 function toggleSenhaLogin() {
   const input = document.getElementById('inputPass');
   const icon = document.getElementById('eyeIconLogin');
@@ -210,139 +306,179 @@ function limparErroLogin() {
   document.getElementById('errorMsgLogin').classList.remove('show');
 }
 
+function mostrarErroLogin(msg) {
+  const btn = document.getElementById('btnLogin');
+  if (btn) { btn.classList.remove('loading'); btn.innerText = 'Entrar no Sistema'; }
+  const txt = document.getElementById('errorTextLogin');
+  if (txt) txt.textContent = msg || 'Usuário ou senha incorretos.';
+  document.getElementById('errorMsgLogin').classList.add('show');
+}
+
+let _loginEmAndamento = false;
 async function tentarLogin() {
   const user = document.getElementById('inputUser').value.trim();
   const pass = document.getElementById('inputPass').value;
   const btn = document.getElementById('btnLogin');
-  
-  if (!user || !pass) return;
-  
+
+  if (!user || !pass || _loginEmAndamento) return;
+  _loginEmAndamento = true;
+
   btn.classList.add('loading');
   btn.innerText = 'Verificando...';
-  
-  // Se os dados estiverem vazios, tenta uma última sincronização rápida
-  if (!DB.servidores().length && !DB.gestores().length) {
-    await syncComSupabase();
-  }
 
-  setTimeout(async () => {
-    // 1. Verificar ADMIN — checa Supabase primeiro, depois fallback local
+  try {
+    // A senha nunca sai do navegador em texto puro: vai o SHA-256 dela,
+    // que o Supabase Auth ainda protege com bcrypt no servidor.
     const passHash = await hashSenha(pass);
-    const adminNoSupabase = _remoteData.gestores.find(g =>
-      (g.role === 'admin' || g.usuario === 'admin') &&
-      g.usuario.toLowerCase() === user.toLowerCase()
-    );
-    if (adminNoSupabase) {
-      const senhaOk = adminNoSupabase.senha === passHash || 
-                     (!isSenhaHash(adminNoSupabase.senha) && adminNoSupabase.senha === pass);
-      if (senhaOk) {
-        // Migrar para hash se ainda estiver em texto puro
-        if (!isSenhaHash(adminNoSupabase.senha)) {
-          migrarSenhaParaHash('gestores', adminNoSupabase.id, pass);
-          adminNoSupabase.senha = passHash;
-        }
-        sessionStorage.setItem('ferias_sessao', JSON.stringify({
-          id: adminNoSupabase.id,
-          usuario: adminNoSupabase.usuario,
-          nome: adminNoSupabase.nome || 'Administrador',
-          cargo: adminNoSupabase.cargo || '',
-          role: 'admin',
-          loginAt: new Date().toISOString()
-        }));
-        logadoComSucesso();
-        return;
-      }
-    } else {
-      // fallback: credenciais locais (para casos sem internet ou primeiro uso)
-      const salvas = JSON.parse(localStorage.getItem('ferias_credenciais') || '[]');
-      const creds = salvas.length ? salvas : CREDENCIAIS_PADRAO;
-      const matchLocal = creds.find(c =>
-        c.usuario.toLowerCase() === user.toLowerCase() &&
-        (c.senha === passHash || (!isSenhaHash(c.senha) && c.senha === pass))
-      );
-      if (matchLocal) {
-        // Migrar localmente para hash
-        if (!isSenhaHash(matchLocal.senha)) {
-          matchLocal.senha = passHash;
-          localStorage.setItem('ferias_credenciais', JSON.stringify(creds));
-        }
-        sessionStorage.setItem('ferias_sessao', JSON.stringify({
-          usuario: matchLocal.usuario,
-          nome: matchLocal.nome || 'Administrador',
-          role: 'admin',
-          loginAt: new Date().toISOString()
-        }));
-        logadoComSucesso();
-        return;
-      }
-    }
 
-    // 2. Verificar SERVIDOR
-    const servidores = DB.servidores();
-    const matchSrv = servidores.find(s => {
-      const dbMatricula = String(s.matricula || '').trim();
-      const loginUser = String(user || '').trim();
-      const dbSenha = String(s.senha || '').trim();
-      return dbMatricula === loginUser &&
-        (dbSenha === passHash || (!isSenhaHash(dbSenha) && dbSenha === pass));
-    });
-    
-    if (matchSrv) {
-      // Migrar senha do servidor para hash automaticamente
-      if (!isSenhaHash(matchSrv.senha)) {
-        migrarSenhaParaHash('servidores', matchSrv.id, pass);
-        matchSrv.senha = passHash;
-        const idx = _remoteData.servidores.findIndex(s => s.id === matchSrv.id);
-        if (idx >= 0) _remoteData.servidores[idx].senha = passHash;
-      }
-      sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
-        id: matchSrv.id,
-        usuario: matchSrv.matricula, 
-        nome: matchSrv.nome, 
-        role: 'servidor',
-        loginAt: new Date().toISOString() 
-      }));
-      logadoComSucesso();
-      return;
-    }
-    
-    // 3. Verificar GESTOR
-    const gestores = DB.gestores();
-    const matchGest = gestores.find(g => {
-      const dbUser = String(g.usuario || '').trim().toLowerCase();
-      const loginUser = String(user || '').trim().toLowerCase();
-      const dbPass = String(g.senha || '').trim();
-      return dbUser === loginUser &&
-        (dbPass === passHash || (!isSenhaHash(dbPass) && dbPass === pass));
-    });
-
-    if (matchGest) {
-      // Migrar senha do gestor para hash automaticamente
-      if (!isSenhaHash(matchGest.senha)) {
-        migrarSenhaParaHash('gestores', matchGest.id, pass);
-        matchGest.senha = passHash;
-        const idxG = _remoteData.gestores.findIndex(g => g.id === matchGest.id);
-        if (idxG >= 0) _remoteData.gestores[idxG].senha = passHash;
-      }
-      sessionStorage.setItem('ferias_sessao', JSON.stringify({ 
-        id: matchGest.id,
-        usuario: matchGest.usuario, 
-        nome: matchGest.nome, 
-        cargo: matchGest.cargo || '',
-        role: 'gestor',
-        setores: matchGest.setores || [],
-        modulos: matchGest.modulos || [],
-        loginAt: new Date().toISOString() 
-      }));
-      logadoComSucesso();
+    // 1. Descobre a conta interna a partir do usuário (gestor) ou matrícula (servidor)
+    const { data: contas, error: errContas } = await supabaseClient.rpc('atlas_resolver_login', { p_usuario: user });
+    if (errContas) {
+      console.error('Erro ao localizar conta:', errContas);
+      const naoPreparado = errContas.code === 'PGRST202' || /atlas_resolver_login/i.test(errContas.message || '');
+      mostrarErroLogin(naoPreparado
+        ? 'O banco ainda não foi preparado para o novo login (falta rodar a Parte A).'
+        : 'Não foi possível conectar. Verifique a internet e tente de novo.');
       return;
     }
 
-    // Caso falhe
+    // 2. Tenta entrar (a conferência da senha é feita no servidor)
+    let authUser = null;
+    let bloqueado = false;
+    for (const c of (contas || [])) {
+      if (!c || !c.email) continue;
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email: c.email, password: passHash });
+      if (!error && data && data.user) { authUser = data.user; break; }
+      if (error && (error.status === 429 || /rate limit/i.test(error.message || ''))) bloqueado = true;
+    }
+
+    if (!authUser) {
+      mostrarErroLogin(bloqueado ? 'Muitas tentativas. Aguarde alguns minutos e tente novamente.' : 'Usuário ou senha incorretos.');
+      return;
+    }
+
+    // 3. Monta os dados de tela
+    const sessao = await montarSessaoAtlas(authUser);
+    if (!sessao) {
+      try { await supabaseClient.auth.signOut(); } catch (e) { /* ignora */ }
+      mostrarErroLogin('Seu cadastro não foi encontrado. Procure a Coordenação.');
+      return;
+    }
+    sessionStorage.setItem('ferias_sessao', JSON.stringify(sessao));
     btn.classList.remove('loading');
     btn.innerText = 'Entrar no Sistema';
-    document.getElementById('errorMsgLogin').classList.add('show');
-  }, 800);
+    logadoComSucesso();
+  } catch (e) {
+    console.error('Falha no login:', e);
+    mostrarErroLogin('Não foi possível entrar. Verifique a internet e tente de novo.');
+  } finally {
+    _loginEmAndamento = false;
+  }
+}
+
+// ===================== SENHAS =====================
+function validarNovaSenha(senha) {
+  if (!senha || senha.length < 6) return 'A senha precisa ter pelo menos 6 caracteres.';
+  if (/^(\d)\1+$/.test(senha) || ['123456', '1234567', '12345678', '654321', 'senha123', 'admin123'].includes(senha.toLowerCase())) {
+    return 'Essa senha é muito fácil de adivinhar. Escolha outra.';
+  }
+  return '';
+}
+
+let _trocaSenhaObrigatoria = false;
+function abrirModalAlterarSenha(obrigatorio) {
+  _trocaSenhaObrigatoria = !!obrigatorio;
+  const m = document.getElementById('modal-alterar-senha');
+  if (!m) return;
+  document.getElementById('mn-nova-senha').value = '';
+  document.getElementById('mn-conf-senha').value = '';
+  const p = m.querySelector('p');
+  if (p) p.textContent = _trocaSenhaObrigatoria
+    ? 'Por segurança, crie uma senha nova e pessoal antes de continuar. Não use a senha antiga.'
+    : 'Defina uma nova senha para seu acesso.';
+  const cancelar = m.querySelector('.modal-footer .btn-ghost');
+  if (cancelar) cancelar.style.display = _trocaSenhaObrigatoria ? 'none' : '';
+  m.classList.add('open');
+}
+
+async function alterarMinhaSenha() {
+  const nova = document.getElementById('mn-nova-senha').value;
+  const conf = document.getElementById('mn-conf-senha').value;
+  const erro = validarNovaSenha(nova);
+  if (erro) return toastMsg(erro, 'error');
+  if (nova !== conf) return toastMsg('As senhas não conferem.', 'error');
+  try {
+    const { error } = await supabaseClient.rpc('atlas_trocar_minha_senha', { p_senha_hash: await hashSenha(nova) });
+    if (error) throw error;
+    try { await supabaseClient.auth.refreshSession(); } catch (e) { /* o token novo vem no próximo login */ }
+    _trocaSenhaObrigatoria = false;
+    document.getElementById('modal-alterar-senha').classList.remove('open');
+    toastMsg('✅ Senha alterada com sucesso.');
+    if (typeof DB !== 'undefined' && DB.saveLog) DB.saveLog('Segurança', 'Alterou a própria senha');
+  } catch (e) {
+    console.error('Erro ao alterar senha:', e);
+    toastMsg('Não foi possível alterar a senha: ' + (e.message || e), 'error');
+  }
+}
+
+// Enquanto a troca for obrigatória, o modal não pode ser fechado clicando fora.
+document.addEventListener('click', function (ev) {
+  if (!_trocaSenhaObrigatoria) return;
+  const m = document.getElementById('modal-alterar-senha');
+  if (m && ev.target === m) { ev.stopImmediatePropagation(); m.classList.add('open'); }
+}, true);
+
+// Gestão define (ou redefine) a senha de acesso de um servidor ou gestor.
+// A pessoa será obrigada a trocar por uma senha pessoal no primeiro acesso.
+async function definirSenhaDeAcesso(tipo, id, senha, forcarTroca) {
+  const erro = (!senha || senha.length < 6) ? 'A senha provisória precisa ter pelo menos 6 caracteres.' : '';
+  if (erro) { toastMsg(erro, 'error'); return false; }
+  const { error } = await supabaseClient.rpc('atlas_definir_senha', {
+    p_tipo: tipo, p_id: id, p_senha_hash: await hashSenha(senha), p_forcar_troca: forcarTroca !== false
+  });
+  if (error) {
+    console.error('Erro ao definir senha:', error);
+    toastMsg('Não foi possível definir a senha: ' + (error.message || ''), 'error');
+    return false;
+  }
+  return true;
+}
+
+function abrirModalDefinirSenha(id) {
+  const srv = DB.servidores().find(s => s.id === id);
+  if (!srv) return;
+  let m = document.getElementById('modal-definir-senha');
+  if (!m) {
+    m = document.createElement('div');
+    m.className = 'modal-bg';
+    m.id = 'modal-definir-senha';
+    m.innerHTML =
+      '<div class="modal" style="max-width:360px">' +
+        '<h3>🔑 Senha de acesso</h3>' +
+        '<p id="mds-texto" style="font-size:.78rem;color:var(--muted);margin-bottom:16px"></p>' +
+        '<div class="field" style="margin-bottom:20px"><label>Senha provisória</label>' +
+        '<input type="text" id="mds-senha" autocomplete="off" placeholder="Mínimo 6 caracteres"></div>' +
+        '<div class="modal-footer">' +
+          '<button class="btn btn-ghost" onclick="fecharModal(\'modal-definir-senha\')">Cancelar</button>' +
+          '<button class="btn btn-primary" id="mds-ok">Definir senha</button>' +
+        '</div>' +
+      '</div>';
+    m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); });
+    document.body.appendChild(m);
+  }
+  document.getElementById('mds-texto').textContent =
+    srv.nome + ' (Mat. ' + srv.matricula + ') vai entrar com a matrícula e esta senha provisória, e o sistema pedirá uma senha pessoal no primeiro acesso.';
+  const input = document.getElementById('mds-senha');
+  input.value = '';
+  document.getElementById('mds-ok').onclick = async function () {
+    const ok = await definirSenhaDeAcesso('servidores', id, input.value.trim(), true);
+    if (!ok) return;
+    fecharModal('modal-definir-senha');
+    toastMsg('✅ Senha provisória definida para ' + srv.nome + '.');
+    DB.saveLog('Segurança', 'Definiu senha provisória de acesso para ' + srv.nome, 'servidores', id);
+  };
+  m.classList.add('open');
+  setTimeout(() => input.focus(), 100);
 }
 
 // Função de utilitário para migrar dados locais para o Supabase
@@ -380,11 +516,11 @@ async function migrarDadosParaSupabase() {
       }
     }
     
-    if (servidores.length) await salvarComHandleError('servidores', servidores);
+    if (servidores.length) await salvarComHandleError('servidores', servidores.map(x => { const c = { ...x }; delete c.senha; return c; }));
     if (programacoes.length) await salvarComHandleError('programacoes', programacoes);
     if (folgas.length) await salvarComHandleError('folgas', folgas);
     if (solicitacoes.length) await salvarComHandleError('solicitacoes', solicitacoes);
-    if (gestores.length) await salvarComHandleError('gestores', gestores);
+    if (gestores.length) await salvarComHandleError('gestores', gestores.map(g => { const c = { ...g }; delete c.senha; return c; }));
     await salvarComHandleError('configuracoes', config);
     
     toastMsg("✅ Migração concluída com sucesso! Recarregando...");
