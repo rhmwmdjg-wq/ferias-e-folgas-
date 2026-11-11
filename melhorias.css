@@ -235,3 +235,110 @@ td.mx-num, th.mx-num { text-align: right; font-family: var(--mono); white-space:
 @media print {
   .mx-palette-bg, .mx-search-trigger { display: none !important; }
 }
+
+
+/* =====================================================================
+   USABILIDADE (usabilidade.js)
+   ===================================================================== */
+
+/* ---- Rodapé compacto: menu do usuário ---- */
+.sidebar-footer.ux-footer { position: relative; padding: 8px 10px; gap: 0; }
+.ux-user-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 9px 10px; border-radius: 10px; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--text);
+  font: inherit; font-size: .78rem; font-weight: 700; text-align: left;
+  transition: background .15s, border-color .15s;
+}
+.ux-user-btn:hover, .ux-user-btn[aria-expanded="true"] { background: var(--primary-dim); border-color: var(--border); }
+.ux-user-btn > .fa-circle-user { color: var(--primary); font-size: 1.05rem; flex-shrink: 0; }
+.ux-user-btn #display-user-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ux-user-btn .ux-chev { font-size: .62rem; color: var(--muted); transition: transform .2s; }
+.ux-user-btn[aria-expanded="true"] .ux-chev { transform: rotate(180deg); }
+.ux-user-menu {
+  display: none; flex-direction: column; gap: 2px;
+  position: absolute; left: 8px; right: 8px; bottom: calc(100% - 4px);
+  padding: 8px; border-radius: 12px; z-index: 60;
+  background: var(--bg); border: 1px solid var(--border);
+  box-shadow: 0 -8px 30px rgba(0,0,0,.28);
+}
+.ux-user-menu.open { display: flex; }
+.ux-menu-item, .ux-menu-item.sidebar-theme-toggle {
+  display: flex; align-items: center; gap: 10px; width: 100%; margin: 0;
+  padding: 9px 10px; border-radius: 8px; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--text);
+  font: inherit; font-size: .76rem; font-weight: 600; text-align: left;
+}
+.ux-menu-item:hover { background: var(--primary-dim); }
+.ux-menu-item > i { width: 16px; text-align: center; color: var(--text-mid); }
+.ux-menu-item .theme-label { font-size: .76rem; color: var(--text); }
+.ux-menu-item.ux-danger, .ux-menu-item.ux-danger > i { color: var(--danger); }
+
+/* ---- Favoritos ---- */
+.ux-favs { padding-bottom: 6px; margin-bottom: 4px; border-bottom: 1px solid var(--border); }
+.ux-favs-label {
+  font-size: .6rem; font-weight: 800; text-transform: uppercase; letter-spacing: .12em;
+  color: var(--warning); margin: 10px 12px 4px; display: flex; align-items: center; gap: 6px;
+}
+.ux-star {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; margin-left: 4px; border-radius: 6px; flex-shrink: 0;
+  font-size: .62rem; color: var(--muted); opacity: 0; cursor: pointer;
+  transition: opacity .15s, color .15s, background .15s;
+}
+.tab-btn:hover .ux-star, .ux-star:focus-visible { opacity: .75; }
+.ux-star:hover { opacity: 1 !important; background: var(--primary-dim); }
+.ux-star.on { opacity: 1; color: var(--warning); }
+.ux-star i { margin: 0 !important; width: auto !important; font-size: inherit !important; color: inherit !important; }
+@media (hover: none) { .ux-star { opacity: .45; } }
+
+/* ---- Campo de servidor com busca ---- */
+.ux-combo { position: relative; display: block; }
+.ux-combo .ux-combo-input { width: 100%; padding-right: 30px; }
+.ux-combo-native { position: absolute !important; left: 0; bottom: 0; width: 1px !important; height: 1px !important; opacity: 0; pointer-events: none; padding: 0 !important; border: 0 !important; }
+.ux-combo-clear {
+  position: absolute; right: 6px; top: 50%; transform: translateY(-50%);
+  display: none; width: 22px; height: 22px; border-radius: 50%;
+  border: none; background: transparent; color: var(--muted); cursor: pointer; font-size: .7rem;
+}
+.ux-combo.tem-valor .ux-combo-clear { display: block; }
+.ux-combo-clear:hover { background: var(--primary-dim); color: var(--text); }
+.ux-combo-list {
+  display: none; position: fixed; z-index: 10060; max-height: 280px; overflow-y: auto;
+  background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  box-shadow: 0 12px 34px rgba(0,0,0,.3); padding: 4px;
+}
+.ux-combo-list.open { display: block; }
+.ux-combo-item { padding: 7px 10px; border-radius: 7px; cursor: pointer; }
+.ux-combo-item.sel, .ux-combo-item:hover { background: var(--primary-dim); }
+.ux-ci-nome { font-size: .82rem; font-weight: 600; color: var(--text); }
+.ux-ci-sub { font-size: .7rem; color: var(--muted); margin-top: 1px; }
+.ux-combo-vazio, .ux-combo-mais { padding: 10px; font-size: .76rem; color: var(--muted); text-align: center; }
+
+/* ---- Banco de Horas: colunas que não espremem os campos ---- */
+.grid-3.ux-grid-largo { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+/* ---- Pendências: seleção e ação em lote ---- */
+.mx-pi-chk { display: flex; align-items: center; padding: 4px 2px 4px 0; cursor: pointer; }
+.mx-pi-chk input { width: 17px; height: 17px; cursor: pointer; accent-color: var(--primary); }
+.mx-pend-all { margin-right: 8px; font-size: .68rem !important; padding: 3px 8px !important; }
+.mx-pend-lote {
+  display: none; align-items: center; gap: 8px; flex-wrap: wrap;
+  position: sticky; top: 8px; z-index: 20; margin-bottom: 12px; padding: 10px 14px;
+  border-radius: 12px; background: var(--bg); border: 1px solid var(--primary);
+  box-shadow: 0 8px 24px rgba(0,0,0,.18); font-size: .8rem;
+}
+.mx-pend-lote strong { margin-right: 6px; }
+.mx-fila {
+  display: none; align-items: center; gap: 10px;
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 10070;
+  max-width: calc(100vw - 24px); padding: 10px 14px; border-radius: 14px;
+  background: var(--bg); border: 1px solid var(--primary); box-shadow: 0 12px 36px rgba(0,0,0,.35);
+}
+.mx-fila-txt { display: flex; flex-direction: column; min-width: 0; font-size: .78rem; }
+.mx-fila-txt span { color: var(--muted); font-size: .72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 46vw; }
+
+/* ---- Foco visível para quem navega pelo teclado ---- */
+button:focus-visible, a:focus-visible, [role="button"]:focus-visible, .tab-btn:focus-visible {
+  outline: 2px solid var(--primary); outline-offset: 2px;
+}
