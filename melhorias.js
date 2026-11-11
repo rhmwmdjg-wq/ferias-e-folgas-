@@ -250,21 +250,10 @@
   }
   function prepararMenu() {
     const tabs = document.getElementById('sidebar-tabs');
-    if (!tabs || document.getElementById('mx-menu-filtro')) return;
-    const wrap = document.createElement('div');
-    wrap.className = 'mx-menu-filter';
-    wrap.innerHTML = '<i class="fa-solid fa-magnifying-glass"></i><input id="mx-menu-filtro" type="text" placeholder="Filtrar menu..." autocomplete="off" aria-label="Filtrar menu"><button class="mx-clear" type="button" title="Limpar filtro">✕</button>';
-    tabs.parentNode.insertBefore(wrap, tabs);
-    const inp = wrap.querySelector('input');
-    inp.addEventListener('input', () => { wrap.classList.toggle('has-text', !!inp.value); aplicarMenu(); });
-    inp.addEventListener('keydown', ev => {
-      if (ev.key === 'Escape') { inp.value = ''; wrap.classList.remove('has-text'); aplicarMenu(); inp.blur(); }
-      if (ev.key === 'Enter') {
-        const primeiro = _grupos.flatMap(g => g.btns).find(b => b.style.display !== 'none' && !b.classList.contains('mx-hide-filter'));
-        if (primeiro) { primeiro.click(); inp.value = ''; wrap.classList.remove('has-text'); aplicarMenu(); }
-      }
-    });
-    wrap.querySelector('.mx-clear').addEventListener('click', () => { inp.value = ''; wrap.classList.remove('has-text'); aplicarMenu(); inp.focus(); });
+    if (!tabs || tabs.dataset.mxPronto) return;
+    tabs.dataset.mxPronto = '1';
+    // O antigo campo "Filtrar menu" foi unificado na busca rápida (Ctrl+K), que
+    // encontra telas, servidores e ações em um só lugar.
 
     tabs.querySelectorAll('.sidebar-section-label').forEach(lbl => {
       const texto = lbl.textContent.trim();
@@ -376,7 +365,7 @@
     bg.className = 'mx-palette-bg'; bg.id = 'mx-palette-bg';
     bg.innerHTML = `<div class="mx-palette" role="dialog" aria-label="Busca rápida">
       <div class="mx-palette-input"><i class="fa-solid fa-magnifying-glass"></i>
-        <input id="mx-pal-input" type="text" placeholder="Buscar servidor, módulo ou ação..." autocomplete="off">
+        <input id="mx-pal-input" type="text" placeholder="Buscar servidor, tela ou ação — ex.: férias maria" autocomplete="off">
         <kbd onclick="MX.fecharBusca()">Esc</kbd></div>
       <div class="mx-palette-list" id="mx-pal-list"></div>
       <div class="mx-pal-foot"><span><kbd>↑</kbd> <kbd>↓</kbd> navegar</span><span><kbd>Enter</kbd> abrir</span><span><kbd>Ctrl</kbd>+<kbd>K</kbd> abre de qualquer tela</span></div>
@@ -411,6 +400,14 @@
     if (i < 0) return e(t);
     return e(t.slice(0, i)) + '<mark>' + e(t.slice(i, i + q.length)) + '</mark>' + e(t.slice(i + q.length));
   }
+  // Ações que podem ser pedidas junto com o nome de um servidor (texto já sem acentos).
+  const INTENCOES = [
+    { re: /\b(programar|marcar|agendar)?\s*ferias\b/, acao: 'ferias', rot: 'Programar férias de ', ico: 'fa-umbrella-beach', tab: 'ferias' },
+    { re: /\b(lancar|registrar|dar)?\s*folgas?\b/, acao: 'folgas', rot: 'Lançar folga de ', ico: 'fa-calendar-check', tab: 'folgas' },
+    { re: /\b(banco\s*(de)?\s*horas?|horas|bh)\b/, acao: 'bh', rot: 'Banco de horas de ', ico: 'fa-clock', tab: 'bancohoras' },
+    { re: /\b(emitir|gerar)?\s*autorizac[a-z]*\b/, acao: 'aut', rot: 'Emitir autorização de ', ico: 'fa-file-pdf', tab: 'emitir-aut' },
+    { re: /\b(editar|alterar)\s*(cadastro)?\b|\bcadastro\b/, acao: 'editar', rot: 'Editar cadastro de ', ico: 'fa-pen', tab: 'servidores' }
+  ];
   function acoesRapidas() {
     const a = [];
     if (tabVisivel('servidores') && isGestao()) a.push({ titulo: 'Cadastrar novo servidor', sub: 'Abre o formulário de cadastro', ico: 'fa-user-plus', run: () => { showTab('servidores'); setTimeout(() => window.novoServidor && novoServidor(), 50); } });
@@ -427,34 +424,58 @@
     const lista = document.getElementById('mx-pal-list');
     const grupos = [];
 
+    // Intenção digitada: "programar férias de maria", "folga joão", "banco de horas ana"...
+    const intencao = q ? INTENCOES.find(i => i.re.test(q) && tabVisivel(i.tab)) : null;
+    const qs = intencao
+      ? q.replace(intencao.re, ' ').replace(/\b(de|do|da|dos|das|para|pra|pro|o|a)\b/g, ' ').replace(/\s+/g, ' ').trim()
+      : q;
+
     // Servidores (somente perfis de gestão)
     if (isGestao()) {
       const srvs = servidoresAcessiveis();
       let achados;
-      if (q) {
-        const qd = q.replace(/\D/g, '');
+      if (qs) {
+        const qd = qs.replace(/\D/g, '');
         achados = srvs.map(s => {
           const n = norm(s.nome);
           let pts = 0;
-          if (n.startsWith(q)) pts = 100; else if (n.split(' ').some(p => p.startsWith(q))) pts = 80; else if (n.includes(q)) pts = 60;
-          else if (String(s.matricula || '') === q) pts = 95; else if (String(s.matricula || '').startsWith(q)) pts = 70;
+          if (n.startsWith(qs)) pts = 100; else if (n.split(' ').some(p => p.startsWith(qs))) pts = 80; else if (n.includes(qs)) pts = 60;
+          else if (String(s.matricula || '') === qs) pts = 95; else if (String(s.matricula || '').startsWith(qs)) pts = 70;
           else if (qd.length >= 4 && String(s.cpf || '').replace(/\D/g, '').includes(qd)) pts = 65;
-          else if (norm(s.setor).includes(q) || norm(s.cargo).includes(q)) pts = 30;
+          else if (!intencao && (norm(s.setor).includes(qs) || norm(s.cargo).includes(qs))) pts = 30;
           return { s, pts };
         }).filter(x => x.pts > 0).sort((a, b) => b.pts - a.pts || a.s.nome.localeCompare(b.s.nome)).slice(0, 8).map(x => x.s);
+      } else if (q) {
+        achados = [];
       } else {
         const rec = LS.get('mx_recentes', []);
         achados = rec.map(id => srvs.find(s => s.id === id)).filter(Boolean);
       }
-      if (achados.length) grupos.push({ nome: q ? 'Servidores' : 'Fichas abertas recentemente', itens: achados.map(s => ({
-        tituloHtml: realce(s.nome, q), sub: 'Mat. ' + (s.matricula || '-') + ' · ' + (s.setor || '-') + ' · ' + (s.cargo || '-'),
+
+      const acaoSrv = (i, s) => ({
+        tituloHtml: e(i.rot) + realce(s.nome, qs), sub: 'Mat. ' + (s.matricula || '-') + ' · ' + (s.setor || '-'),
+        icoHtml: '<i class="fa-solid ' + i.ico + '"></i>', hint: 'Enter',
+        run: () => { _fichaId = s.id; MX.fichaAcao(i.acao); }
+      });
+      if (intencao && achados.length) {
+        // Pediu uma ação: ela vem primeiro, para os servidores encontrados.
+        grupos.push({ nome: 'Ações', itens: achados.slice(0, 5).map(s => acaoSrv(intencao, s)) });
+      }
+      if (achados.length) grupos.push({ nome: qs ? 'Servidores' : 'Fichas abertas recentemente', itens: achados.map(s => ({
+        tituloHtml: realce(s.nome, qs), sub: 'Mat. ' + (s.matricula || '-') + ' · ' + (s.setor || '-') + ' · ' + (s.cargo || '-'),
         icoHtml: (typeof getAvatarHtml === 'function' ? getAvatarHtml(s.foto, s.nome, 30) : ''), hint: 'Ficha 360°',
         run: () => abrirFicha360(s.id)
       })) });
+      if (!intencao && qs && achados.length) {
+        // Só digitou o nome: oferece os atalhos mais comuns para o primeiro resultado.
+        const s0 = achados[0];
+        const atalhos = INTENCOES.filter(i => tabVisivel(i.tab)).slice(0, 4).map(i => acaoSrv(i, s0));
+        if (atalhos.length) grupos.push({ nome: 'Atalhos para ' + String(s0.nome || '').split(' ')[0], itens: atalhos });
+      }
     }
 
     // Módulos visíveis no menu
-    const mods = Array.from(document.querySelectorAll('#sidebar-tabs .tab-btn')).filter(b => b.style.display !== 'none' && b.id !== 'tab-sair');
+    const mods = Array.from(document.querySelectorAll('#sidebar-tabs .tab-btn')).filter(b => b.style.display !== 'none' && b.id !== 'tab-sair' && !b.classList.contains('ux-fav-btn'));
     const modsAch = mods.filter(b => !q || norm(b.textContent).includes(q)).slice(0, q ? 8 : 40);
     if (modsAch.length) grupos.push({ nome: 'Módulos', itens: modsAch.map(b => {
       const lbl = (b.querySelector('.tab-label') || b).textContent.trim();
@@ -1016,22 +1037,112 @@
       '<div class="mx-kpi info"><div class="mx-kpi-val">' + n('info') + '</div><div class="mx-kpi-lbl">ℹ️ Informativos</div></div>' +
       '<div class="mx-kpi ok"><div class="mx-kpi-val">' + secs.filter(s => !s.itens.length).length + '/' + secs.length + '</div><div class="mx-kpi-lbl">✅ Categorias em dia</div></div>';
     const estado = LS.get('mx_pend_secoes', {});
+    _pendMapa = {}; _pendSecoes = secs;
     const ordenadas = secs.slice().sort((a, b) => (b.itens.length ? 1 : 0) - (a.itens.length ? 1 : 0) || b.max - a.max);
     lista.innerHTML = ordenadas.map(sec => {
       const fechado = !sec.itens.length || (estado[sec.id] != null ? estado[sec.id] : !!sec.padraoFechado);
       const corN = sec.itens.length ? (sec.max >= 3 ? 'var(--danger)' : sec.max === 2 ? 'var(--warning)' : 'var(--primary)') : 'var(--success)';
       const lim = _pendMostrarTudo[sec.id] ? sec.itens.length : 8;
-      const itens = sec.itens.slice(0, lim).map(it => '<div class="mx-pend-item mx-sev-' + it.sev + '"><div class="mx-pi-main"><div class="mx-pi-title">' + e(it.titulo) + '</div><div class="mx-pi-sub">' + e(it.sub) + '</div></div>' +
+      let temLote = false;
+      sec.itens.forEach(it => { if (acoesLote(it).length) { temLote = true; it._k = chaveItem(sec, it); _pendMapa[it._k] = it; } });
+      const itens = sec.itens.slice(0, lim).map(it => '<div class="mx-pend-item mx-sev-' + it.sev + '">' +
+        (it._k ? '<label class="mx-pi-chk" title="Selecionar para ação em lote"><input type="checkbox" aria-label="Selecionar: ' + e(it.titulo) + '"' + (_pendSel.has(it._k) ? ' checked' : '') + ' onchange="MX.pendSel(\'' + it._k + '\', this.checked)"></label>' : '') +
+        '<div class="mx-pi-main"><div class="mx-pi-title">' + e(it.titulo) + '</div><div class="mx-pi-sub">' + e(it.sub) + '</div></div>' +
         '<div class="mx-pi-actions">' + it.acoes.map(a => '<button class="btn ' + a.cls + ' btn-sm" onclick="' + a.on.replace(/"/g, '&quot;') + '">' + a.label + '</button>').join('') + '</div></div>').join('');
       const mais = sec.itens.length > lim ? '<div class="mx-pend-more"><button class="btn btn-ghost btn-sm" onclick="MX.pendTudo(\'' + sec.id + '\')">Ver todos os ' + sec.itens.length + '</button></div>' : '';
       return '<div class="mx-pend-section' + (fechado ? ' collapsed' : '') + '" id="mx-pend-' + sec.id + '">' +
         '<div class="mx-pend-head" onclick="MX.pendToggle(\'' + sec.id + '\')"><div class="mx-pend-ico" style="background:' + sec.cor + '22">' + sec.ico + '</div><h4>' + sec.titulo + '</h4>' +
+        (temLote ? '<button type="button" class="btn btn-ghost btn-sm mx-pend-all" onclick="event.stopPropagation();MX.pendSelSecao(\'' + sec.id + '\')">☑ Selecionar todos</button>' : '') +
         '<span class="mx-pend-n" style="background:' + corN + '22;color:' + corN + '">' + (sec.itens.length || '✓') + '</span><i class="fa-solid fa-chevron-down mx-chev"></i></div>' +
         '<div class="mx-pend-body">' + (sec.itens.length ? itens + mais : '<div style="padding:8px 18px;font-size:.8rem;color:var(--muted)">Nada pendente aqui. 👍</div>') + '</div></div>';
     }).join('') || '<div class="empty"><div class="icon">✅</div><p>Nenhuma pendência para o seu perfil.</p></div>';
+    Array.from(_pendSel).forEach(k => { if (!_pendMapa[k]) _pendSel.delete(k); });
+    renderLote();
     atualizarBadgePendencias(secs);
   }
   MX.renderPendencias = renderPendencias;
+
+  // ----- Ação em lote: selecionar várias pendências e resolver de uma vez -----
+  let _pendMapa = {}, _pendSecoes = [];
+  const _pendSel = new Set();
+  const LOTE_DIRETO = ['Dar baixa'];                       // executa tudo de uma vez
+  const LOTE_SEQUENCIA = ['Emitir', 'Avisar', 'Parabenizar']; // abre um por vez, com "Próximo"
+  const rotuloLimpo = l => String(l || '').replace(/^[^A-Za-zÀ-ÿ]+/, '').trim();
+  function acoesLote(it) {
+    return (it.acoes || []).filter(a => LOTE_DIRETO.concat(LOTE_SEQUENCIA).includes(rotuloLimpo(a.label)));
+  }
+  function chaveItem(sec, it) {
+    const txt = sec.id + '|' + acoesLote(it).map(a => a.on).join('|');
+    let h = 0; for (let i = 0; i < txt.length; i++) { h = ((h << 5) - h + txt.charCodeAt(i)) | 0; }
+    return sec.id + '_' + (h >>> 0).toString(36);
+  }
+  function renderLote() {
+    const lista = document.getElementById('mx-pend-lista'); if (!lista) return;
+    let bar = document.getElementById('mx-pend-lote');
+    if (!bar) {
+      bar = document.createElement('div'); bar.id = 'mx-pend-lote'; bar.className = 'mx-pend-lote';
+      bar.setAttribute('role', 'region'); bar.setAttribute('aria-label', 'Ações em lote');
+      lista.parentNode.insertBefore(bar, lista);
+    }
+    const sel = Array.from(_pendSel).map(k => _pendMapa[k]).filter(Boolean);
+    if (!sel.length) { bar.style.display = 'none'; bar.innerHTML = ''; return; }
+    const cont = {};
+    sel.forEach(it => acoesLote(it).forEach(a => { const r = rotuloLimpo(a.label); cont[r] = cont[r] || { n: 0, label: a.label }; cont[r].n++; }));
+    bar.style.display = 'flex';
+    bar.innerHTML = '<strong>' + sel.length + ' selecionada' + (sel.length > 1 ? 's' : '') + '</strong>' +
+      Object.keys(cont).map(r => '<button type="button" class="btn btn-primary btn-sm" onclick="MX.pendLote(\'' + r + '\')">' + e(cont[r].label) + ' (' + cont[r].n + ')</button>').join('') +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="MX.pendLimpar()">Limpar seleção</button>';
+  }
+  MX.pendSel = function (k, on) { if (on) _pendSel.add(k); else _pendSel.delete(k); renderLote(); };
+  MX.pendLimpar = function () { _pendSel.clear(); renderPendencias(); };
+  MX.pendSelSecao = function (secId) {
+    const sec = _pendSecoes.find(x => x.id === secId); if (!sec) return;
+    const chaves = sec.itens.map(it => it._k).filter(Boolean);
+    const todos = chaves.length && chaves.every(k => _pendSel.has(k));
+    chaves.forEach(k => { if (todos) _pendSel.delete(k); else _pendSel.add(k); });
+    _pendMostrarTudo[secId] = true;
+    renderPendencias();
+  };
+  const rodar = a => safe(() => (new Function(a.on.replace(/&quot;/g, '"')))());
+  let _fila = [], _filaPos = -1, _filaRot = '';
+  MX.pendLote = function (rotulo) {
+    const alvo = Array.from(_pendSel).map(k => ({ k, it: _pendMapa[k] })).filter(x => x.it)
+      .map(x => ({ k: x.k, it: x.it, a: acoesLote(x.it).find(a => rotuloLimpo(a.label) === rotulo) })).filter(x => x.a);
+    if (!alvo.length) return;
+    if (LOTE_DIRETO.includes(rotulo)) {
+      if (!confirm(rotulo + ' em ' + alvo.length + ' item(ns) selecionado(s)?')) return;
+      alvo.forEach(x => { rodar(x.a); _pendSel.delete(x.k); });
+      toast('✅ ' + rotulo + ': ' + alvo.length + ' item(ns) concluído(s).', 'success');
+      setTimeout(renderPendencias, 150);
+      return;
+    }
+    _fila = alvo; _filaPos = -1; _filaRot = rotulo;
+    MX.filaProximo();
+  };
+  function renderFila() {
+    let box = document.getElementById('mx-fila');
+    if (!box) { box = document.createElement('div'); box.id = 'mx-fila'; box.className = 'mx-fila'; box.setAttribute('role', 'status'); document.body.appendChild(box); }
+    if (_filaPos < 0 || _filaPos >= _fila.length) { box.style.display = 'none'; return; }
+    const atual = _fila[_filaPos], ultimo = _filaPos === _fila.length - 1;
+    box.style.display = 'flex';
+    box.innerHTML = '<div class="mx-fila-txt"><strong>' + e(_filaRot) + ' em sequência — ' + (_filaPos + 1) + ' de ' + _fila.length + '</strong><span>' + e(atual.it.titulo) + '</span></div>' +
+      '<button type="button" class="btn btn-primary btn-sm" onclick="MX.filaProximo()">' + (ultimo ? '✓ Concluir' : 'Próximo ▶') + '</button>' +
+      '<button type="button" class="btn btn-ghost btn-sm" onclick="MX.filaParar()" aria-label="Encerrar sequência">✕</button>';
+  }
+  MX.filaProximo = function () {
+    if (_filaPos >= 0 && _fila[_filaPos]) _pendSel.delete(_fila[_filaPos].k); // o anterior foi tratado
+    _filaPos++;
+    if (_filaPos >= _fila.length) { MX.filaParar(true); return; }
+    document.querySelectorAll('.modal-bg.open').forEach(m => m.classList.remove('open'));
+    renderFila();
+    rodar(_fila[_filaPos].a);
+  };
+  MX.filaParar = function (fim) {
+    const n = _fila.length;
+    _fila = []; _filaPos = -1; renderFila();
+    if (fim) toast('✅ Sequência concluída: ' + n + ' item(ns).', 'success');
+    safe(renderPendencias);
+  };
   MX.pendToggle = function (id) {
     const el = document.getElementById('mx-pend-' + id); if (!el) return;
     el.classList.toggle('collapsed');
