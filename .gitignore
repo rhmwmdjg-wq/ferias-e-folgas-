@@ -1,0 +1,6 @@
+# Dados pessoais nunca devem ir para o repositório
+servidores_import.json
+temp_xlsx.json
+*.xlsx
+*.csv
+backup*.json
