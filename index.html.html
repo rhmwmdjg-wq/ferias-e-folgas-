@@ -8594,6 +8594,7 @@ async function dsAssinarComPosicao() {
   if (!_dsCert || !_dsKey) return toastMsg('Carregue o certificado primeiro.', 'warning');
   if (!_dsPdfBytes) return toastMsg('Selecione o PDF.', 'warning');
   if (!_dsPlace) return toastMsg('Clique na página para posicionar a assinatura.', 'warning');
+  if (dsPdfJaAssinado(_dsPdfBytes)) return toastMsg('Este PDF já possui assinatura digital. Use o botão "Assinar PAdES (Adobe)" para acrescentar outra sem invalidar a anterior.', 'warning');
 
   try {
     const buf = _dsPdfBytes.buffer.slice(_dsPdfBytes.byteOffset, _dsPdfBytes.byteOffset + _dsPdfBytes.length);
@@ -8650,36 +8651,35 @@ async function dsAssinarPades() {
 
   try {
     // Bibliotecas PAdES empacotadas no próprio sistema (sem depender de CDN externo)
-    const { pdfLib, SignPdf, Signer, pdflibAddPlaceholder, Buffer: PBuffer } = await dsCarregarBibliotecaPades();
-
-    const doc = await pdfLib.PDFDocument.load(_dsPdfBytes);
-    const page = doc.getPage(_dsPlace.page);
-    const x = _dsPlace.xPt, y = _dsPlace.yPt, w = _dsPlace.wPt, h = _dsPlace.hPt;
-    const { rgb, StandardFonts } = pdfLib;
+    const { pdfLib, SignPdf, Signer, Buffer: PBuffer } = await dsCarregarBibliotecaPades();
     const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+    const jaAssinado = dsPdfJaAssinado(_dsPdfBytes);
 
-    // Aparência visível: selo ICP-Brasil (ou imagem do usuário), ajustado à caixa sem distorcer
-    const aparenciaBytes = await dsObterAparenciaBytes();
-    const png = await doc.embedPng(aparenciaBytes);
-    const fit = Math.min(w / png.width, h / png.height);
-    const dw = png.width * fit, dh = png.height * fit;
-    page.drawImage(png, { x: x + (w - dw) / 2, y: y + (h - dh) / 2, width: dw, height: dh });
-
-    // Cria o campo de assinatura (placeholder) com ByteRange/Contents
-    pdflibAddPlaceholder({
-      pdfDoc: doc,
-      reason: 'Assinatura digital',
-      contactInfo: '',
-      name: cn,
-      location: 'Itacarambi - MG',
-      signingTime: new Date(),
-      signatureLength: 16384,
-      widgetRect: [x, y, x + w, y + h],
-      subFilter: 'ETSI.CAdES.detached'
-    });
-
-    // Objeto streams desativado (obrigatório para localizar o placeholder)
-    const withPlaceholder = await doc.save({ useObjectStreams: false });
+    // Gravação incremental: o arquivo original é mantido byte a byte e a assinatura é
+    // acrescentada ao final. Assim, assinaturas que o PDF já tenha continuam válidas.
+    async function prepararPdf(incremental) {
+      const doc = await pdfLib.PDFDocument.load(_dsPdfBytes, incremental ? { forIncrementalUpdate: true } : {});
+      const png = await doc.embedPng(await dsObterAparenciaBytes());
+      dsAdicionarCampoAssinatura(pdfLib, doc, _dsPlace.page, {
+        rect: [_dsPlace.xPt, _dsPlace.yPt, _dsPlace.wPt, _dsPlace.hPt],
+        imagem: png,
+        nome: cn,
+        motivo: 'Assinatura digital',
+        local: 'Itacarambi - MG',
+        data: new Date(),
+        tamanho: 16384
+      });
+      return await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
+    }
+    let withPlaceholder;
+    try {
+      withPlaceholder = await prepararPdf(true);
+    } catch (eInc) {
+      // Um PDF já assinado só pode receber nova assinatura de forma incremental
+      if (jaAssinado) throw new Error('Este PDF já possui assinatura e não pôde ser assinado novamente sem invalidá-la (' + (eInc.message || eInc) + ').');
+      console.warn('Gravação incremental indisponível; regravando o PDF.', eInc);
+      withPlaceholder = await prepararPdf(false);
+    }
 
     // Assinador: gera o PKCS#7 (CMS) com o certificado
     const signer = new Signer();

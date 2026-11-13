@@ -229,3 +229,106 @@ function dsCarregarBibliotecaPades() {
   });
   return _dsPadesPromise;
 }
+
+// ===================== CAMPO DE ASSINATURA NO PDF =====================
+
+// Indica se o PDF já possui alguma assinatura digital embutida.
+function dsPdfJaAssinado(bytes) {
+  const alvo = [0x2f, 0x42, 0x79, 0x74, 0x65, 0x52, 0x61, 0x6e, 0x67, 0x65]; // "/ByteRange"
+  const fim = bytes.length - alvo.length;
+  for (let i = 0; i <= fim; i++) {
+    let j = 0;
+    while (j < alvo.length && bytes[i + j] === alvo[j]) j++;
+    if (j === alvo.length) return true;
+  }
+  return false;
+}
+
+/**
+ * Cria o campo de assinatura (dicionário /Sig + widget) na página indicada.
+ * O selo visível fica na aparência do próprio campo — o conteúdo da página
+ * não é alterado, então assinaturas anteriores do documento continuam válidas.
+ *
+ * @param {object} L     biblioteca pdf-lib
+ * @param {object} doc   PDFDocument
+ * @param {number} indicePagina  página (base 0) onde o selo aparece
+ * @param {object} o     { rect:[x,y,w,h], imagem (PDFImage), nome, motivo, local, data, tamanho, subFilter }
+ */
+function dsAdicionarCampoAssinatura(L, doc, indicePagina, o) {
+  const ctx = doc.context;
+  // Localiza a página direto na árvore do PDF, sem tocar no conteúdo dela
+  const folhas = [];
+  doc.catalog.Pages().traverse(function (no, ref) {
+    if (no instanceof L.PDFPageLeaf) folhas.push({ no: no, ref: ref });
+  });
+  const pagina = folhas[indicePagina];
+  if (!pagina) throw new Error('Página não encontrada no PDF.');
+  const N = L.PDFName.of, num = L.PDFNumber.of;
+  const x = o.rect[0], y = o.rect[1], w = o.rect[2], h = o.rect[3];
+
+  // Dicionário da assinatura, com espaço reservado para o ByteRange e o conteúdo
+  const byteRange = L.PDFArray.withContext(ctx);
+  byteRange.push(num(0));
+  for (let i = 0; i < 3; i++) byteRange.push(N('**********'));
+  const sigDict = ctx.obj({
+    Type: 'Sig',
+    Filter: 'Adobe.PPKLite',
+    SubFilter: o.subFilter || 'ETSI.CAdES.detached',
+    ByteRange: byteRange,
+    Contents: L.PDFHexString.of('00'.repeat(o.tamanho || 16384)),
+    Reason: L.PDFHexString.fromText(o.motivo || 'Assinatura digital'),
+    M: L.PDFString.fromDate(o.data || new Date()),
+    Name: L.PDFHexString.fromText(o.nome || ''),
+    Location: L.PDFHexString.fromText(o.local || ''),
+    Prop_Build: { App: { Name: 'Atlas Saude' } }
+  });
+  // Registrado como bloco bruto para nunca ser compactado/alterado na gravação
+  const bruto = new Uint8Array(sigDict.sizeInBytes());
+  sigDict.copyBytesInto(bruto, 0);
+  const sigRef = ctx.register(L.PDFInvalidObject.of(bruto));
+
+  // Aparência do campo: a imagem do selo ajustada à caixa, sem distorcer
+  let operadores = '';
+  const recursos = {};
+  if (o.imagem) {
+    const fit = Math.min(w / o.imagem.width, h / o.imagem.height);
+    const dw = o.imagem.width * fit, dh = o.imagem.height * fit;
+    const f = function (v) { return (Math.round(v * 1000) / 1000).toString(); };
+    operadores = 'q ' + f(dw) + ' 0 0 ' + f(dh) + ' ' + f((w - dw) / 2) + ' ' + f((h - dh) / 2) + ' cm /Selo Do Q';
+    recursos.XObject = { Selo: o.imagem.ref };
+  }
+  const aparencia = ctx.stream(operadores, {
+    Type: 'XObject', Subtype: 'Form', FormType: 1,
+    BBox: [0, 0, w, h],
+    Resources: recursos
+  });
+  const aparenciaRef = ctx.register(aparencia);
+
+  // Nome de campo único: permite várias assinaturas no mesmo documento
+  const nomeCampo = 'Assinatura_' + Date.now().toString(36) + Math.floor(Math.random() * 1e6).toString(36);
+  const widgetRef = ctx.register(ctx.obj({
+    Type: 'Annot',
+    Subtype: 'Widget',
+    FT: 'Sig',
+    Rect: [x, y, x + w, y + h],
+    V: sigRef,
+    T: L.PDFString.of(nomeCampo),
+    F: 132, // imprimir + bloqueado
+    P: pagina.ref,
+    AP: { N: aparenciaRef }
+  }));
+
+  // Acrescenta o campo às anotações da página sem normalizar/alterar o conteúdo dela
+  const anotacoes = [];
+  const atuais = pagina.no.lookup(N('Annots'));
+  if (atuais instanceof L.PDFArray) {
+    for (let i = 0; i < atuais.size(); i++) anotacoes.push(atuais.get(i));
+  }
+  anotacoes.push(widgetRef);
+  pagina.no.set(N('Annots'), ctx.obj(anotacoes));
+  const acro = doc.catalog.getOrCreateAcroForm();
+  acro.addField(widgetRef);
+  acro.dict.set(N('SigFlags'), num(3));
+
+  return { sigRef: sigRef, widgetRef: widgetRef, acroForm: acro };
+}
