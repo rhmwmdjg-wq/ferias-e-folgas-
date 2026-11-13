@@ -71,7 +71,7 @@ async function verificarSessao() {
     
     // Controle de abas por role
     const adminTabs = ['tab-config', 'tab-gestores', 'tab-auditoria', 'tab-backup', 'label-admin-section'];
-    const gestorTabs = ['tab-alertas', 'tab-pendencias', 'tab-saldos', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-oficios', 'tab-notificacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto', 'tab-pontomensal', 'tab-assinatura'];
+    const gestorTabs = ['tab-alertas', 'tab-pendencias', 'tab-saldos', 'tab-servidores', 'tab-aniversariantes', 'tab-ferias', 'tab-calendario', 'tab-emitir-aut', 'tab-autorizacoes', 'tab-folgas', 'tab-bancohoras', 'tab-coberturas', 'tab-solicitacoes', 'tab-oficios', 'tab-notificacoes', 'tab-relatorio', 'tab-mapaausencias', 'tab-eventos', 'tab-veiculos', 'tab-ponto', 'tab-pontomensal', 'tab-assinatura', 'tab-sistemas'];
     
     adminTabs.forEach(id => {
       const el = document.getElementById(id);

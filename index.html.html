@@ -1806,6 +1806,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <span class="tab-label">Mapa de Ausências</span>
       </button>
 
+      <!-- ===== Sistemas Parceiros ===== -->
+      <div class="sidebar-section-label">Sistemas Parceiros</div>
+      <button class="tab-btn" onclick="showTab('sistemas')" id="tab-sistemas" style="margin-bottom:4px">
+        <i class="fa-solid fa-link"></i>
+        <span class="tab-label">Acesso aos Sistemas</span>
+      </button>
+
       <!-- ===== Administração ===== -->
       <div class="sidebar-section-label" id="label-admin-section" style="display:none">Administração</div>
       <button class="tab-btn" onclick="showTab('config')" id="tab-config" style="display:none">
@@ -3434,6 +3441,30 @@ Coordenação de RH
       <div class="empty"><div class="icon">🤝</div><p>Selecione um mês para visualizar as coberturas.</p></div>
     </div>
   </div>
+</div>
+
+<!-- ======================= ABA SISTEMAS PARCEIROS ======================= -->
+<style>
+#panel-sistemas .sp-topo{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+#panel-sistemas .sp-busca{flex:1;min-width:220px;padding:10px 14px;border-radius:var(--r-sm);border:1px solid var(--border);background:var(--card2);color:var(--text);font-size:.9rem}
+#panel-sistemas .sp-grupo-titulo{font-size:.75rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--primary);margin:18px 0 10px}
+#panel-sistemas .sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+#panel-sistemas .sp-card{display:flex;align-items:center;gap:14px;text-align:left;padding:16px;border-radius:12px;border:1px solid var(--border);background:var(--card);color:var(--text);cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;font:inherit}
+#panel-sistemas .sp-card:hover{transform:translateY(-2px);border-color:var(--sp-cor);box-shadow:0 6px 22px -8px var(--sp-cor)}
+#panel-sistemas .sp-icone{flex:0 0 46px;height:46px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;color:#fff;background:var(--sp-cor)}
+#panel-sistemas .sp-textos{flex:1;display:flex;flex-direction:column;gap:3px;min-width:0}
+#panel-sistemas .sp-nome{font-weight:800;font-size:.95rem}
+#panel-sistemas .sp-desc{font-size:.75rem;opacity:.7;line-height:1.3}
+#panel-sistemas .sp-seta{opacity:.45;font-size:.85rem}
+#panel-sistemas .sp-card:hover .sp-seta{opacity:1;color:var(--sp-cor)}
+#panel-sistemas .sp-vazio{padding:30px;text-align:center;opacity:.6}
+</style>
+<div class="tab-panel" id="panel-sistemas">
+  <div class="section-title">🔗 Sistemas Parceiros</div>
+  <div class="sp-topo">
+    <input type="text" id="busca-sistema" class="sp-busca" placeholder="Buscar sistema..." oninput="renderSistemasParceiros()">
+  </div>
+  <div id="sistemas-grid"></div>
 </div>
 
 <!-- ======================= ABA GERADOR DE OFÍCIOS ======================= -->
@@ -7182,6 +7213,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="reports.js"></script>
 <script src="protocolo-entrega.js"></script>
 <script src="oficios.js"></script>
+<script src="sistemas.js"></script>
 <script>
 // Módulo Fechamento de Ponto Mensal (APS).
 // Grade editável, fechamento do mês, histórico e impressão com alterações em vermelho.
