@@ -3,6 +3,27 @@
 
 let autTipoPeriodo = 0;
 
+// Formas de parcelamento disponíveis na autorização (dias de cada período, na ordem)
+const AUT_PARCELAMENTOS = {
+  1: [30],
+  2: [15, 15],
+  3: [10, 10, 10],
+  4: [20, 10],
+  5: [10, 20]
+};
+
+function autDiasPorPeriodo(tipo) {
+  return AUT_PARCELAMENTOS[tipo] || [30];
+}
+
+// Texto do parcelamento para o histórico, ex.: "2 períodos (20 + 10 dias)"
+function autDescricaoParcelamento(dias) {
+  if (dias.length === 1) return 'Integral (30 dias)';
+  const iguais = dias.every(d => d === dias[0]);
+  if (iguais) return dias.length + ' períodos de ' + dias[0] + ' dias';
+  return dias.length + ' períodos (' + dias.join(' + ') + ' dias)';
+}
+
 function abrirModalAutorizacao(srvId, inicio, fim, tipo, periodo) {
   autTipoPeriodo = 0;
   // Somente servidores dos setores habilitados para o gestor (admin vê todos)
@@ -72,7 +93,7 @@ function selecionarTipoPeriodo(tipo) {
   document.querySelectorAll('.periodo-option').forEach(o => o.classList.remove('selected'));
   document.getElementById('aut-per-' + tipo).classList.add('selected');
 
-  const diasPorPeriodo = tipo === 1 ? [30] : tipo === 2 ? [15, 15] : [10, 10, 10];
+  const diasPorPeriodo = autDiasPorPeriodo(tipo);
   const section = document.getElementById('aut-datas-section');
   section.style.display = 'block';
 
@@ -131,7 +152,7 @@ async function gerarAutorizacaoFerias() {
   const tipoFerias = document.getElementById('aut-tipo-ferias').value;
   const srv = DB.servidores().find(s => s.id === srvId);
 
-  const diasPorPeriodo = autTipoPeriodo === 1 ? [30] : autTipoPeriodo === 2 ? [15, 15] : [10, 10, 10];
+  const diasPorPeriodo = autDiasPorPeriodo(autTipoPeriodo);
   const periodos = [];
 
   for (let i = 0; i < diasPorPeriodo.length; i++) {
@@ -151,7 +172,7 @@ async function gerarAutorizacaoFerias() {
   imprimirAutorizacaoFerias(srv, periodos, tercoMes, periodoRef, obs, textoAutorizacao, tipoFerias);
 
   // Salvar no histórico de autorizações
-  const tipoParc = periodos.length === 1 ? 'Integral (30 dias)' : periodos.length === 2 ? '2 períodos de 15 dias' : '3 períodos de 10 dias';
+  const tipoParc = autDescricaoParcelamento(diasPorPeriodo);
   await DB.saveAutorizacao({
     id: uid(),
     srvId: srv.id,
