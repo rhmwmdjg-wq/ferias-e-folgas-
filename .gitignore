@@ -4,3 +4,7 @@ temp_xlsx.json
 *.xlsx
 *.csv
 backup*.json
+
+# Certificados digitais nunca devem ir para o repositório
+*.pfx
+*.p12

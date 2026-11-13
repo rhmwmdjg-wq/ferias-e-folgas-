@@ -7214,6 +7214,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="protocolo-entrega.js"></script>
 <script src="oficios.js"></script>
 <script src="sistemas.js"></script>
+<script src="assinatura.js"></script>
 <script>
 // Módulo Fechamento de Ponto Mensal (APS).
 // Grade editável, fechamento do mês, histórico e impressão com alterações em vermelho.
@@ -7918,10 +7919,15 @@ function pmImprimir() {
     <p style="font-size:.8rem;color:var(--muted);margin-bottom:10px">
       Selecione o arquivo <strong>.pfx</strong>/<strong>.p12</strong> e informe a senha. O certificado fica <strong>apenas neste navegador</strong> (nunca é enviado para nenhum servidor).
     </p>
+    <div id="ds-cofre-info" style="display:none;margin-bottom:10px;background:var(--surface);border:1px solid var(--border-mid);border-radius:var(--r-sm);padding:10px 12px;font-size:.8rem"></div>
     <div class="form-row cols-2">
       <div class="field"><label>Arquivo do Certificado (.pfx/.p12)</label><input type="file" id="ds-pfx" accept=".pfx,.p12,application/x-pkcs12"></div>
-      <div class="field"><label>Senha do Certificado</label><input type="password" id="ds-senha" placeholder="••••••••"></div>
+      <div class="field"><label>Senha do Certificado</label><input type="password" id="ds-senha" placeholder="••••••••" autocomplete="off"></div>
     </div>
+    <label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.8rem;cursor:pointer">
+      <input type="checkbox" id="ds-lembrar" style="width:auto">
+      <span>Lembrar o certificado <strong>neste aparelho</strong> (a senha continua sendo pedida a cada uso; não marque em computador compartilhado)</span>
+    </label>
     <div class="field" style="margin-top:10px">
       <label>Cadeia de certificados — AC intermediária/raiz (.cer/.crt/.pem/.p7b)</label>
       <input type="file" id="ds-chain" accept=".cer,.crt,.pem,.p7b,.p7c" multiple onchange="dsAdicionarCadeia(this)">
@@ -8332,47 +8338,67 @@ async function dsAdicionarCadeia(input) {
   else toastMsg('Não foi possível ler os arquivos de cadeia.', 'warning');
 }
 
-function dsCarregarPfx() {
+async function dsCarregarPfx() {
   if (typeof forge === 'undefined') return toastMsg('Biblioteca de certificado não carregou (verifique a internet).', 'error');
   const file = document.getElementById('ds-pfx').files[0];
   const senha = document.getElementById('ds-senha').value;
-  if (!file) return toastMsg('Selecione o arquivo .pfx.', 'warning');
+  const lembrar = !!(document.getElementById('ds-lembrar') && document.getElementById('ds-lembrar').checked);
 
-  const reader = new FileReader();
-  reader.onload = async function (e) {
-    try {
-      const bin = dsBinFromArrayBuffer(e.target.result);
-      const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(bin), senha);
+  // Sem arquivo selecionado: usa o certificado salvo neste aparelho (se houver)
+  let buffer = null, nomeArq = '', veioDoCofre = false;
+  if (file) {
+    buffer = await file.arrayBuffer();
+    nomeArq = file.name;
+  } else {
+    const reg = await dsCofreLer();
+    if (reg && reg.bytes) { buffer = reg.bytes; nomeArq = reg.nome; veioDoCofre = true; }
+  }
+  if (!buffer) return toastMsg('Selecione o arquivo .pfx.', 'warning');
+  if (!senha) return toastMsg('Informe a senha do certificado.', 'warning');
 
-      const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
-      const certArr = certBags[forge.pki.oids.certBag] || [];
-      const cert = certArr[0] && certArr[0].cert;
+  try {
+    const bin = dsBinFromArrayBuffer(buffer);
+    const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(bin), senha);
 
-      let key;
-      const shrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag];
-      if (shrouded && shrouded[0] && shrouded[0].key) key = shrouded[0].key;
-      if (!key) {
-        const plain = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag];
-        if (plain && plain[0] && plain[0].key) key = plain[0].key;
-      }
-      if (!cert || !key) throw new Error('Certificado ou chave privada não encontrados no arquivo.');
+    const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+    const certArr = (certBags[forge.pki.oids.certBag] || []).map(function (b) { return b.cert; }).filter(Boolean);
 
-      _dsCert = cert; _dsKey = key;
-      _dsCerts = certArr.map(function (b) { return b.cert; }).filter(Boolean);
-      dsAplicarCadeiaEmbutida();
+    let key;
+    const shrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag];
+    if (shrouded && shrouded[0] && shrouded[0].key) key = shrouded[0].key;
+    if (!key) {
+      const plain = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag];
+      if (plain && plain[0] && plain[0].key) key = plain[0].key;
+    }
+    // O titular é o certificado que casa com a chave privada (não necessariamente o primeiro)
+    const cert = dsEscolherCertTitular(certArr, key);
+    if (!cert || !key) throw new Error('Certificado ou chave privada não encontrados no arquivo.');
 
-      dsMostrarInfoCert();
+    _dsCert = cert; _dsKey = key;
+    _dsCerts = certArr;
+    dsAplicarCadeiaEmbutida();
+
+    // A senha nunca fica guardada: some do campo assim que o certificado abre
+    document.getElementById('ds-senha').value = '';
+    if (file && lembrar) {
+      try { await dsCofreSalvar(buffer, nomeArq); } catch (e3) { console.warn('Cofre:', e3); }
+    }
+    dsCofreAtualizarUI();
+
+    dsMostrarInfoCert();
+    if (!dsCadeiaCompleta()) {
       toastMsg('Certificado carregado! Buscando cadeia de ACs...', 'info');
       try { await dsBuscarCadeiaAIA(_dsCert, 0); } catch (e2) { console.warn('AIA:', e2); }
       dsMostrarInfoCert();
-      toastMsg('Certificado carregado com sucesso!', 'success');
-    } catch (err) {
-      console.error(err);
-      _dsCert = null; _dsKey = null;
-      toastMsg('Erro ao ler o certificado: ' + (err.message || err) + ' (senha incorreta?)', 'error');
     }
-  };
-  reader.readAsArrayBuffer(file);
+    toastMsg('Certificado carregado com sucesso!', 'success');
+  } catch (err) {
+    console.error(err);
+    _dsCert = null; _dsKey = null;
+    const senhaErrada = /mac|password|senha|invalid/i.test(String(err && err.message));
+    toastMsg(senhaErrada ? 'Senha do certificado incorreta.' : 'Erro ao ler o certificado: ' + (err.message || err), 'error');
+    if (veioDoCofre && !senhaErrada) toastMsg('Se o problema continuar, selecione o arquivo .pfx novamente.', 'warning');
+  }
 }
 
 function dsAssinarPdf() {
@@ -8385,22 +8411,7 @@ function dsAssinarPdf() {
     try {
       const bin = dsBinFromArrayBuffer(e.target.result);
 
-      const p7 = forge.pkcs7.createSignedData();
-      p7.content = forge.util.createBuffer(bin);
-      (_dsCerts.length ? _dsCerts : [_dsCert]).forEach(function (c) { p7.addCertificate(c); });
-      p7.addSigner({
-        key: _dsKey,
-        certificate: _dsCert,
-        digestAlgorithm: forge.pki.oids.sha256,
-        authenticatedAttributes: [
-          { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
-          { type: forge.pki.oids.messageDigest },
-          { type: forge.pki.oids.signingTime, value: new Date() }
-        ]
-      });
-      p7.sign({ detached: true });
-
-      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+      const der = dsCriarCms(bin);
       const out = new Uint8Array(der.length);
       for (let i = 0; i < der.length; i++) out[i] = der.charCodeAt(i) & 0xff;
       const blob = new Blob([out], { type: 'application/pkcs7-signature' });
@@ -8588,19 +8599,7 @@ async function dsAssinarComPosicao() {
     const buf = _dsPdfBytes.buffer.slice(_dsPdfBytes.byteOffset, _dsPdfBytes.byteOffset + _dsPdfBytes.length);
     const bin = dsBinFromArrayBuffer(buf);
 
-    const p7 = forge.pkcs7.createSignedData();
-    p7.content = forge.util.createBuffer(bin);
-    p7.addCertificate(_dsCert);
-    p7.addSigner({
-      key: _dsKey, certificate: _dsCert, digestAlgorithm: forge.pki.oids.sha256,
-      authenticatedAttributes: [
-        { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
-        { type: forge.pki.oids.messageDigest },
-        { type: forge.pki.oids.signingTime, value: new Date() }
-      ]
-    });
-    p7.sign({ detached: true });
-    const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
+    const der = dsCriarCms(bin);
     const p7s = new Uint8Array(der.length);
     for (let i = 0; i < der.length; i++) p7s[i] = der.charCodeAt(i) & 0xff;
 
@@ -8650,18 +8649,8 @@ async function dsAssinarPades() {
   res.innerHTML = '⏳ Gerando assinatura PAdES... aguarde.';
 
   try {
-    // Polyfill de Buffer (as bibliotecas PAdES usam Buffer do Node)
-    if (!window.Buffer) {
-      const bm = await import('https://cdn.jsdelivr.net/npm/buffer@6.0.3/+esm');
-      window.Buffer = bm.Buffer;
-    }
-    const pdfLib = await import('https://cdn.jsdelivr.net/npm/pdf-lib@1.17.1/+esm');
-    const signpdfMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/signpdf@3.2.4/+esm');
-    const placeMod = await import('https://cdn.jsdelivr.net/npm/@signpdf/placeholder-pdf-lib@3.2.4/+esm');
-    const SignPdf = signpdfMod.SignPdf || signpdfMod.default;
-    const Signer = signpdfMod.Signer || (signpdfMod.default && signpdfMod.default.Signer);
-    const pdflibAddPlaceholder = placeMod.pdflibAddPlaceholder || (placeMod.default && placeMod.default.pdflibAddPlaceholder);
-    if (!SignPdf || !Signer || !pdflibAddPlaceholder) throw new Error('Bibliotecas PAdES não carregaram corretamente.');
+    // Bibliotecas PAdES empacotadas no próprio sistema (sem depender de CDN externo)
+    const { pdfLib, SignPdf, Signer, pdflibAddPlaceholder, Buffer: PBuffer } = await dsCarregarBibliotecaPades();
 
     const doc = await pdfLib.PDFDocument.load(_dsPdfBytes);
     const page = doc.getPage(_dsPlace.page);
@@ -8686,7 +8675,7 @@ async function dsAssinarPades() {
       signingTime: new Date(),
       signatureLength: 16384,
       widgetRect: [x, y, x + w, y + h],
-      subFilter: 'adbe.pkcs7.detached'
+      subFilter: 'ETSI.CAdES.detached'
     });
 
     // Objeto streams desativado (obrigatório para localizar o placeholder)
@@ -8695,23 +8684,12 @@ async function dsAssinarPades() {
     // Assinador: gera o PKCS#7 (CMS) com o certificado
     const signer = new Signer();
     signer.sign = async function (buffer) {
-      const p7 = forge.pkcs7.createSignedData();
-      p7.content = forge.util.createBuffer(buffer.toString('binary'));
-      (_dsCerts.length ? _dsCerts : [_dsCert]).forEach(function (c) { p7.addCertificate(c); });
-      p7.addSigner({
-        key: _dsKey, certificate: _dsCert, digestAlgorithm: forge.pki.oids.sha256,
-        authenticatedAttributes: [
-          { type: forge.pki.oids.contentType, value: forge.pki.oids.data },
-          { type: forge.pki.oids.messageDigest },
-          { type: forge.pki.oids.signingTime, value: new Date() }
-        ]
-      });
-      p7.sign({ detached: true });
-      const der = forge.asn1.toDer(p7.toAsn1()).getBytes();
-      return window.Buffer.from(der, 'binary');
+      // CAdES-BES: a hora da assinatura vai no dicionário do PDF (/M), não no CMS
+      const der = dsCriarCms(buffer.toString('binary'), { incluirHora: false });
+      return PBuffer.from(der, 'binary');
     };
 
-    const signed = await new SignPdf().sign(window.Buffer.from(withPlaceholder), signer);
+    const signed = await new SignPdf().sign(PBuffer.from(withPlaceholder), signer);
     const out = new Uint8Array(signed.length);
     for (let i = 0; i < signed.length; i++) out[i] = signed[i];
 
