@@ -37,6 +37,7 @@ function showTab(tab) {
   if (tab === 'protocolo') { renderProtocolos(); }
   if (tab === 'oficios') { carregarNovoOficio(); renderHistoricoOficios(); }
   if (tab === 'sistemas' && typeof renderSistemasParceiros === 'function') renderSistemasParceiros();
+  if (tab === 'atestadorh' && typeof renderAtestadoRH === 'function') renderAtestadoRH();
   if (tab === 'notificacoes') { carregarNovaNotificacao(); renderHistoricoNotificacoes(); }
   currentPage = 1;
 }
