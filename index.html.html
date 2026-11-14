@@ -3451,31 +3451,50 @@ Coordenação de RH
 <div class="tab-panel" id="panel-atestadorh">
   <div class="section-title">📧 Enviar Atestado ao RH</div>
   <div class="card" style="padding:18px;max-width:760px">
-    <p style="margin:0 0 14px;font-size:.85rem;opacity:.8">Anexe o PDF do atestado e ele é enviado por e-mail ao RH da Prefeitura, pelo e-mail da Coordenação de Atenção Primária. O arquivo não fica guardado no sistema.</p>
+    <p style="margin:0 0 14px;font-size:.85rem;opacity:.8">Selecione o servidor, informe os dias e anexe o PDF. O atestado é enviado por e-mail ao RH da Prefeitura, pelo e-mail da Coordenação de Atenção Primária. O arquivo não fica guardado no sistema.</p>
     <div class="form-row cols-2">
-      <div class="field"><label>Profissional *</label><select id="ar-servidor"></select></div>
-      <div class="field"><label>Tratamento no e-mail</label>
-        <select id="ar-genero">
-          <option value="">do(a) profissional</option>
-          <option value="f">da profissional</option>
-          <option value="m">do profissional</option>
+      <div class="field"><label>Servidor *</label><select id="ar-servidor" onchange="arAtualizarPrevia()"></select></div>
+      <div class="field"><label>Dias de atestado *</label><input type="number" id="ar-dias" min="1" max="365" step="1" placeholder="Ex.: 3" oninput="arAtualizarPrevia()"></div>
+    </div>
+    <div id="ar-srv-info" style="display:none;margin-top:12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px"></div>
+    <div id="ar-pericia" style="display:none;margin-top:10px;border:1px solid var(--border);border-radius:var(--r-sm);padding:10px 12px;font-size:.82rem"></div>
+    <div class="form-row cols-2" style="margin-top:12px">
+      <div class="field"><label>Tratamento no texto</label>
+        <select id="ar-genero" onchange="arAtualizarPrevia()">
+          <option value="">do(a) servidor(a)</option>
+          <option value="f">da servidora</option>
+          <option value="m">do servidor</option>
         </select>
       </div>
-    </div>
-    <div class="field" style="margin-top:12px"><label>PDF do Atestado * <small style="opacity:.7">(até 8 MB)</small></label>
-      <input type="file" id="ar-pdf" accept="application/pdf,.pdf" onchange="arArquivoSelecionado()">
-      <div id="ar-pdf-info" style="font-size:.8rem;margin-top:6px"></div>
+      <div class="field"><label>PDF do Atestado * <small style="opacity:.7">(até 8 MB)</small></label>
+        <input type="file" id="ar-pdf" accept="application/pdf,.pdf" onchange="arArquivoSelecionado()">
+        <div id="ar-pdf-info" style="font-size:.8rem;margin-top:6px"></div>
+      </div>
     </div>
     <div class="field" style="margin-top:12px"><label>Observação <small style="opacity:.7">(opcional — entra no corpo do e-mail)</small></label>
-      <textarea id="ar-obs" maxlength="1000" placeholder="Ex.: atestado de 3 dias, a partir de 12/11." style="min-height:60px"></textarea>
+      <textarea id="ar-obs" maxlength="1000" placeholder="Ex.: afastamento a partir de 12/11." style="min-height:54px" oninput="arAtualizarPrevia()"></textarea>
+    </div>
+    <div id="ar-previa" style="display:none;margin-top:12px">
+      <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em">Texto do e-mail</label>
+      <pre id="ar-previa-texto" style="white-space:pre-wrap;font:inherit;font-size:.85rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin:0"></pre>
+      <div style="font-size:.74rem;opacity:.65;margin-top:4px">A assinatura (seu nome, cargo e a Coordenação) é acrescentada automaticamente.</div>
     </div>
     <div style="margin-top:16px">
       <button class="btn btn-primary" id="ar-btn-enviar" onclick="enviarAtestadoRH()">📧 Enviar ao RH</button>
     </div>
   </div>
+  <div id="ar-pergunta-whats" class="card" style="display:none;padding:16px;margin-top:16px;max-width:760px;border:1px solid var(--success, #22c55e)"></div>
   <div class="card" style="padding:16px;margin-top:16px;max-width:760px">
     <h3 style="margin:0 0 10px">Enviados nesta sessão</h3>
     <div id="ar-enviados"></div>
+  </div>
+  <div class="card" style="padding:16px;margin-top:16px;max-width:760px">
+    <h3 style="margin:0 0 6px">WhatsApp do RH da Secretaria de Saúde</h3>
+    <div style="font-size:.8rem;opacity:.75;margin-bottom:10px">Número que recebe o comprovante depois do envio do e-mail. Fica salvo para os próximos envios.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+      <input type="tel" id="ar-whats-rh" placeholder="DDD + número, ex.: 38 99999-9999" style="flex:1;min-width:220px">
+      <button type="button" class="btn btn-ghost" onclick="arSalvarWhatsRH()">Salvar número</button>
+    </div>
   </div>
 </div>
 
