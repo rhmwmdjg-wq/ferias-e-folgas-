@@ -1810,6 +1810,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <span class="tab-label">Mapa de Ausências</span>
       </button>
 
+      <!-- ===== Inteligência ===== -->
+      <div class="sidebar-section-label">Inteligência</div>
+      <button class="tab-btn" onclick="showTab('iagestao')" id="tab-iagestao" style="margin-bottom:4px">
+        <i class="fa-solid fa-wand-magic-sparkles"></i>
+        <span class="tab-label">Análise com IA</span>
+      </button>
+
       <!-- ===== Sistemas Parceiros ===== -->
       <div class="sidebar-section-label">Sistemas Parceiros</div>
       <button class="tab-btn" onclick="showTab('sistemas')" id="tab-sistemas" style="margin-bottom:4px">
@@ -3445,6 +3452,57 @@ Coordenação de RH
       <div class="empty"><div class="icon">🤝</div><p>Selecione um mês para visualizar as coberturas.</p></div>
     </div>
   </div>
+</div>
+
+<!-- ======================= ABA ANÁLISE COM IA ======================= -->
+<style>
+#panel-iagestao .ia-msg{border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-top:12px;background:var(--card);line-height:1.55;font-size:.9rem}
+#panel-iagestao .ia-perg{background:var(--surface);font-weight:700}
+#panel-iagestao .ia-tit{margin:16px 0 6px;font-size:1rem;color:var(--primary)}
+#panel-iagestao .ia-resp .ia-tit:first-child{margin-top:0}
+#panel-iagestao .ia-resp p{margin:6px 0}
+#panel-iagestao .ia-resp ul{margin:6px 0 6px 20px;padding:0}
+#panel-iagestao .ia-resp li{margin:4px 0}
+#panel-iagestao .ia-nome{font-weight:700;border-bottom:1px dotted var(--primary)}
+</style>
+<div class="tab-panel" id="panel-iagestao">
+  <div class="section-title">🤖 Análise com IA — Auditoria, Estratégias e Planejamento</div>
+  <div class="card" style="padding:18px;max-width:900px">
+    <p style="margin:0 0 14px;font-size:.85rem;opacity:.8">A IA lê os números do sistema (banco de horas, folgas, férias, solicitações e atestados) e devolve uma auditoria com estratégias e planejamento. Ela recebe só totais e códigos no lugar dos nomes; os nomes são colocados de volta aqui na sua tela.</p>
+    <div class="form-row cols-2">
+      <div class="field"><label>Período analisado</label>
+        <select id="ia-periodo">
+          <option value="6">Últimos 6 meses</option>
+          <option value="12" selected>Últimos 12 meses</option>
+          <option value="24">Últimos 24 meses</option>
+        </select>
+      </div>
+      <div class="field"><label>Foco da análise <small style="opacity:.7">(opcional)</small></label>
+        <input type="text" id="ia-foco" maxlength="300" placeholder="Ex.: horas extras da UBS Central; férias de janeiro">
+      </div>
+    </div>
+    <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+      <button class="btn btn-primary" id="ia-btn-gerar" onclick="iaGerarAnalise()">🤖 Gerar análise</button>
+      <div id="ia-acoes" style="display:none;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-ghost btn-sm" onclick="iaCopiar()">📋 Copiar</button>
+        <button class="btn btn-ghost btn-sm" onclick="iaImprimir()">🖨️ Imprimir</button>
+      </div>
+    </div>
+    <div id="ia-status" style="display:none;margin-top:12px;font-size:.85rem;font-weight:600;color:var(--primary)"></div>
+  </div>
+  <div id="ia-resultado" style="max-width:900px"></div>
+  <div id="ia-pergunta-box" class="card" style="display:none;padding:16px;margin-top:14px;max-width:900px">
+    <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em">Pergunte sobre os dados</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input type="text" id="ia-pergunta" maxlength="500" placeholder="Ex.: qual setor mais acumula horas? Quem devo priorizar nas férias?" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter'){event.preventDefault();iaPerguntar()}">
+      <button class="btn btn-primary" id="ia-btn-perguntar" onclick="iaPerguntar()">Perguntar</button>
+    </div>
+  </div>
+  <details style="max-width:900px;margin-top:14px;font-size:.8rem">
+    <summary style="cursor:pointer;opacity:.75">Ver exatamente o que foi enviado para a IA</summary>
+    <pre id="ia-dados" style="white-space:pre-wrap;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin-top:8px;font-size:.75rem"></pre>
+  </details>
+  <p style="max-width:900px;font-size:.75rem;opacity:.6;margin-top:10px">As conclusões são sugestões geradas por inteligência artificial a partir dos números lançados no sistema. Confira antes de tomar decisões; lançamentos incompletos geram análise incompleta.</p>
 </div>
 
 <!-- ======================= ABA ENVIAR ATESTADO AO RH ======================= -->
@@ -7282,6 +7340,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="oficios.js"></script>
 <script src="sistemas.js"></script>
 <script src="atestado-rh.js"></script>
+<script src="ia-gestao.js"></script>
 <script src="assinatura.js"></script>
 <script>
 // Módulo Fechamento de Ponto Mensal (APS).

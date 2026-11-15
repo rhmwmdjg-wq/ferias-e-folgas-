@@ -28,7 +28,8 @@ const MODULOS_SISTEMA = [
   { id: 'relatorio', tab: 'tab-relatorio', label: 'Relatório Geral' },
   { id: 'mapaausencias', tab: 'tab-mapaausencias', label: 'Mapa de Ausências' },
   { id: 'sistemas', tab: 'tab-sistemas', label: 'Sistemas Parceiros' },
-  { id: 'atestadorh', tab: 'tab-atestadorh', label: 'Enviar Atestado ao RH' }
+  { id: 'atestadorh', tab: 'tab-atestadorh', label: 'Enviar Atestado ao RH' },
+  { id: 'iagestao', tab: 'tab-iagestao', label: 'Análise com IA' }
 ];
 
 function labelModulo(id) {
