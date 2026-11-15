@@ -2921,6 +2921,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
     <select id="ma-filtro-tipo" onchange="renderMapaAusencias()">
       <option value="">Férias & Folgas</option>
       <option value="ferias">🌴 Só Férias</option>
+      <option value="ferias-aut">✅ Só Férias Autorizadas</option>
       <option value="folga">🏖️ Só Folgas</option>
     </select>
     <label style="display:flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted);font-weight:600">
@@ -3078,6 +3079,7 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:16px">
     <div class="section-title" style="margin:0">📜 Histórico de Autorizações Emitidas</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="sincronizarAutorizacoesComProgramacao()" title="Reflete as autorizações já emitidas na programação de férias e no mapa de ausências">🔗 Sincronizar com a programação</button>
       <button class="btn btn-primary btn-sm" onclick="abrirModalAutorizacao()">📄 Nova Autorização</button>
     </div>
   </div>

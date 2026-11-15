@@ -148,6 +148,9 @@ function renderMapaAusencias() {
 }
 
 function contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  // 'ferias-aut' = só férias confirmadas por autorização emitida
+  const soAutorizadas = filtroTipo === 'ferias-aut';
+  if (soAutorizadas) filtroTipo = 'ferias';
   let count = 0;
 
   const servidoresSetor = filtroSetor
@@ -160,6 +163,7 @@ function contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSe
       const srv = servidores.find(s => s.id === p.srvId);
       if (!srv || !servidoresSetor.includes(srv)) return;
       if (p.concluido) return;
+      if (soAutorizadas && !p.autorizado) return;
       const pInicio = p.inicio || '';
       const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
       if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) {
@@ -187,6 +191,9 @@ function contarAusencias(dia, diaISO, servidores, programacoes, folgas, filtroSe
 }
 
 function listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  // 'ferias-aut' = só férias confirmadas por autorização emitida
+  const soAutorizadas = filtroTipo === 'ferias-aut';
+  if (soAutorizadas) filtroTipo = 'ferias';
   const nomes = [];
 
   const servidoresSetor = filtroSetor
@@ -198,10 +205,11 @@ function listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSet
       const srv = servidores.find(s => s.id === p.srvId);
       if (!srv || !servidoresSetor.includes(srv)) return;
       if (p.concluido) return;
+      if (soAutorizadas && !p.autorizado) return;
       const pInicio = p.inicio || '';
       const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
       if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) {
-        nomes.push({ nome: srv.nome, tipo: p.tipo === 'anual' ? 'Férias' : 'Prêmio', setor: srv.setor, cargo: srv.cargo });
+        nomes.push({ nome: srv.nome, tipo: p.tipo === 'anual' ? 'Férias' : 'Prêmio', setor: srv.setor, cargo: srv.cargo, autorizado: !!p.autorizado });
       }
     });
   }
@@ -224,6 +232,9 @@ function listarAusentes(dia, diaISO, servidores, programacoes, folgas, filtroSet
 }
 
 function contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, filtroSetor, filtroTipo) {
+  // 'ferias-aut' = só férias confirmadas por autorização emitida
+  const soAutorizadas = filtroTipo === 'ferias-aut';
+  if (soAutorizadas) filtroTipo = 'ferias';
   const servidoresSetor = filtroSetor ? servidores.filter(s => s.setor === filtroSetor) : servidores;
   let ferias = 0, folga = 0;
 
@@ -232,6 +243,7 @@ function contarAusenciasPorTipo(diaISO, servidores, programacoes, folgas, filtro
       const srv = servidores.find(s => s.id === p.srvId);
       if (!srv || !servidoresSetor.includes(srv)) return;
       if (p.concluido) return;
+      if (soAutorizadas && !p.autorizado) return;
       const pInicio = p.inicio || '';
       const pFim = p.retorno ? addDays(p.retorno, -1) : (p.fim || '');
       if (pInicio && pFim && diaISO >= pInicio && diaISO <= pFim) ferias++;
@@ -433,7 +445,10 @@ function abrirModalAusencias(cell) {
       const tipoClass = n.tipo === 'Férias' ? 'tag-blue' : n.tipo === 'Prêmio' ? 'tag-purple' : 'tag-warn';
       html += `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--card);border-radius:var(--r-sm);border:1px solid var(--border)">
         <span style="font-weight:600;font-size:.84rem;color:var(--text)">${esc(n.nome)}</span>
-        <span class="tag ${tipoClass}">${n.tipo}</span>
+        <span style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;justify-content:flex-end">
+          <span class="tag ${tipoClass}">${n.tipo}</span>
+          ${n.tipo === 'Folga' ? '' : (n.autorizado ? '<span class="tag tag-green" style="font-size:.65rem">✅ Autorizada</span>' : '<span class="tag tag-warn" style="font-size:.65rem">⏳ Só programada</span>')}
+        </span>
       </div>`;
     });
     html += '</div>';
