@@ -558,6 +558,7 @@
     if (pode('bancohoras')) acoes.push('<button class="btn btn-ghost btn-sm" onclick="MX.fichaAcao(\'bh\')">⏱️ Banco de horas</button>');
     if (pode('emitir-aut')) acoes.push('<button class="btn btn-primary btn-sm" onclick="MX.fichaAcao(\'aut\')">📄 Emitir autorização</button>');
     if (s.telefone) acoes.push('<a class="btn btn-success btn-sm" href="' + waLink(s.telefone, 'Olá, ' + s.nome.split(' ')[0] + '!') + '" target="_blank" rel="noopener"><i class="fa-brands fa-whatsapp"></i> WhatsApp</a>');
+    if (pode('iagestao') && typeof iaAbrir === 'function') acoes.push('<button class="btn btn-ghost btn-sm" onclick="MX.fichaAcao(\'ia\')">🤖 Perguntar à IA</button>');
     acoes.push('<button class="btn btn-ghost btn-sm" onclick="MX.imprimirFicha()" style="margin-left:auto">🖨️ Imprimir ficha</button>');
 
     document.getElementById('mx-ficha').innerHTML = `
@@ -697,6 +698,7 @@
     fecharFicha();
     const setSel = (selId, val) => { const el = document.getElementById(selId); if (el && Array.from(el.options).some(o => o.value === val)) { el.value = val; el.dispatchEvent(new Event('change')); } };
     if (acao === 'editar') { showTab('servidores'); setTimeout(() => editarServidor(id), 60); }
+    if (acao === 'ia' && typeof iaAbrir === 'function') iaAbrir('servidor', { srv: id });
     if (acao === 'ferias') { showTab('ferias'); setTimeout(() => { const f = document.getElementById('fp-filtro-setor'); if (f) { f.value = ''; f.dispatchEvent(new Event('change')); } setSel('fp-servidor', id); }, 80); }
     if (acao === 'folgas') {
       showTab('folgas');

@@ -286,6 +286,7 @@ function renderSolicitacoes() {
           ${canApprove ? `
             <button class="btn btn-primary btn-sm" onclick="resolverSolicitacao('${s.id}', 'autorizado')">✅ Autorizar</button>
             <button class="btn btn-danger btn-sm" onclick="resolverSolicitacao('${s.id}', 'negado')">❌ Negar</button>
+            ${(typeof iaAbrir === 'function' && typeof tabVisivelIA === 'function' && tabVisivelIA()) ? `<button class="btn btn-ghost btn-sm" onclick="iaAbrir('parecer', { sol: '${s.id}' }, true)" title="Parecer de apoio à decisão">🤖 Parecer da IA</button>` : ''}
           ` : ''}
           ${canPrint ? `
             <button class="btn btn-ghost btn-sm" onclick="imprimirComSolicitacao('${s.id}')">🖨️ Imprimir Autorização</button>
