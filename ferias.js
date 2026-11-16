@@ -4,7 +4,8 @@
 function popularSelectServidor() {
   const sel = document.getElementById('fp-servidor');
   if (!sel) return;
-  const servidores = getServidoresAcessiveis();
+  // Programação de férias: apenas servidores efetivos (regra do município)
+  const servidores = getServidoresAcessiveis().filter(feriasEhEfetivo);
   sel.innerHTML = '<option value="">Selecione...</option>' + servidores.map(function(s) { return '<option value="' + s.id + '">' + esc(s.nome) + ' (Mat. ' + esc(s.matricula) + ')</option>'; }).join('');
 }
 
@@ -89,6 +90,7 @@ async function salvarProgramacao() {
   toastMsg('Férias programadas com sucesso!');
   limparFormFerias();
   renderProgramacoes();
+  if (typeof renderAuditoriaConflitosFerias === 'function') renderAuditoriaConflitosFerias();
   atualizarBadge();
   renderDashboard();
 }
@@ -274,4 +276,161 @@ function renderCalendario() {
   }
 
   grid.innerHTML = html;
+}
+
+// ===================== Auditoria de conflitos de férias (somente efetivos) =====================
+// Regra do município: a programação de férias é feita apenas com servidores efetivos.
+// Conflito = dois efetivos da mesma unidade (setor) e da mesma categoria (cargo) com férias
+// na mesma data (períodos sobrepostos) ou no mesmo mês.
+
+function feriasEhEfetivo(s) {
+  return String((s && s.vinculo) || '').toLowerCase() !== 'contratado';
+}
+function feriasCargoChave(s) {
+  return String((s && s.cargo) || '').trim().toLowerCase().replace(/\s+/g, ' ') || '(sem cargo)';
+}
+function feriasDataLocal(str) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(str || ''));
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null;
+}
+function feriasMesesDoPeriodo(a, b) {
+  const out = [];
+  let d = new Date(a.getFullYear(), a.getMonth(), 1);
+  while (d <= b) { out.push(d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')); d = new Date(d.getFullYear(), d.getMonth() + 1, 1); }
+  return out;
+}
+function feriasRotuloMes(chave) {
+  const p = chave.split('-');
+  return MESES_PT[parseInt(p[1], 10) - 1] + '/' + p[0];
+}
+
+// opts: { setor, escopo: 'futuro'|'ano'|'tudo', tipo: ''|'data'|'mes' }
+// Retorna { conflitos: [...], base: {efetivos, progs, setores} }
+function feriasConflitos(opts) {
+  opts = opts || {};
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const anoIni = new Date(hoje.getFullYear(), 0, 1);
+  const srvs = (typeof getServidoresAcessiveis === 'function' ? getServidoresAcessiveis() : DB.servidores()).filter(feriasEhEfetivo);
+  const porId = {}; srvs.forEach(function (s) { porId[s.id] = s; });
+  const progs = (typeof getProgramacoesAcessiveis === 'function' ? getProgramacoesAcessiveis() : DB.programacoes())
+    .map(function (p) { return { p: p, s: porId[p.srvId], a: feriasDataLocal(p.inicio), b: feriasDataLocal(p.fim || p.inicio) }; })
+    .filter(function (x) {
+      if (!x.s || !x.a || !x.b || x.b < x.a) return false;
+      if (opts.setor && (x.s.setor || 'Sem setor') !== opts.setor) return false;
+      if (opts.escopo === 'ano') return x.b >= anoIni;
+      if (opts.escopo === 'tudo') return true;
+      return x.b >= hoje; // futuro (padrão): em curso ou ainda por vir
+    });
+  // agrupa por unidade + categoria
+  const grupos = {};
+  progs.forEach(function (x) {
+    const k = (x.s.setor || 'Sem setor') + '|' + feriasCargoChave(x.s);
+    (grupos[k] || (grupos[k] = [])).push(x);
+  });
+  const conflitos = [];
+  Object.keys(grupos).forEach(function (k) {
+    const l = grupos[k].sort(function (x, y) { return x.a - y.a; });
+    for (let i = 0; i < l.length; i++) {
+      for (let j = i + 1; j < l.length; j++) {
+        const x = l[i], y = l[j];
+        if (x.s.id === y.s.id) continue;
+        const sobre = x.a <= y.b && y.a <= x.b;
+        let tipo, detalhe;
+        if (sobre) {
+          const ini = x.a > y.a ? x.a : y.a, fim = x.b < y.b ? x.b : y.b;
+          const dias = Math.round((fim - ini) / 86400000) + 1;
+          tipo = 'data';
+          detalhe = dias + ' dia(s) em comum: ' + ini.toLocaleDateString('pt-BR') + ' a ' + fim.toLocaleDateString('pt-BR');
+        } else {
+          const mx = feriasMesesDoPeriodo(x.a, x.b), my = feriasMesesDoPeriodo(y.a, y.b);
+          const comuns = mx.filter(function (m) { return my.indexOf(m) >= 0; });
+          if (!comuns.length) continue;
+          tipo = 'mes';
+          detalhe = 'mesmo mês: ' + comuns.map(feriasRotuloMes).join(', ');
+        }
+        if (opts.tipo && opts.tipo !== tipo) continue;
+        conflitos.push({ setor: x.s.setor || 'Sem setor', cargo: x.s.cargo || '(sem cargo)', tipo: tipo, detalhe: detalhe,
+          a: { srv: x.s, prog: x.p, ini: x.a, fim: x.b }, b: { srv: y.s, prog: y.p, ini: y.a, fim: y.b } });
+      }
+    }
+  });
+  conflitos.sort(function (u, v) { return u.setor.localeCompare(v.setor, 'pt-BR') || (u.tipo === 'data' ? 0 : 1) - (v.tipo === 'data' ? 0 : 1) || u.a.ini - v.a.ini; });
+  const setores = {}; srvs.forEach(function (s) { const st = s.setor || 'Sem setor'; setores[st] = (setores[st] || 0) + 1; });
+  return { conflitos: conflitos, base: { efetivos: srvs.length, progs: progs.length, setores: setores } };
+}
+
+function popularSelectConflitosSetor() {
+  const sel = document.getElementById('fc-setor'); if (!sel) return;
+  const atual = sel.value;
+  const setores = {};
+  getServidoresAcessiveis().filter(feriasEhEfetivo).forEach(function (s) { setores[s.setor || 'Sem setor'] = 1; });
+  sel.innerHTML = '<option value="">Todas as unidades</option>' + Object.keys(setores).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); })
+    .map(function (st) { return '<option value="' + esc(st) + '">' + esc(st) + '</option>'; }).join('');
+  if (atual && setores[atual]) sel.value = atual;
+}
+
+function renderAuditoriaConflitosFerias() {
+  const box = document.getElementById('fc-resultado'); if (!box) return;
+  if (!document.getElementById('fc-setor').options.length || document.getElementById('fc-setor').options.length <= 1) popularSelectConflitosSetor();
+  const setor = document.getElementById('fc-setor').value;
+  const escopo = document.getElementById('fc-escopo').value;
+  const tipo = document.getElementById('fc-tipo').value;
+  const R = feriasConflitos({ setor: setor, escopo: escopo, tipo: tipo });
+  const resumo = document.getElementById('fc-resumo');
+  const nData = R.conflitos.filter(function (c) { return c.tipo === 'data'; }).length, nMes = R.conflitos.length - nData;
+  const unidades = {}; R.conflitos.forEach(function (c) { (unidades[c.setor] || (unidades[c.setor] = [])).push(c); });
+  if (resumo) {
+    resumo.innerHTML =
+      '<span class="tag tag-blue">' + R.base.efetivos + ' efetivos' + (setor ? ' na unidade' : '') + '</span> ' +
+      '<span class="tag tag-blue">' + R.base.progs + ' períodos analisados</span> ' +
+      '<span class="tag ' + (nData ? 'tag-red' : 'tag-green') + '">' + nData + ' na mesma data</span> ' +
+      '<span class="tag ' + (nMes ? 'tag-warn' : 'tag-green') + '">' + nMes + ' no mesmo mês</span> ' +
+      '<span class="tag">' + Object.keys(unidades).length + ' unidade(s) com conflito</span>';
+  }
+  if (!R.conflitos.length) {
+    box.innerHTML = '<div class="empty"><div class="icon">✅</div><p>Nenhum conflito: não há dois efetivos da mesma categoria com férias ' + (tipo === 'mes' ? 'no mesmo mês' : tipo === 'data' ? 'na mesma data' : 'na mesma data nem no mesmo mês') + (setor ? ' nesta unidade.' : ' em nenhuma unidade.') + '</p></div>';
+    return;
+  }
+  function per(x) { return x.ini.toLocaleDateString('pt-BR') + ' → ' + x.fim.toLocaleDateString('pt-BR') + (x.prog.autorizado ? ' <span class="tag tag-green" style="font-size:.6rem">✅ autorizada</span>' : ' <span class="tag" style="font-size:.6rem">⏳ programada</span>'); }
+  function pessoa(x) { return '<strong class="mx-srv-name" onclick="abrirFicha360(\'' + x.srv.id + '\')" title="Abrir ficha">' + esc(x.srv.nome) + '</strong><div style="font-size:.74rem;color:var(--muted)">Mat. ' + esc(x.srv.matricula || '-') + ' · ' + per(x) + '</div>'; }
+  box.innerHTML = Object.keys(unidades).sort(function (a, b) { return a.localeCompare(b, 'pt-BR'); }).map(function (st) {
+    const l = unidades[st];
+    const d = l.filter(function (c) { return c.tipo === 'data'; }).length;
+    return '<div style="margin-bottom:16px">' +
+      '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px"><strong>🏥 ' + esc(st) + '</strong>' +
+      '<span class="tag tag-blue" style="font-size:.65rem">' + (R.base.setores[st] || 0) + ' efetivos</span>' +
+      (d ? '<span class="tag tag-red" style="font-size:.65rem">' + d + ' mesma data</span>' : '') +
+      (l.length - d ? '<span class="tag tag-warn" style="font-size:.65rem">' + (l.length - d) + ' mesmo mês</span>' : '') + '</div>' +
+      '<div class="table-wrap"><table class="table" style="font-size:.8rem"><thead><tr><th>Categoria (cargo)</th><th>Servidor A</th><th>Servidor B</th><th>Conflito</th></tr></thead><tbody>' +
+      l.map(function (c) {
+        return '<tr><td>' + esc(c.cargo) + '</td><td>' + pessoa(c.a) + '</td><td>' + pessoa(c.b) + '</td><td>' +
+          (c.tipo === 'data' ? '<span class="tag tag-red">📅 Mesma data</span>' : '<span class="tag tag-warn">🗓️ Mesmo mês</span>') +
+          '<div style="font-size:.74rem;color:var(--muted);margin-top:4px">' + esc(c.detalhe) + '</div></td></tr>';
+      }).join('') + '</tbody></table></div></div>';
+  }).join('');
+}
+
+function imprimirAuditoriaConflitosFerias() {
+  const setor = document.getElementById('fc-setor').value, escopo = document.getElementById('fc-escopo').value, tipo = document.getElementById('fc-tipo').value;
+  const R = feriasConflitos({ setor: setor, escopo: escopo, tipo: tipo });
+  const unidades = {}; R.conflitos.forEach(function (c) { (unidades[c.setor] || (unidades[c.setor] = [])).push(c); });
+  const esc2 = function (t) { return String(t == null ? '' : t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+  const fmt = function (d) { return d.toLocaleDateString('pt-BR'); };
+  let html = '<h2 style="margin:0 0 4px">Auditoria de conflitos de férias — servidores efetivos</h2>' +
+    '<p style="margin:0 0 12px;font-size:12px">' + (setor ? 'Unidade: ' + esc2(setor) : 'Todas as unidades') + ' · ' + { futuro: 'férias em curso e futuras', ano: 'ano de ' + new Date().getFullYear() + ' e futuras', tudo: 'todo o histórico' }[escopo] +
+    ' · ' + R.base.progs + ' períodos · ' + R.conflitos.length + ' conflito(s) · emitido em ' + new Date().toLocaleString('pt-BR') + '</p>';
+  if (!R.conflitos.length) html += '<p>Nenhum conflito encontrado.</p>';
+  Object.keys(unidades).sort().forEach(function (st) {
+    html += '<h3 style="margin:14px 0 6px;font-size:14px">' + esc2(st) + ' (' + (R.base.setores[st] || 0) + ' efetivos)</h3>' +
+      '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr><th>Categoria</th><th>Servidor A</th><th>Servidor B</th><th>Conflito</th></tr></thead><tbody>' +
+      unidades[st].map(function (c) {
+        return '<tr><td>' + esc2(c.cargo) + '</td><td>' + esc2(c.a.srv.nome) + '<br><small>' + fmt(c.a.ini) + ' a ' + fmt(c.a.fim) + (c.a.prog.autorizado ? ' (autorizada)' : '') + '</small></td>' +
+          '<td>' + esc2(c.b.srv.nome) + '<br><small>' + fmt(c.b.ini) + ' a ' + fmt(c.b.fim) + (c.b.prog.autorizado ? ' (autorizada)' : '') + '</small></td>' +
+          '<td>' + (c.tipo === 'data' ? 'Mesma data' : 'Mesmo mês') + '<br><small>' + esc2(c.detalhe) + '</small></td></tr>';
+      }).join('') + '</tbody></table>';
+  });
+  const w = window.open('', '_blank');
+  if (!w) { toastMsg('Permita pop-ups para imprimir.', 'error'); return; }
+  w.document.write('<html><head><title>Conflitos de férias</title><style>body{font-family:Arial,sans-serif;padding:20px;color:#111}th,td{border:1px solid #999;padding:4px 6px;text-align:left;vertical-align:top}th{background:#eee}</style></head><body>' + html + '</body></html>');
+  w.document.close(); w.focus(); w.print();
 }

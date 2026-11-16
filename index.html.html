@@ -2631,6 +2631,31 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
       <div id="lista-programacoes"><div class="empty"><div class="icon">📅</div><p>Nenhuma programação cadastrada.</p></div></div>
     </div>
   </div>
+
+  <!-- Auditoria de conflitos (somente efetivos) -->
+  <div class="card" style="margin-top:16px" id="fc-card">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <h3 style="margin:0"><span class="icon">🔍</span> Auditoria de Conflitos por Unidade</h3>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select id="fc-setor" onchange="renderAuditoriaConflitosFerias()" style="padding:4px 8px;font-size:.72rem;background:var(--card);border:1px solid var(--border-mid);border-radius:6px;color:var(--text)"><option value="">Todas as unidades</option></select>
+        <select id="fc-tipo" onchange="renderAuditoriaConflitosFerias()" style="padding:4px 8px;font-size:.72rem;background:var(--card);border:1px solid var(--border-mid);border-radius:6px;color:var(--text)">
+          <option value="">Mesma data e mesmo mês</option>
+          <option value="data">Só mesma data</option>
+          <option value="mes">Só mesmo mês</option>
+        </select>
+        <select id="fc-escopo" onchange="renderAuditoriaConflitosFerias()" style="padding:4px 8px;font-size:.72rem;background:var(--card);border:1px solid var(--border-mid);border-radius:6px;color:var(--text)">
+          <option value="futuro">Em curso e futuras</option>
+          <option value="ano">Deste ano em diante</option>
+          <option value="tudo">Todo o histórico</option>
+        </select>
+        <button class="btn btn-ghost btn-sm" onclick="renderAuditoriaConflitosFerias()" title="Recalcular">🔄</button>
+        <button class="btn btn-ghost btn-sm" onclick="imprimirAuditoriaConflitosFerias()" title="Imprimir relatório de conflitos">🖨️ Imprimir</button>
+      </div>
+    </div>
+    <p style="font-size:.78rem;color:var(--muted);margin:0 0 10px">Compara apenas <strong>servidores efetivos</strong> (a programação de férias não inclui contratados). Aponta, em cada unidade, dois servidores da <strong>mesma categoria (cargo)</strong> com férias na <strong>mesma data</strong> (períodos sobrepostos) ou no <strong>mesmo mês</strong>.</p>
+    <div id="fc-resumo" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px"></div>
+    <div id="fc-resultado"></div>
+  </div>
 </div>
 
 <!-- ======================= ABA CALENDÁRIO ======================= -->

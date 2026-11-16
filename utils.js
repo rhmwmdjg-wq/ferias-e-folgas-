@@ -18,7 +18,7 @@ function showTab(tab) {
   if (tab === 'servidores') { renderTabela(); atualizarSelectsSetores(); }
   if (tab === 'config') renderConfig();
   if (tab === 'gestores') { renderGestores(); popularSetoresGestor(); popularModulosGestor(); }
-  if (tab === 'ferias') renderProgramacoes(), popularSelectServidor();
+  if (tab === 'ferias') { renderProgramacoes(); popularSelectServidor(); if (typeof popularSelectConflitosSetor === 'function') { popularSelectConflitosSetor(); renderAuditoriaConflitosFerias(); } }
   if (tab === 'calendario') iniciarCalendario();
   if (tab === 'relatorio') renderRelatorio(), popularSelectRelatorio();
   if (tab === 'presenca') atualizarSelectsSetores();
@@ -119,7 +119,8 @@ function addDays(dataStr, dias) {
 
 function popularSelectFerias(setor) {
   const sel = document.getElementById('fp-servidor'); if (!sel) return;
-  const lista = getServidoresAcessiveis().filter(s => !setor || s.setor === setor);
+  // Programação de férias: apenas servidores efetivos (regra do município)
+  const lista = getServidoresAcessiveis().filter(s => String(s.vinculo || '').toLowerCase() !== 'contratado' && (!setor || s.setor === setor));
   sel.innerHTML = '<option value="">Selecione...</option>' + lista.map(s => `<option value="${s.id}">${s.nome} (Mat. ${s.matricula})</option>`).join('');
 }
 

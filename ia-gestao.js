@@ -36,6 +36,8 @@ function iaHoje() { const h = new Date(); h.setHours(0, 0, 0, 0); return h; }
 function iaDiasEntre(a, b) { return Math.round((b - a) / IA_DIA_MS); }
 function iaVinculo(s) { return String((s && s.vinculo) || '').toLowerCase() === 'contratado' ? 'contratado' : 'efetivo'; }
 function iaSetor(s) { return (s && s.setor) || 'Sem setor'; }
+function iaEfetivo(s) { return iaVinculo(s) === 'efetivo'; }
+const IA_REGRA_FERIAS = 'REGRA DO MUNICÍPIO: a programação de férias é feita APENAS com servidores EFETIVOS. Contratados não entram na programação, na escala nem nos cálculos de férias; use-os apenas como contexto de cobertura da unidade.';
 function iaLista(arr, vazio) { return arr.length ? arr.join('; ') : (vazio || 'nenhum'); }
 
 // Datas (Date) de um uso de folga
@@ -54,6 +56,7 @@ function iaBase(filtro, rotuloNome) {
   const porId = {}; todos.forEach(function (s) { porId[s.id] = s; });
   const ids = new Set(srvs.map(function (s) { return s.id; }));
   const porSetor = {}; todos.forEach(function (s) { const k = iaSetor(s); porSetor[k] = (porSetor[k] || 0) + 1; });
+  const porSetorEf = {}; todos.forEach(function (s) { if (!iaEfetivo(s)) return; const k = iaSetor(s); porSetorEf[k] = (porSetorEf[k] || 0) + 1; });
   const codigoDe = {}; _iaCodigos = {};
   let seq = 0;
   function cod(id) {
@@ -71,7 +74,7 @@ function iaBase(filtro, rotuloNome) {
     const s = porId[id];
     return cod(id) + ' [' + iaSetor(s) + '; ' + (s.cargo || 'sem cargo') + '; ' + iaVinculo(s) + ']';
   }
-  return { srvs: srvs, todos: todos, ids: ids, porId: porId, porSetor: porSetor, cod: cod, desc: desc, hoje: iaHoje() };
+  return { srvs: srvs, todos: todos, ids: ids, porId: porId, porSetor: porSetor, porSetorEf: porSetorEf, cod: cod, desc: desc, hoje: iaHoje() };
 }
 
 function iaSaldoHoras(srvId) {
@@ -82,8 +85,19 @@ function iaSaldoFolgas(srvId) {
   return DB.folgas().filter(function (f) { return f.srvId === srvId; })
     .reduce(function (a, f) { return a + (f.tipo === 'credito' ? 1 : -1) * (Number(f.qtd) || 0); }, 0);
 }
+// Programações de férias: só de servidores efetivos (regra do município)
 function iaProgs(ids) {
-  return DB.programacoes().filter(function (p) { return (!ids || ids.has(p.srvId)) && iaData(p.inicio) && iaData(p.fim); });
+  const porId = {}; DB.servidores().forEach(function (s) { porId[s.id] = s; });
+  return DB.programacoes().filter(function (p) { return (!ids || ids.has(p.srvId)) && porId[p.srvId] && iaEfetivo(porId[p.srvId]) && iaData(p.inicio) && iaData(p.fim); });
+}
+// Conflitos de férias por unidade/categoria (mesma data ou mesmo mês), só efetivos — usa o motor da tela de férias
+function iaLinhasConflitos(B, setorFiltro, limite) {
+  if (typeof feriasConflitos !== 'function') return [];
+  const R = feriasConflitos({ setor: setorFiltro || '', escopo: 'futuro' });
+  return R.conflitos.filter(function (c) { return B.ids.has(c.a.srv.id) || B.ids.has(c.b.srv.id); }).slice(0, limite || 40).map(function (c) {
+    return c.setor + ' / ' + c.cargo + ': ' + B.cod(c.a.srv.id) + ' (' + iaBR(c.a.ini) + ' a ' + iaBR(c.a.fim) + (c.a.prog.autorizado ? ', autorizada' : '') + ') x ' +
+      B.cod(c.b.srv.id) + ' (' + iaBR(c.b.ini) + ' a ' + iaBR(c.b.fim) + (c.b.prog.autorizado ? ', autorizada' : '') + ') — ' + (c.tipo === 'data' ? 'MESMA DATA, ' : '') + c.detalhe;
+  });
 }
 function iaItensAtestado(ids) {
   try { return DB.itensProtocolo().filter(function (i) { return i.tipo === 'atestado' && (!ids || ids.has(i.srvId)); }); } catch (e) { return []; }
@@ -129,7 +143,7 @@ function iaLinhasCalendario(B, cal, setorUnico) {
   const out = [];
   cal.meses.forEach(function (m) {
     const partes = Object.keys(cal.mapa[m]).filter(function (st) { return !setorUnico || st === setorUnico; }).sort()
-      .map(function (st) { return st + ' ' + cal.mapa[m][st].size + '/' + (B.porSetor[st] || '?'); });
+      .map(function (st) { return st + ' ' + cal.mapa[m][st].size + '/' + (B.porSetorEf[st] || '?'); });
     out.push(iaRotuloMes(m) + ': ' + (partes.join(', ') || 'ninguém'));
   });
   return out;
@@ -219,21 +233,27 @@ function iaMontarContexto(mesesAtras, filtro) {
     const diasAte = iaDiasEntre(hoje, ini);
     if (!p.autorizado && !p.concluido && diasAte >= 0 && diasAte <= 60) semAutorizacao.push(desc(p.srvId) + ' início ' + iaBR(ini) + ' (em ' + diasAte + ' dias)');
   });
+  const efetSrvs = srvs.filter(iaEfetivo);
+  const porSetorEf = {}; efetSrvs.forEach(function (s) { const k = iaSetor(s); porSetorEf[k] = (porSetorEf[k] || 0) + 1; });
   L.push('');
-  L.push('FÉRIAS');
+  L.push('FÉRIAS (somente servidores EFETIVOS: ' + efetSrvs.length + ' de ' + srvs.length + ')');
+  L.push(IA_REGRA_FERIAS);
+  L.push('Efetivos por setor: ' + Object.keys(porSetorEf).sort().map(function (k) { return k + '=' + porSetorEf[k]; }).join('; '));
   L.push('Servidores com férias nos próximos 12 meses, por mês: ' + mesesFuturos.map(function (m) { return iaRotuloMes(m) + ' ' + feriasMes[m].pessoas.size; }).join('; '));
   const concentr = [];
   mesesFuturos.forEach(function (m) {
     Object.keys(feriasMes[m].setor).forEach(function (st) {
-      const fora = feriasMes[m].setor[st].size, tot = porSetor[st] || 0;
+      const fora = feriasMes[m].setor[st].size, tot = porSetorEf[st] || 0;
       if (fora >= 2 && tot && fora / tot >= 0.25) concentr.push(iaRotuloMes(m) + ' ' + st + ': ' + fora + ' de ' + tot + ' fora');
     });
   });
-  L.push('Meses/setores com 25% ou mais do setor de férias no mesmo mês: ' + iaLista(concentr.slice(0, 25)));
+  L.push('Meses/setores com 25% ou mais dos efetivos do setor de férias no mesmo mês: ' + iaLista(concentr.slice(0, 25)));
+  const confl = iaLinhasConflitos(B, null, 40);
+  L.push('CONFLITOS POR UNIDADE E CATEGORIA (dois efetivos do mesmo setor e mesmo cargo com férias na mesma data ou no mesmo mês; em curso/futuras): ' + confl.length + (confl.length ? '\n- ' + confl.join('\n- ') : ' (nenhum)'));
   L.push('Férias que começam em até 60 dias e ainda NÃO estão autorizadas: ' + iaLista(semAutorizacao.slice(0, 20), 'nenhuma'));
-  const semProg = srvs.filter(function (s) { return !comFeriasFuturas.has(s.id) && !comFeriasNoAno.has(s.id); });
+  const semProg = efetSrvs.filter(function (s) { return !comFeriasFuturas.has(s.id) && !comFeriasNoAno.has(s.id); });
   const semPorSetor = {}; semProg.forEach(function (s) { const k = iaSetor(s); semPorSetor[k] = (semPorSetor[k] || 0) + 1; });
-  L.push('Servidores sem nenhuma férias registrada em ' + hoje.getFullYear() + ' nem programada para frente: ' + semProg.length + ' de ' + srvs.length +
+  L.push('Efetivos sem nenhuma férias registrada em ' + hoje.getFullYear() + ' nem programada para frente: ' + semProg.length + ' de ' + efetSrvs.length +
     (semProg.length ? ' — por setor: ' + Object.keys(semPorSetor).sort().map(function (k) { return k + '=' + semPorSetor[k]; }).join('; ') : ''));
   const antigos = semProg.map(function (s) { const a = iaData(s.admissao); return { s: s, anos: a ? (hoje - a) / (365.25 * IA_DIA_MS) : null }; })
     .filter(function (x) { return x.anos !== null && x.anos >= 1; }).sort(function (a, b) { return b.anos - a.anos; }).slice(0, 15);
@@ -321,6 +341,7 @@ function iaCtxServidor(id, rotuloNome) {
 function iaCtxSimulador(id, inicioStr, dias) {
   const B = iaBase();
   const s = B.porId[id]; if (!s) throw new Error('Selecione o servidor.');
+  if (!iaEfetivo(s)) throw new Error('Este servidor é contratado. A programação de férias é feita apenas com servidores efetivos.');
   const ini = iaData(inicioStr); if (!ini) throw new Error('Informe a data de início.');
   dias = Math.floor(Number(dias)); if (!(dias >= 1 && dias <= 60)) throw new Error('Informe a quantidade de dias (1 a 60).');
   const fim = new Date(ini.getTime() + (dias - 1) * IA_DIA_MS);
@@ -328,12 +349,19 @@ function iaCtxSimulador(id, inicioStr, dias) {
   const L = ['DATA DE HOJE: ' + iaBR(B.hoje), '', 'FÉRIAS SIMULADAS: ' + B.cod(id) + ' de ' + iaBR(ini) + ' a ' + iaBR(fim) + ' (' + dias + ' dias), começando em ' + iaDiasEntre(B.hoje, ini) + ' dias.', ''];
   iaLinhasServidor(B, id).forEach(function (l) { L.push(l); });
   const aus = iaAusenciasSetor(B, setor, ini, fim, id);
-  const mesmoCargo = B.todos.filter(function (x) { return iaSetor(x) === setor && x.id !== id && (x.cargo || '') === (s.cargo || ''); }).length;
+  const mesmoCargo = B.todos.filter(function (x) { return iaSetor(x) === setor && x.id !== id && iaEfetivo(x) && (x.cargo || '') === (s.cargo || ''); }).length;
   L.push('');
-  L.push('SETOR NO PERÍODO SIMULADO: ' + (B.porSetor[setor] || 0) + ' servidores no setor; ' + mesmoCargo + ' outros com o mesmo cargo (' + (s.cargo || 'sem cargo') + '). Além do servidor simulado, ' + aus.pessoas + ' já estarão fora em algum dia do período:');
+  L.push(IA_REGRA_FERIAS);
+  L.push('SETOR NO PERÍODO SIMULADO: ' + (B.porSetor[setor] || 0) + ' servidores no setor (' + (B.porSetorEf[setor] || 0) + ' efetivos); ' + mesmoCargo + ' outros efetivos com o mesmo cargo (' + (s.cargo || 'sem cargo') + '). Além do servidor simulado, ' + aus.pessoas + ' já estarão fora em algum dia do período:');
   L.push(iaLista(aus.linhas.slice(0, 30), 'ninguém'));
+  const confSim = aus.linhas.filter(function (l) { return l.indexOf('(' + (s.cargo || 'sem cargo') + ') férias') >= 0; });
+  L.push('CONFLITO DE CATEGORIA NAS DATAS SIMULADAS (mesmo setor e mesmo cargo, de férias na mesma data): ' + iaLista(confSim, 'nenhum'));
+  const mesesSim = []; for (let d = new Date(ini.getFullYear(), ini.getMonth(), 1); d <= fim; d = new Date(d.getFullYear(), d.getMonth() + 1, 1)) mesesSim.push(iaChaveMes(d.getFullYear(), d.getMonth()));
+  const mesmoMes = iaProgs().filter(function (p) { const x = B.porId[p.srvId]; if (!x || p.srvId === id || iaSetor(x) !== setor || (x.cargo || '') !== (s.cargo || '')) return false; const a = iaData(p.inicio), b = iaData(p.fim); return mesesSim.some(function (m) { const q = m.split('-'); const m0 = new Date(+q[0], +q[1] - 1, 1), m1 = new Date(+q[0], +q[1], 0); return a <= m1 && b >= m0; }); })
+    .map(function (p) { return B.cod(p.srvId) + ' ' + iaBR(iaData(p.inicio)) + ' a ' + iaBR(iaData(p.fim)); });
+  L.push('MESMA CATEGORIA COM FÉRIAS NO MESMO MÊS: ' + iaLista(mesmoMes, 'ninguém'));
   L.push('');
-  L.push('CALENDÁRIO DE FÉRIAS DO SETOR (pessoas fora/total do setor, próximos 12 meses):');
+  L.push('CALENDÁRIO DE FÉRIAS DO SETOR (efetivos de férias/total de efetivos do setor, próximos 12 meses):');
   iaLinhasCalendario(B, iaCalendarioFerias(B), setor).forEach(function (l) { L.push(l); });
   return L.join('\n');
 }
@@ -343,16 +371,24 @@ function iaCtxEscala(setorFiltro) {
   const hoje = B.hoje, ano = hoje.getFullYear();
   const comFerias = new Set();
   iaProgs().forEach(function (p) { const a = iaData(p.inicio), b = iaData(p.fim); if (b >= hoje || a.getFullYear() === ano || b.getFullYear() === ano) comFerias.add(p.srvId); });
-  const sem = B.todos.filter(function (s) { return !comFerias.has(s.id) && (!setorFiltro || iaSetor(s) === setorFiltro); })
+  const sem = B.todos.filter(function (s) { return iaEfetivo(s) && !comFerias.has(s.id) && (!setorFiltro || iaSetor(s) === setorFiltro); })
     .map(function (s) { const a = iaData(s.admissao); return { s: s, anos: a ? (hoje - a) / (365.25 * IA_DIA_MS) : -1 }; })
     .sort(function (a, b) { return b.anos - a.anos; });
-  if (!sem.length) throw new Error('Todos os servidores' + (setorFiltro ? ' deste setor' : '') + ' já têm férias no ano ou programadas.');
-  const L = ['DATA DE HOJE: ' + iaBR(hoje), '', 'TAMANHO DOS SETORES: ' + Object.keys(B.porSetor).sort().map(function (k) { return k + '=' + B.porSetor[k]; }).join('; '), ''];
-  L.push('SERVIDORES SEM FÉRIAS EM ' + ano + ' NEM PROGRAMADAS (' + sem.length + (sem.length > 60 ? ', mostrando os 60 com mais tempo de casa' : '') + '):');
+  if (!sem.length) throw new Error('Todos os servidores efetivos' + (setorFiltro ? ' deste setor' : '') + ' já têm férias no ano ou programadas.');
+  const L = ['DATA DE HOJE: ' + iaBR(hoje), '', IA_REGRA_FERIAS, 'EFETIVOS POR SETOR: ' + Object.keys(B.porSetorEf).sort().map(function (k) { return k + '=' + B.porSetorEf[k]; }).join('; '), ''];
+  L.push('REGRA DE DISTRIBUIÇÃO: evitar que dois efetivos do mesmo setor e mesmo cargo fiquem de férias na mesma data; de preferência, nem no mesmo mês.');
+  L.push('SERVIDORES EFETIVOS SEM FÉRIAS EM ' + ano + ' NEM PROGRAMADAS (' + sem.length + (sem.length > 60 ? ', mostrando os 60 com mais tempo de casa' : '') + '):');
   sem.slice(0, 60).forEach(function (x) { L.push('- ' + B.desc(x.s.id) + (x.anos >= 0 ? ' ' + iaNum(x.anos) + ' anos de casa' : ' admissão não informada') + '; saldo de horas ' + iaNum(iaSaldoHoras(x.s.id)) + ' h'); });
   L.push('');
-  L.push('FÉRIAS JÁ PROGRAMADAS (pessoas fora/total do setor, por mês):');
+  L.push('FÉRIAS JÁ PROGRAMADAS (efetivos de férias/total de efetivos do setor, por mês):');
   iaLinhasCalendario(B, iaCalendarioFerias(B), setorFiltro || null).forEach(function (l) { L.push(l); });
+  const progsFut = iaProgs(B.ids).filter(function (p) { return iaData(p.fim) >= hoje && (!setorFiltro || iaSetor(B.porId[p.srvId]) === setorFiltro); })
+    .sort(function (a, b) { return iaData(a.inicio) - iaData(b.inicio); });
+  L.push('');
+  L.push('PERÍODOS JÁ PROGRAMADOS POR CATEGORIA (setor / cargo: quem e quando): ');
+  progsFut.slice(0, 80).forEach(function (p) { const s = B.porId[p.srvId]; L.push('- ' + iaSetor(s) + ' / ' + (s.cargo || 'sem cargo') + ': ' + B.cod(p.srvId) + ' ' + iaBR(iaData(p.inicio)) + ' a ' + iaBR(iaData(p.fim))); });
+  const confl = iaLinhasConflitos(B, setorFiltro, 30);
+  L.push('CONFLITOS JÁ EXISTENTES (mesmo setor e cargo, mesma data ou mês): ' + (confl.length ? '\n- ' + confl.join('\n- ') : 'nenhum'));
   return L.join('\n');
 }
 
@@ -373,7 +409,7 @@ function iaCtxCompensacao(setorFiltro) {
     L.push('- ' + B.desc(x.s.id) + ' ' + iaNum(x.h) + ' h; saldo de folgas ' + iaNum(iaSaldoFolgas(x.s.id)) + ' d; férias programadas: ' + iaLista(pr, 'nenhuma'));
   });
   L.push('');
-  L.push('FÉRIAS PROGRAMADAS POR SETOR (pessoas fora/total, por mês):');
+  L.push('FÉRIAS PROGRAMADAS POR SETOR (efetivos de férias/total de efetivos, por mês):');
   iaLinhasCalendario(B, iaCalendarioFerias(B), setorFiltro || null).slice(0, 6).forEach(function (l) { L.push(l); });
   return L.join('\n');
 }
@@ -400,10 +436,38 @@ function iaCtxParecer(solId) {
   iaLinhasServidor(B, sol.srvId).forEach(function (l) { L.push(l); });
   const setor = iaSetor(s);
   const aus = iaAusenciasSetor(B, setor, ini, fim, sol.srvId);
-  const mesmoCargo = B.todos.filter(function (x) { return iaSetor(x) === setor && x.id !== sol.srvId && (x.cargo || '') === (s.cargo || ''); }).length;
+  const mesmoCargo = B.todos.filter(function (x) { return iaSetor(x) === setor && x.id !== sol.srvId && iaEfetivo(x) && (x.cargo || '') === (s.cargo || ''); }).length;
   L.push('');
-  L.push('SETOR NAS DATAS PEDIDAS: ' + (B.porSetor[setor] || 0) + ' servidores; ' + mesmoCargo + ' outros com o mesmo cargo; ' + aus.pessoas + ' já fora em algum dia do período:');
+  if (String(sol.tipo || '').indexOf('ferias') >= 0) { L.push(IA_REGRA_FERIAS); if (!iaEfetivo(s)) L.push('ATENÇÃO: o solicitante é CONTRATADO; pedido de férias de contratado não entra na programação de férias.'); }
+  L.push('SETOR NAS DATAS PEDIDAS: ' + (B.porSetor[setor] || 0) + ' servidores (' + (B.porSetorEf[setor] || 0) + ' efetivos); ' + mesmoCargo + ' outros efetivos com o mesmo cargo; ' + aus.pessoas + ' já fora em algum dia do período:');
   L.push(iaLista(aus.linhas.slice(0, 30), 'ninguém'));
+  const confPar = aus.linhas.filter(function (l) { return l.indexOf('(' + (s.cargo || 'sem cargo') + ') férias') >= 0; });
+  L.push('CONFLITO DE CATEGORIA (mesmo setor e cargo de férias na mesma data): ' + iaLista(confPar, 'nenhum'));
+  return L.join('\n');
+}
+
+function iaCtxConflitos(setorFiltro) {
+  const B = iaBase();
+  const R = typeof feriasConflitos === 'function' ? feriasConflitos({ setor: setorFiltro || '', escopo: 'futuro' }) : { conflitos: [], base: { efetivos: 0, progs: 0, setores: {} } };
+  const confl = R.conflitos.filter(function (c) { return B.ids.has(c.a.srv.id) || B.ids.has(c.b.srv.id); });
+  if (!confl.length) throw new Error('Nenhum conflito de férias' + (setorFiltro ? ' nesta unidade' : '') + ': não há dois efetivos da mesma categoria com férias na mesma data nem no mesmo mês.');
+  const L = ['DATA DE HOJE: ' + iaBR(B.hoje), IA_REGRA_FERIAS, '',
+    'EFETIVOS POR UNIDADE: ' + Object.keys(R.base.setores).sort().map(function (k) { return k + '=' + R.base.setores[k]; }).join('; '),
+    'PERÍODOS DE FÉRIAS ANALISADOS (em curso e futuros): ' + R.base.progs, ''];
+  const cat = {};
+  B.todos.forEach(function (s) { if (!iaEfetivo(s) || (setorFiltro && iaSetor(s) !== setorFiltro)) return; const k = iaSetor(s) + ' / ' + (typeof feriasCargoChave === 'function' ? feriasCargoChave(s) : String(s.cargo || 'sem cargo').trim().toLowerCase()); cat[k] = (cat[k] || 0) + 1; });
+  L.push('TAMANHO DE CADA CATEGORIA (setor / cargo = efetivos): ' + Object.keys(cat).sort().map(function (k) { return k + '=' + cat[k]; }).join('; '));
+  L.push('');
+  L.push('CONFLITOS (' + confl.length + '):');
+  confl.slice(0, 60).forEach(function (c, i) {
+    L.push((i + 1) + '. ' + c.setor + ' / ' + c.cargo + ' — ' + (c.tipo === 'data' ? 'MESMA DATA' : 'MESMO MÊS') + ': ' +
+      B.desc(c.a.srv.id) + ' ' + iaBR(c.a.ini) + ' a ' + iaBR(c.a.fim) + (c.a.prog.autorizado ? ' [autorizada]' : ' [só programada]') + ' x ' +
+      B.desc(c.b.srv.id) + ' ' + iaBR(c.b.ini) + ' a ' + iaBR(c.b.fim) + (c.b.prog.autorizado ? ' [autorizada]' : ' [só programada]') + ' — ' + c.detalhe);
+  });
+  L.push('');
+  L.push('OBS.: férias já AUTORIZADAS têm documento emitido; prefira remanejar a que está só programada.');
+  L.push('CALENDÁRIO (efetivos de férias/total de efetivos do setor, próximos 12 meses):');
+  iaLinhasCalendario(B, iaCalendarioFerias(B), setorFiltro || null).forEach(function (l) { L.push(l); });
   return L.join('\n');
 }
 
@@ -491,6 +555,9 @@ function iaCtxAuditoriaDados() {
   });
   // férias
   const progs = iaProgs(B.ids);
+  const progsContr = DB.programacoes().filter(function (p) { const s = B.porId[p.srvId]; return s && B.ids.has(p.srvId) && !iaEfetivo(s); });
+  if (progsContr.length) add('alta', progsContr.length + ' programação(ões) de férias lançadas para servidor CONTRATADO (a programação é só de efetivos): ' + progsContr.slice(0, 10).map(function (p) { return B.desc(p.srvId) + ' ' + iaBR(iaData(p.inicio)) + ' a ' + iaBR(iaData(p.fim)); }).join('; '));
+  iaLinhasConflitos(B, null, 60).forEach(function (l) { add(l.indexOf('MESMA DATA') >= 0 ? 'alta' : 'conferir', 'conflito de férias por unidade/categoria — ' + l); });
   const porSrv = {};
   progs.forEach(function (p) {
     const a = iaData(p.inicio), b = iaData(p.fim), dias = iaDiasEntre(a, b) + 1;
@@ -511,7 +578,7 @@ function iaCtxAuditoriaDados() {
       if (dentro.length) add('alta', B.desc(id) + ': folga lançada em ' + dentro.map(iaBR).join(', ') + ' dentro do período de férias');
     });
   });
-  const L = ['DATA DE HOJE: ' + iaBR(hoje), 'BASE CONFERIDA: ' + B.srvs.length + ' servidores, ' + bh.length + ' lançamentos de horas, ' + fg.length + ' de folgas, ' + progs.length + ' períodos de férias.', '',
+  const L = ['DATA DE HOJE: ' + iaBR(hoje), 'BASE CONFERIDA: ' + B.srvs.length + ' servidores (' + B.srvs.filter(iaEfetivo).length + ' efetivos), ' + bh.length + ' lançamentos de horas, ' + fg.length + ' de folgas, ' + progs.length + ' períodos de férias de efetivos.', IA_REGRA_FERIAS, '',
     'ACHADOS DETECTADOS PELO SISTEMA (' + A.length + (A.length > 120 ? ', mostrando 120' : '') + '):'];
   if (!A.length) L.push('Nenhuma inconsistência encontrada nas checagens automáticas.');
   A.slice(0, 120).forEach(function (x) { L.push('- ' + x); });
@@ -707,6 +774,9 @@ const IA_FERRAMENTAS = [
       _iaUltimoAlvo = v.srv;
       return { contexto: iaCtxServidor(v.srv, 'primeiro'), foco: [v.motivo, v.extra].filter(Boolean).join('. ') };
     } },
+  { id: 'conflitos', ico: '🚦', titulo: 'Conflitos de férias por unidade', desc: 'Efetivos da mesma categoria com férias na mesma data ou no mesmo mês; como resolver.', tarefa: 'pergunta',
+    campos: [{ id: 'setor', rot: 'Unidade', tipo: 'select', op: iaOpcoesSetor }, { id: 'foco', rot: 'Orientação (opcional)', tipo: 'texto', dica: 'Ex.: priorizar quem tem mais tempo de casa' }],
+    montar: function (v) { return { contexto: iaCtxConflitos(v.setor), pergunta: 'Analise os conflitos de férias listados, unidade por unidade: para cada conflito, diga o risco de a categoria ficar descoberta na unidade (use o tamanho da categoria), classifique a gravidade (mesma data é mais grave que mesmo mês) e proponha qual dos dois períodos remanejar e para qual mês, escolhendo meses em que nenhum outro efetivo do mesmo cargo esteja de férias. Prefira remanejar o período que está só programado e preservar o que já está autorizado. Termine com uma lista de ações em ordem de prioridade. Não trate de horas extras nem de folgas.' + (v.foco ? ' Orientação do gestor: ' + v.foco : '') }; } },
   { id: 'auditoria_dados', ico: '🧹', titulo: 'Auditoria dos lançamentos', desc: 'Duplicidades, folga em férias, períodos sobrepostos, cadastro incompleto.', tarefa: 'auditoria_dados', campos: [],
     montar: function () { return { contexto: iaCtxAuditoriaDados() }; } },
   { id: 'auditoria_log', ico: '🕵️', titulo: 'Auditoria do registro de atividades', desc: 'Quem alterou o quê, exclusões e ações em horário atípico.', tarefa: 'auditoria_log',

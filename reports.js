@@ -455,6 +455,8 @@ async function excluirProgRel(id) {
 
   renderRelatorio();
   renderDashboard();
+  if (typeof renderProgramacoes === 'function' && document.getElementById('lista-programacoes')) renderProgramacoes();
+  if (typeof renderAuditoriaConflitosFerias === 'function') renderAuditoriaConflitosFerias();
   atualizarBadge();
   toastMsg('Programação excluída permanentemente.');
 }
