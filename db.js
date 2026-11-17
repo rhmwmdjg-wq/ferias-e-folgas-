@@ -116,6 +116,27 @@ async function salvarComFila(tabela, paraSubir, rotulo) {
 }
 window.salvarComFila = salvarComFila;
 
+// Grava ofícios/notificações na nuvem. Se a tabela ainda não tiver alguma coluna nova
+// ("extras" ou "destinatarios"), grava sem ela em vez de perder o documento inteiro.
+async function salvarDocsCompat(tabela, d) {
+  let linhas = d;
+  try {
+    for (let tentativa = 0; tentativa < 3; tentativa++) {
+      const { error } = await supabaseClient.from(tabela).upsert(linhas, { onConflict: 'id' });
+      if (!error) return;
+      if (isQuotaError(error)) { saveToSyncQueue(tabela, d); return; }
+      const msg = (error.message || '').toLowerCase();
+      const faltando = ['extras', 'destinatarios'].find(c => msg.includes(c) && linhas.some(o => c in o));
+      if (!faltando) { console.warn('Erro ao salvar ' + tabela + ' no Supabase:', error.message); return; }
+      console.warn("Coluna '" + faltando + "' ausente em " + tabela + '. Salvando em modo compatível.');
+      linhas = linhas.map(o => { const c = { ...o }; delete c[faltando]; return c; });
+    }
+  } catch (e) {
+    if (isQuotaError(e)) saveToSyncQueue(tabela, d);
+    else console.error('Erro ao salvar ' + tabela + ' no Supabase:', e);
+  }
+}
+
 const DB = {
   servidores: () => _remoteData.servidores.length ? _remoteData.servidores : JSON.parse(localStorage.getItem('srv_servidores') || '[]'),
   saveServidores: async (d, apenasNovos) => {
@@ -621,28 +642,7 @@ const DB = {
     _remoteData.oficios = d;
     localStorage.setItem('srv_oficios', JSON.stringify(d));
     if (!d || !d.length) return;
-    try {
-      const { error } = await supabaseClient.from('oficios').upsert(d, { onConflict: 'id' });
-      if (error) {
-        if (isQuotaError(error)) {
-          saveToSyncQueue('oficios', d);
-        } else {
-          const msg = (error.message || '').toLowerCase();
-          if (msg.includes('destinatarios')) {
-            // Coluna "destinatarios" ainda não existe na nuvem: salva sem ela
-            console.warn("Coluna 'destinatarios' ausente. Salvando ofício em modo compatível.");
-            const safe = d.map(o => { const c = { ...o }; delete c.destinatarios; return c; });
-            const { error: err2 } = await supabaseClient.from('oficios').upsert(safe, { onConflict: 'id' });
-            if (err2 && !isQuotaError(err2)) console.warn("Aviso ao salvar ofícios (modo compatível):", err2.message);
-          } else {
-            console.warn("Erro ao salvar ofícios no Supabase:", error.message);
-          }
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) saveToSyncQueue('oficios', d);
-      else console.error("Erro ao salvar ofícios no Supabase:", e);
-    }
+    await salvarDocsCompat('oficios', d);
   },
   deleteOficio: async (id) => {
     _remoteData.oficios = _remoteData.oficios.filter(o => o.id !== id);
@@ -669,23 +669,7 @@ const DB = {
     _remoteData.notificacoes = d;
     localStorage.setItem('srv_notificacoes', JSON.stringify(d));
     if (!d || !d.length) return;
-    try {
-      const { error } = await supabaseClient.from('notificacoes').upsert(d, { onConflict: 'id' });
-      if (error) {
-        if (isQuotaError(error)) saveToSyncQueue('notificacoes', d);
-        else {
-          const msg = (error.message || '').toLowerCase();
-          if (msg.includes('destinatarios')) {
-            const safe = d.map(o => { const c = { ...o }; delete c.destinatarios; return c; });
-            const { error: err2 } = await supabaseClient.from('notificacoes').upsert(safe, { onConflict: 'id' });
-            if (err2 && !isQuotaError(err2)) console.warn("Aviso notificacoes (modo compatível):", err2.message);
-          } else console.warn("Erro ao salvar notificações:", error.message);
-        }
-      }
-    } catch (e) {
-      if (isQuotaError(e)) saveToSyncQueue('notificacoes', d);
-      else console.error("Erro ao salvar notificações:", e);
-    }
+    await salvarDocsCompat('notificacoes', d);
   },
   deleteNotificacao: async (id) => {
     _remoteData.notificacoes = _remoteData.notificacoes.filter(o => o.id !== id);

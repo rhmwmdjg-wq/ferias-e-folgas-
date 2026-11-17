@@ -991,6 +991,32 @@
       })) });
     }
 
+    // Ofícios com prazo de resposta e notificações aguardando ciência
+    if (tabVisivel('oficios') && typeof docLista === 'function') {
+      const abertos = safe(() => docLista('ofi'), []).filter(o => {
+        const x = o.extras || {};
+        return x.prazoResposta && !x.cancelado && x.status !== 'respondido' && x.status !== 'arquivado' && diffDays(x.prazoResposta) <= 5;
+      }).sort((a, b) => String(a.extras.prazoResposta).localeCompare(String(b.extras.prazoResposta)));
+      secs.push({ id: 'ofi-prazo', titulo: 'Ofícios aguardando resposta', ico: '📜', cor: '#4d8bff', itens: abertos.map(o => {
+        const d = diffDays(o.extras.prazoResposta);
+        return { sev: d < 0 ? 'bad' : d <= 2 ? 'warn' : 'info', titulo: o.codigo + ' — ' + (o.destinatario || 'sem destinatário'),
+          sub: (d < 0 ? 'Prazo vencido há ' + (-d) + ' dia(s)' : d === 0 ? 'Prazo vence HOJE' : 'Prazo vence em ' + d + ' dia(s)') + ' (' + fd(o.extras.prazoResposta) + ') · ' + (o.assunto || ''),
+          acoes: [{ label: '📜 Abrir', cls: 'btn-ghost', on: "showTab('oficios');setTimeout(function(){docEditar('ofi','" + jsArg(o.id) + "')},80)" },
+            { label: '✅ Respondido', cls: 'btn-primary', on: "docMudarSituacao('ofi','" + jsArg(o.id) + "','respondido').then(function(){MX.renderPendencias()})" }] };
+      }) });
+    }
+    if (tabVisivel('notificacoes') && typeof docLista === 'function') {
+      const semCiencia = safe(() => docLista('ntf'), []).filter(o => {
+        const x = o.extras || {};
+        return !x.cancelado && (!x.status || x.status === 'emitido') && o.criadoEm && diffDays(String(o.criadoEm).slice(0, 10)) <= -7;
+      });
+      secs.push({ id: 'ntf-ciencia', titulo: 'Notificações sem ciência registrada', ico: '⚠️', cor: '#f5b52e', padraoFechado: true, itens: semCiencia.map(o => ({
+        sev: 'info', titulo: o.codigo + ' — ' + (o.destinatario || 'sem destinatário'),
+        sub: 'Emitida em ' + fd(String(o.criadoEm).slice(0, 10)) + ' · ' + (o.assunto || '') + ' — registre a ciência (ou a recusa) no histórico.',
+        acoes: [{ label: '⚠️ Abrir', cls: 'btn-ghost', on: "showTab('notificacoes')" }]
+      })) });
+    }
+
     if (isAdmin()) {
       const ult = LS.get('mx_ultimo_backup', null);
       const dias = ult ? Math.floor((Date.now() - new Date(ult)) / 86400000) : null;

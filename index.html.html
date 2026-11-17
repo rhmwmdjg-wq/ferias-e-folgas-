@@ -3605,16 +3605,29 @@ Coordenação de RH
 <div class="tab-panel" id="panel-oficios">
   <div class="section-title">📜 Gerador de Ofícios Oficiais</div>
 
+  <div id="ofi-aviso-sql" style="display:none; margin-bottom:14px; border:1px solid var(--warning, #f59e0b); border-radius:var(--r-sm); padding:10px 12px; font-size:.78rem; background:var(--surface);">
+    ⚠️ Falta um passo para a nuvem guardar situação, prazos, anexos, envios e assinaturas dos ofícios: execute o script <strong>sql_oficios_v2.sql</strong> no SQL Editor do Supabase. Até lá, essas informações ficam salvas só neste aparelho.
+  </div>
+
   <div class="ev-grid" style="grid-template-columns: 1fr 1.1fr;">
     <!-- Form Card -->
     <div class="ev-card" id="card-form-oficio">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:8px; flex-wrap:wrap;">
         <h3 style="margin:0;">✍️ <span id="ofi-form-title">Novo Ofício Oficial</span></h3>
         <button class="btn btn-ghost btn-sm" onclick="carregarNovoOficio()">➕ Novo Ofício</button>
       </div>
-      
+
       <input type="hidden" id="ofi-id">
       <input type="hidden" id="ofi-ano">
+
+      <div class="field" style="margin-bottom:12px;">
+        <label>Modelo</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          <select id="ofi-modelo-select" style="flex:1; min-width:180px;" onchange="ofiAplicarModelo(this.value)"></select>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="ofiSalvarComoModelo()" title="Guardar o assunto e o texto atuais como um modelo seu">💾 Salvar como modelo</button>
+          <button type="button" class="btn btn-danger btn-sm" id="ofi-modelo-excluir" style="display:none" onclick="ofiExcluirModelo()" title="Excluir este modelo">🗑️</button>
+        </div>
+      </div>
 
       <div class="form-row cols-3">
         <div class="field" style="max-width:110px;">
@@ -3627,17 +3640,18 @@ Coordenação de RH
         </div>
         <div class="field">
           <label>Cidade e Data por Extenso</label>
-          <input id="ofi-cidade-data" placeholder="ITACARAMBI - MG, 06 de Outubro de 2026" oninput="atualizarPreviewOficio()">
+          <input id="ofi-cidade-data" placeholder="ITACARAMBI - MG, 06 de outubro de 2026" oninput="atualizarPreviewOficio()">
         </div>
       </div>
+      <div id="ofi-avisos" style="display:none; margin:8px 0 4px; font-size:.74rem; color:var(--warning, #f59e0b); line-height:1.5;"></div>
 
-      <div class="field" style="margin-bottom:10px;">
+      <div class="field" style="margin:10px 0;">
         <label>Destinatário(s) do Ofício</label>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <select id="ofi-dest-select" style="flex:1; min-width:200px;"></select>
           <button type="button" class="btn btn-primary btn-sm" onclick="adicionarDestinatarioOficio()">➕ Adicionar</button>
         </div>
-        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">Selecione destinatários cadastrados para preencher automaticamente. Você pode adicionar vários ao mesmo ofício.</div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">A forma de tratamento (“À Senhora”, “A Sua Excelência o Senhor”…) vem do cadastro e pode ser ajustada em cada ofício.</div>
       </div>
 
       <div id="ofi-dest-selecionados" style="margin-bottom:14px;"></div>
@@ -3647,9 +3661,39 @@ Coordenação de RH
         <input id="ofi-assunto" placeholder="Ex: Solicitação de Manutenção de Veículo" oninput="atualizarPreviewOficio()">
       </div>
 
-      <div class="field" style="margin-bottom:14px">
+      <div class="field" style="margin-bottom:8px">
         <label>Texto do Corpo do Ofício * (Separe parágrafos com Enter)</label>
-        <textarea id="ofi-texto" placeholder="Digite o conteúdo oficial do ofício..." style="min-height:160px; line-height:1.6;" oninput="atualizarPreviewOficio()"></textarea>
+        <textarea id="ofi-texto" placeholder="Comece pelo vocativo (ex.: Senhora Secretária,) e escreva o conteúdo. O fecho “Atenciosamente,” é colocado automaticamente." style="min-height:180px; line-height:1.6;" oninput="atualizarPreviewOficio()"></textarea>
+      </div>
+      <div style="margin-bottom:14px;">
+        <button type="button" class="btn btn-ghost btn-sm so-logado" onclick="docIaAlternar('ofi')">✨ Redigir / revisar com IA</button>
+        <div id="ofi-ia-box" style="display:none; margin-top:8px; border:1px solid var(--border-mid); border-radius:var(--r-sm); padding:10px; background:var(--surface);">
+          <div class="field"><label>O que o ofício deve comunicar ou pedir?</label>
+            <textarea id="ofi-ia-pedido" style="min-height:64px" placeholder="Ex.: pedir à Secretária a compra de 2 balanças para a UBS Central, porque as atuais estão quebradas desde outubro; prazo até dia 30."></textarea></div>
+          <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="docIaGerar('ofi','redigir')">✨ Redigir o texto</button>
+            <button type="button" class="btn btn-ghost btn-sm" onclick="docIaGerar('ofi','revisar')">🪄 Revisar o texto que já escrevi</button>
+          </div>
+          <div id="ofi-ia-status" style="font-size:.74rem; margin-top:6px;"></div>
+          <div style="font-size:.68rem; color:var(--muted); margin-top:4px;">O pedido é enviado à IA (Google Gemini). Não inclua dados de pacientes nem informações sigilosas. Revise sempre o resultado.</div>
+        </div>
+      </div>
+
+      <div class="form-row cols-2" style="margin-bottom:14px;">
+        <div class="field">
+          <label>Anexos (um por linha)</label>
+          <textarea id="ofi-anexos" style="min-height:52px" placeholder="Ex: Planilha de quantitativos" oninput="atualizarPreviewOficio()"></textarea>
+        </div>
+        <div class="field">
+          <label>C/C — com cópia para (um por linha)</label>
+          <textarea id="ofi-cc" style="min-height:52px" placeholder="Ex: Setor de Compras" oninput="atualizarPreviewOficio()"></textarea>
+        </div>
+      </div>
+
+      <div class="field" style="margin-bottom:14px; max-width:240px;">
+        <label>Prazo para resposta (opcional)</label>
+        <input type="date" id="ofi-prazo">
+        <div style="font-size:0.68rem; color:var(--muted); margin-top:4px;">Controle interno: aparece no histórico e nas Pendências quando vencer.</div>
       </div>
 
       <div class="field" style="margin-bottom:14px;">
@@ -3670,10 +3714,14 @@ Coordenação de RH
         </div>
       </div>
 
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
         <button class="btn btn-primary" id="btn-salvar-oficio" onclick="salvarOficio()">💾 Salvar & Emitir Ofício</button>
-        <button class="btn btn-ghost" onclick="imprimirOficioAtual()">🖨️ Imprimir PDF</button>
         <button class="btn btn-ghost" onclick="carregarNovoOficio()">🧹 Limpar</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn btn-ghost" onclick="docAcaoFormulario('ofi','baixar')">📄 Baixar PDF</button>
+        <button class="btn btn-ghost" onclick="imprimirOficioAtual()">🖨️ Abrir / Imprimir</button>
+        <button class="btn btn-success so-logado" onclick="docAcaoFormulario('ofi','enviar')">🖋️ Assinar e ✉️ Enviar</button>
       </div>
 
       <!-- Action box for generated link -->
@@ -3696,18 +3744,29 @@ Coordenação de RH
     </div>
   </div>
 
-  <!-- Cadastro de Destinatários e Emissores -->
+  <!-- Cadastro de Destinatários, Emissores e E-mails -->
   <div class="ev-card" style="margin-top:20px;">
-    <h3 style="margin-bottom:4px;">🗂️ Cadastro de Destinatários e Emissores</h3>
-    <p style="font-size:.78rem;color:var(--muted);margin-bottom:16px">Cadastre uma vez e reutilize. Ao selecionar no ofício, o Nome, Cargo e Órgão são preenchidos automaticamente.</p>
+    <h3 style="margin-bottom:4px;">🗂️ Cadastros: Destinatários, Emissores e E-mails</h3>
+    <p style="font-size:.78rem;color:var(--muted);margin-bottom:16px">Cadastre uma vez e reutilize. Ao selecionar no ofício, o tratamento, o nome, o cargo e o órgão são preenchidos automaticamente.</p>
 
-    <div class="ev-grid" style="grid-template-columns:1fr 1fr;gap:24px;">
+    <div class="ev-grid" style="grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;">
       <!-- Destinatários -->
       <div>
         <h4 style="margin-bottom:10px;">📌 Destinatários</h4>
+        <input type="hidden" id="dest-cad-id">
+        <div class="field" style="margin-bottom:8px;">
+          <label>Forma de tratamento</label>
+          <select id="dest-cad-tratamento">
+            <option value="">(sem forma de tratamento)</option>
+            <option value="sr">Ao Senhor</option>
+            <option value="sra">À Senhora</option>
+            <option value="exmo">A Sua Excelência o Senhor (autoridades)</option>
+            <option value="exma">A Sua Excelência a Senhora (autoridades)</option>
+          </select>
+        </div>
         <div class="field" style="margin-bottom:8px;">
           <label>Nome *</label>
-          <input id="dest-cad-nome" placeholder="Ex: À Sua Senhoria o Senhor João Silva">
+          <input id="dest-cad-nome" placeholder="Ex: João da Silva">
         </div>
         <div class="field" style="margin-bottom:8px;">
           <label>Cargo</label>
@@ -3715,9 +3774,10 @@ Coordenação de RH
         </div>
         <div class="field" style="margin-bottom:10px;">
           <label>Órgão / Secretaria / Empresa</label>
-          <input id="dest-cad-orgao" placeholder="Ex: Prefeitura Municipal de Luzilândia">
+          <input id="dest-cad-orgao" placeholder="Ex: Secretaria Municipal de Saúde">
         </div>
         <button class="btn btn-primary btn-sm" onclick="salvarCadastroDestinatario()">💾 Salvar Destinatário</button>
+        <button class="btn btn-ghost btn-sm" id="dest-cad-cancelar" style="display:none" onclick="cancelarEdicaoDestinatario()">Cancelar edição</button>
         <div id="lista-destinatarios-cadastro" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
 
@@ -3735,17 +3795,36 @@ Coordenação de RH
         <button class="btn btn-primary btn-sm" onclick="salvarCadastroEmissor()">💾 Salvar Emissor</button>
         <div id="lista-emissores-cadastro" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
       </div>
+
+      <!-- E-mails -->
+      <div class="so-logado">
+        <h4 style="margin-bottom:10px;">📧 E-mails para envio de ofícios</h4>
+        <div class="field" style="margin-bottom:8px;">
+          <label>Nome / Setor *</label>
+          <input id="mail-cad-nome" placeholder="Ex: Setor de Compras">
+        </div>
+        <div class="field" style="margin-bottom:10px;">
+          <label>E-mail *</label>
+          <input id="mail-cad-email" type="email" placeholder="Ex: compras@itacarambi.mg.gov.br">
+        </div>
+        <button class="btn btn-primary btn-sm" onclick="salvarCadastroEmail()">💾 Salvar E-mail</button>
+        <div style="font-size:.68rem;color:var(--muted);margin-top:6px">Na hora de enviar, você marca um ou vários destes e-mails.</div>
+        <div id="lista-emails-cadastro" style="margin-top:12px;display:flex;flex-direction:column;gap:8px;"></div>
+      </div>
     </div>
   </div>
 
   <!-- Table History Card -->
   <div class="ev-card" style="margin-top:20px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
       <h3>📜 Histórico de Ofícios Emitidos</h3>
-      <div style="display:flex; gap:8px; flex:1; max-width:340px;">
-        <input type="text" id="ofi-busca" placeholder="🔍 Buscar por número, assunto, destinatário..." oninput="renderHistoricoOficios()" style="padding:6px 10px; font-size:0.78rem; width:100%;">
+      <div style="display:flex; gap:8px; flex:1; flex-wrap:wrap; justify-content:flex-end;">
+        <input type="text" id="ofi-busca" class="doc-ctl" placeholder="🔍 Buscar por número, assunto, destinatário, texto..." oninput="renderHistoricoOficios()" style="padding:6px 10px; font-size:0.78rem; flex:1; min-width:180px; max-width:340px;">
+        <select id="ofi-filtro-status" class="doc-ctl" onchange="renderHistoricoOficios()" style="padding:6px 8px; font-size:0.78rem; width:auto;"></select>
+        <select id="ofi-filtro-ano" class="doc-ctl" onchange="renderHistoricoOficios()" style="padding:6px 8px; font-size:0.78rem; width:auto;"></select>
       </div>
     </div>
+    <div id="ofi-lacunas" style="display:none; font-size:.74rem; color:var(--muted); margin-bottom:10px;"></div>
     <div id="lista-oficios">
       <div class="empty"><div class="icon">📜</div><p>Nenhum ofício cadastrado.</p></div>
     </div>
@@ -3756,10 +3835,14 @@ Coordenação de RH
 <div class="tab-panel" id="panel-notificacoes">
   <div class="section-title">⚠️ Notificação Administrativa</div>
 
+  <div id="ntf-aviso-sql" style="display:none; margin-bottom:14px; border:1px solid var(--warning, #f59e0b); border-radius:var(--r-sm); padding:10px 12px; font-size:.78rem; background:var(--surface);">
+    ⚠️ Falta um passo para a nuvem guardar tipo, prazo, situação e assinatura das notificações: execute o script <strong>sql_oficios_v2.sql</strong> no SQL Editor do Supabase. Até lá, essas informações ficam salvas só neste aparelho.
+  </div>
+
   <div class="ev-grid" style="grid-template-columns: 1fr 1.1fr;">
     <!-- Form Card -->
     <div class="ev-card" id="card-form-notificacao">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; gap:8px; flex-wrap:wrap;">
         <h3 style="margin:0;">✍️ <span id="ntf-form-title">Nova Notificação Administrativa</span></h3>
         <button class="btn btn-ghost btn-sm" onclick="carregarNovaNotificacao()">➕ Nova Notificação</button>
       </div>
@@ -3774,34 +3857,82 @@ Coordenação de RH
         </div>
         <div class="field">
           <label>Código Formatado da Notificação</label>
-          <input id="ntf-codigo" placeholder="Notificação nº 001/2026 - SMS" oninput="atualizarPreviewNotificacao()">
+          <input id="ntf-codigo" placeholder="Notificação nº 001/2026 - APS" oninput="atualizarPreviewNotificacao()">
         </div>
         <div class="field">
           <label>Cidade e Data por Extenso</label>
-          <input id="ntf-cidade-data" placeholder="ITACARAMBI - MG, 06 de Outubro de 2026" oninput="atualizarPreviewNotificacao()">
+          <input id="ntf-cidade-data" placeholder="ITACARAMBI - MG, 06 de outubro de 2026" oninput="atualizarPreviewNotificacao()">
         </div>
       </div>
 
-      <div class="field" style="margin-bottom:10px;">
-        <label>Destinatário(s) da Notificação</label>
+      <div class="form-row cols-2" style="margin-top:10px;">
+        <div class="field">
+          <label>Tipo de notificação</label>
+          <select id="ntf-tipo" onchange="atualizarPreviewNotificacao()">
+            <option value="">(não informar)</option>
+            <option value="orientacao">Orientação</option>
+            <option value="ciencia">Ciência de fatos</option>
+            <option value="esclarecimentos">Pedido de esclarecimentos</option>
+            <option value="reiteracao">Reiteração</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Prazo para manifestação (dias úteis)</label>
+          <input type="number" id="ntf-prazo-dias" min="0" max="90" placeholder="Ex: 5" oninput="atualizarPreviewNotificacao()">
+        </div>
+      </div>
+
+      <div class="field" style="margin:10px 0;">
+        <label>Servidor notificado</label>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
           <select id="ntf-dest-select" style="flex:1; min-width:200px;"></select>
           <button type="button" class="btn btn-primary btn-sm" onclick="adicionarDestinatarioNotificacao()">➕ Adicionar</button>
         </div>
-        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">Selecione destinatários cadastrados (os mesmos do Gerador de Ofícios).</div>
+        <div style="font-size:0.7rem; color:var(--muted); margin-top:4px;">A lista vem do cadastro de servidores: nome, matrícula, cargo e setor são preenchidos automaticamente.</div>
       </div>
 
-      <div id="ntf-dest-selecionados" style="margin-bottom:14px;"></div>
+      <div id="ntf-dest-selecionados" style="margin-bottom:8px;"></div>
+      <div id="ntf-avisos" style="display:none; margin-bottom:12px; font-size:.74rem; color:var(--warning, #f59e0b); line-height:1.5;"></div>
 
       <div class="field" style="margin-bottom:14px;">
         <label>Assunto / Ementa *</label>
-        <input id="ntf-assunto" placeholder="Ex: Notificação de ..." oninput="atualizarPreviewNotificacao()">
+        <input id="ntf-assunto" placeholder="Ex: Registro de visitas domiciliares no e-SUS" oninput="atualizarPreviewNotificacao()">
       </div>
 
-      <div class="field" style="margin-bottom:14px">
+      <div class="field" style="margin-bottom:8px">
         <label>Texto da Notificação * (Separe parágrafos com Enter)</label>
-        <textarea id="ntf-texto" placeholder="Digite o conteúdo oficial da notificação..." style="min-height:160px; line-height:1.6;" oninput="atualizarPreviewNotificacao()"></textarea>
+        <textarea id="ntf-texto" placeholder="Digite o conteúdo oficial da notificação..." style="min-height:180px; line-height:1.6;" oninput="atualizarPreviewNotificacao()"></textarea>
       </div>
+      <div style="margin-bottom:14px; display:flex; gap:6px; flex-wrap:wrap;">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="ntfInserirEstrutura()" title="Fatos, orientação, providência e prazo">🧱 Inserir estrutura sugerida</button>
+        <button type="button" class="btn btn-ghost btn-sm" onclick="docIaAlternar('ntf')">✨ Redigir / revisar com IA</button>
+      </div>
+      <div id="ntf-ia-box" style="display:none; margin:-6px 0 14px; border:1px solid var(--border-mid); border-radius:var(--r-sm); padding:10px; background:var(--surface);">
+        <div class="field"><label>O que a notificação deve registrar?</label>
+          <textarea id="ntf-ia-pedido" style="min-height:64px" placeholder="Ex.: registrar que as visitas de outubro ficaram abaixo do mínimo e orientar a regularizar o registro no e-SUS até o dia 30."></textarea></div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+          <button type="button" class="btn btn-primary btn-sm" onclick="docIaGerar('ntf','redigir')">✨ Redigir o texto</button>
+          <button type="button" class="btn btn-ghost btn-sm" onclick="docIaGerar('ntf','revisar')">🪄 Revisar o texto que já escrevi</button>
+        </div>
+        <div id="ntf-ia-status" style="font-size:.74rem; margin-top:6px;"></div>
+        <div style="font-size:.68rem; color:var(--muted); margin-top:4px;">O pedido é enviado à IA (Google Gemini). Descreva os fatos sem dados de saúde ou informações sigilosas. Revise sempre o resultado.</div>
+      </div>
+
+      <div class="form-row cols-2" style="margin-bottom:10px;">
+        <div class="field">
+          <label>Ofício relacionado (opcional)</label>
+          <select id="ntf-oficio-rel" onchange="atualizarPreviewNotificacao()"></select>
+        </div>
+        <div class="field">
+          <label>Anexos (um por linha)</label>
+          <textarea id="ntf-anexos" style="min-height:40px" placeholder="Ex: Relatório de visitas de outubro" oninput="atualizarPreviewNotificacao()"></textarea>
+        </div>
+      </div>
+
+      <label style="display:flex; align-items:center; gap:8px; font-size:.78rem; cursor:pointer; margin-bottom:14px;">
+        <input type="checkbox" id="ntf-testemunhas" style="width:auto" onchange="atualizarPreviewNotificacao()">
+        <span>Incluir campo de <strong>testemunhas</strong> (para o caso de o servidor se recusar a assinar)</span>
+      </label>
 
       <div class="field" style="margin-bottom:14px;">
         <label>Emissor / Assinante Cadastrado</label>
@@ -3815,10 +3946,14 @@ Coordenação de RH
         <div class="field"><label>Cargo do Emissor / Assinante</label><input id="ntf-emissor-cargo" placeholder="Ex: Coordenadora APS" oninput="atualizarPreviewNotificacao()"></div>
       </div>
 
-      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
         <button class="btn btn-primary" id="btn-salvar-notificacao" onclick="salvarNotificacao()">💾 Salvar & Emitir Notificação</button>
-        <button class="btn btn-ghost" onclick="imprimirNotificacaoAtual()">🖨️ Imprimir PDF</button>
         <button class="btn btn-ghost" onclick="carregarNovaNotificacao()">🧹 Limpar</button>
+      </div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;">
+        <button class="btn btn-ghost" onclick="docAcaoFormulario('ntf','baixar')">📄 Baixar PDF</button>
+        <button class="btn btn-ghost" onclick="imprimirNotificacaoAtual()">🖨️ Abrir / Imprimir</button>
+        <button class="btn btn-success" onclick="docAcaoFormulario('ntf','assinar')">🖋️ Assinar digitalmente</button>
       </div>
 
       <div id="ntf-link-action-box" style="display:none; background:var(--surface); border:1px solid var(--border-mid); padding:12px; border-radius:var(--r-sm); gap:8px; align-items:center; margin-top:10px;">
@@ -3840,10 +3975,15 @@ Coordenação de RH
 
   <!-- Histórico -->
   <div class="ev-card" style="margin-top:20px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; flex-wrap:wrap; gap:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; flex-wrap:wrap; gap:10px;">
       <h3>📋 Histórico de Notificações Emitidas</h3>
-      <input type="text" id="ntf-busca" placeholder="🔍 Buscar por número, assunto, destinatário..." oninput="renderHistoricoNotificacoes()" style="padding:6px 10px; font-size:0.78rem; max-width:340px; flex:1;">
+      <div style="display:flex; gap:8px; flex:1; flex-wrap:wrap; justify-content:flex-end;">
+        <input type="text" id="ntf-busca" class="doc-ctl" placeholder="🔍 Buscar por número, assunto, servidor, texto..." oninput="renderHistoricoNotificacoes()" style="padding:6px 10px; font-size:0.78rem; max-width:340px; flex:1; min-width:180px;">
+        <select id="ntf-filtro-status" class="doc-ctl" onchange="renderHistoricoNotificacoes()" style="padding:6px 8px; font-size:0.78rem; width:auto;"></select>
+        <select id="ntf-filtro-ano" class="doc-ctl" onchange="renderHistoricoNotificacoes()" style="padding:6px 8px; font-size:0.78rem; width:auto;"></select>
+      </div>
     </div>
+    <div id="ntf-lacunas" style="display:none; font-size:.74rem; color:var(--muted); margin-bottom:10px;"></div>
     <div id="lista-notificacoes">
       <div class="empty"><div class="icon">⚠️</div><p>Nenhuma notificação cadastrada.</p></div>
     </div>
@@ -5532,6 +5672,11 @@ function normalizarCamposObjeto(obj) {
 async function migrarDadosLocaisParaNuvem(tabela, pendentes) {
   if (!pendentes || !Array.isArray(pendentes) || pendentes.length === 0) return;
   console.log(`📤 Enviando ${pendentes.length} registros locais de [${tabela}] para o Supabase...`);
+  if ((tabela === 'oficios' || tabela === 'notificacoes') && typeof salvarDocsCompat === 'function') {
+    // Tolera a falta das colunas novas ("extras") enquanto o script SQL não for executado
+    await salvarDocsCompat(tabela, pendentes);
+    return;
+  }
   try {
     if (tabela === 'eventos') {
       for (const ev of pendentes) {
@@ -7358,7 +7503,9 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="eventos.js"></script>
 <script src="reports.js"></script>
 <script src="protocolo-entrega.js"></script>
+<script src="qrcode.vendor.js"></script>
 <script src="oficios.js"></script>
+<script src="oficios-pdf.js"></script>
 <script src="sistemas.js"></script>
 <script src="atestado-rh.js"></script>
 <script src="ia-gestao.js"></script>

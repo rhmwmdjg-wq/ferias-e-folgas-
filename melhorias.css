@@ -235,3 +235,12 @@ td.mx-num, th.mx-num { text-align: right; font-family: var(--mono); white-space:
 @media print {
   .mx-palette-bg, .mx-search-trigger { display: none !important; }
 }
+
+/* Ofícios e notificações: campos soltos (filtros do histórico, situação, diálogo de envio) */
+.doc-ctl {
+  background: var(--surface); color: var(--text);
+  border: 1px solid var(--border-mid); border-radius: 8px;
+  padding: 6px 10px; font-size: .78rem; font-family: inherit;
+}
+.doc-ctl:focus { outline: none; border-color: var(--primary); }
+select.doc-ctl option { background: var(--card2, #16203a); color: var(--text); }

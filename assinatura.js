@@ -332,3 +332,85 @@ function dsAdicionarCampoAssinatura(L, doc, indicePagina, o) {
 
   return { sigRef: sigRef, widgetRef: widgetRef, acroForm: acro };
 }
+
+// ===================== USO POR OUTROS MÓDULOS (ofícios e notificações) =====================
+
+// Abre um .pfx a partir dos bytes e da senha e deixa o certificado pronto para assinar.
+// É o mesmo procedimento do botão "Carregar Certificado", sem depender dos campos da aba.
+async function dsAbrirCertificado(buffer, senha) {
+  if (typeof forge === 'undefined') throw new Error('Biblioteca de certificado não carregou (verifique a internet).');
+  const bin = dsBinFromArrayBuffer(buffer);
+  const p12 = forge.pkcs12.pkcs12FromAsn1(forge.asn1.fromDer(bin), senha);
+  const certBags = p12.getBags({ bagType: forge.pki.oids.certBag });
+  const certArr = (certBags[forge.pki.oids.certBag] || []).map(function (b) { return b.cert; }).filter(Boolean);
+  let key;
+  const shrouded = p12.getBags({ bagType: forge.pki.oids.pkcs8ShroudedKeyBag })[forge.pki.oids.pkcs8ShroudedKeyBag];
+  if (shrouded && shrouded[0] && shrouded[0].key) key = shrouded[0].key;
+  if (!key) {
+    const plain = p12.getBags({ bagType: forge.pki.oids.keyBag })[forge.pki.oids.keyBag];
+    if (plain && plain[0] && plain[0].key) key = plain[0].key;
+  }
+  const cert = dsEscolherCertTitular(certArr, key);
+  if (!cert || !key) throw new Error('Certificado ou chave privada não encontrados no arquivo.');
+
+  _dsCert = cert; _dsKey = key; _dsCerts = certArr;
+  try { dsAplicarCadeiaEmbutida(); } catch (e) { console.warn('Cadeia embutida:', e); }
+  try { dsMostrarInfoCert(); } catch (e) { /* aba não montada */ }
+  try {
+    if (typeof dsCadeiaCompleta === 'function' && !dsCadeiaCompleta()) {
+      await dsBuscarCadeiaAIA(_dsCert, 0);
+      try { dsMostrarInfoCert(); } catch (e) { /* aba não montada */ }
+    }
+  } catch (e) { console.warn('AIA:', e); }
+  return cert;
+}
+
+/**
+ * Assina um PDF em PAdES (assinatura embutida, reconhecida pelo Adobe e pelo validador do ITI)
+ * e devolve os bytes assinados.
+ * @param {Uint8Array} pdfBytes  PDF a assinar
+ * @param {object} place         { page (base 0), rect: [x, y, largura, altura] } — onde fica o selo visível
+ * @param {object} info          { motivo, local }
+ */
+async function dsAssinarPdfBytes(pdfBytes, place, info) {
+  if (!_dsCert || !_dsKey) throw new Error('Carregue o certificado primeiro.');
+  info = info || {};
+  const lib = await dsCarregarBibliotecaPades();
+  const pdfLib = lib.pdfLib, SignPdf = lib.SignPdf, Signer = lib.Signer, PBuffer = lib.Buffer;
+  const cn = _dsCert.subject.getField('CN') ? _dsCert.subject.getField('CN').value : '';
+  const jaAssinado = dsPdfJaAssinado(pdfBytes);
+  const selo = await dsObterAparenciaBytes();
+
+  async function preparar(incremental) {
+    const doc = await pdfLib.PDFDocument.load(pdfBytes, incremental ? { forIncrementalUpdate: true } : {});
+    const png = await doc.embedPng(selo);
+    dsAdicionarCampoAssinatura(pdfLib, doc, place.page, {
+      rect: place.rect,
+      imagem: png,
+      nome: cn,
+      motivo: info.motivo || 'Assinatura digital',
+      local: info.local || 'Itacarambi - MG',
+      data: new Date(),
+      tamanho: 16384
+    });
+    return await doc.save({ useObjectStreams: false, updateFieldAppearances: false });
+  }
+  let comEspaco;
+  try {
+    comEspaco = await preparar(true);
+  } catch (eInc) {
+    if (jaAssinado) throw new Error('Este PDF já possui assinatura e não pôde ser assinado novamente sem invalidá-la (' + (eInc.message || eInc) + ').');
+    console.warn('Gravação incremental indisponível; regravando o PDF.', eInc);
+    comEspaco = await preparar(false);
+  }
+
+  const signer = new Signer();
+  signer.sign = async function (buffer) {
+    // CAdES-BES: a hora da assinatura vai no dicionário do PDF (/M), não no CMS
+    return PBuffer.from(dsCriarCms(buffer.toString('binary'), { incluirHora: false }), 'binary');
+  };
+  const assinado = await new SignPdf().sign(PBuffer.from(comEspaco), signer);
+  const out = new Uint8Array(assinado.length);
+  for (let i = 0; i < assinado.length; i++) out[i] = assinado[i];
+  return out;
+}
