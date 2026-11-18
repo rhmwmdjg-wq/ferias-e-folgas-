@@ -51,8 +51,15 @@ function arDescricao(srv, dias, genero) {
   let s = t.trat + ' ' + srv.nome;
   if (srv.matricula) s += ', matrícula ' + srv.matricula;
   if (srv.setor) s += ', ' + t.lotado + ' no setor ' + srv.setor;
-  s += ', de ' + dias + (dias === 1 ? ' dia' : ' dias');
+  s += ', de ' + arTextoDuracao(dias);
   return s;
+}
+
+// "3 dias", "1 dia" ou "meio período (turno da manhã)"
+function arTextoDuracao(dias, turno) {
+  turno = turno || arTurnoInformado();
+  if (dias === 0.5) return 'meio período' + (turno ? ' (turno da ' + (turno === 'tarde' ? 'tarde' : 'manhã') + ')' : '');
+  return dias + (dias === 1 ? ' dia' : ' dias');
 }
 
 function arTextoEmail(srv, dias, genero, obs) {
@@ -75,9 +82,25 @@ function arSrvSelecionado() {
   return id ? DB.servidores().find(function (s) { return s.id === id; }) : null;
 }
 
+// Turno do meio período ('manha' ou 'tarde'); vazio quando o atestado é de dias inteiros
+function arTurnoInformado() {
+  const el = document.getElementById('ar-duracao');
+  const v = el ? el.value : 'dias';
+  return (v === 'manha' || v === 'tarde') ? v : '';
+}
+
 function arDiasInformados() {
+  if (arTurnoInformado()) return 0.5;
   const n = Math.floor(Number(document.getElementById('ar-dias').value));
   return (n >= 1 && n <= 365) ? n : 0;
+}
+
+// Mostra ou esconde o campo de dias conforme a duração escolhida
+function arMudarDuracao() {
+  const meio = !!arTurnoInformado();
+  const campo = document.getElementById('ar-dias-campo');
+  if (campo) campo.style.display = meio ? 'none' : '';
+  arAtualizarPrevia();
 }
 
 function renderAtestadoRH() {
@@ -125,7 +148,7 @@ function arAtualizarPrevia() {
   pericia.style.borderColor = precisa ? 'var(--warning, #f59e0b)' : 'var(--border)';
   pericia.innerHTML = precisa
     ? '⚠️ <strong>Precisa de perícia:</strong> servidor ' + vinc.toLowerCase() + ' com atestado de ' + dias + ' dias. A mensagem do WhatsApp sairá com "Favor agendar perícia".'
-    : 'ℹ️ Sem perícia: servidor ' + vinc.toLowerCase() + ' com atestado de ' + dias + (dias === 1 ? ' dia' : ' dias') + '.';
+    : 'ℹ️ Sem perícia: servidor ' + vinc.toLowerCase() + ' com atestado de ' + arTextoDuracao(dias) + '.';
 
   previa.style.display = 'block';
   document.getElementById('ar-previa-texto').textContent =
@@ -213,7 +236,7 @@ function arRenderEnviados() {
   }
   box.innerHTML = _arEnviadosSessao.map(function (e, i) {
     return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
-      '<span>✅</span><div style="flex:1"><strong>' + arEsc(e.profissional) + '</strong> — ' + e.dias + (e.dias === 1 ? ' dia' : ' dias') +
+      '<span>✅</span><div style="flex:1"><strong>' + arEsc(e.profissional) + '</strong> — ' + arTextoDuracao(e.dias, e.turno) +
       (e.pericia ? ' · <span style="color:var(--warning, #f59e0b);font-weight:700">perícia</span>' : '') +
       '<div style="font-size:.75rem;opacity:.7">' + arEsc(e.arquivo) + ' · enviado às ' + arEsc(e.hora) + ' para ' + arEsc(e.destinatario) + '</div></div>' +
       '<button type="button" class="btn btn-success btn-sm" onclick="arAbrirWhatsApp(' + i + ')" title="Enviar comprovante pelo WhatsApp">💬 WhatsApp</button></div>';
@@ -224,6 +247,7 @@ async function enviarAtestadoRH() {
   if (_arEnviando) return;
   const srv = arSrvSelecionado();
   const dias = arDiasInformados();
+  const turno = arTurnoInformado();
   const file = document.getElementById('ar-pdf').files[0];
   const genero = document.getElementById('ar-genero').value;
   const observacao = document.getElementById('ar-obs').value.trim();
@@ -235,7 +259,7 @@ async function enviarAtestadoRH() {
   if (!ehPdf) return toastMsg('O arquivo precisa ser um PDF.', 'warning');
   if (file.size > ATESTADO_RH_MAX_BYTES) return toastMsg('O PDF passa de 8 MB. Reduza o arquivo.', 'warning');
 
-  if (!confirm('Enviar o atestado de ' + srv.nome + ' (' + dias + (dias === 1 ? ' dia' : ' dias') + ') por e-mail ao RH da Prefeitura?\n\nArquivo: ' + file.name)) return;
+  if (!confirm('Enviar o atestado de ' + srv.nome + ' (' + arTextoDuracao(dias, turno) + ') por e-mail ao RH da Prefeitura?\n\nArquivo: ' + file.name)) return;
 
   const btn = document.getElementById('ar-btn-enviar');
   const textoBtn = btn.innerHTML;
@@ -254,6 +278,7 @@ async function enviarAtestadoRH() {
         matricula: srv.matricula || '',
         setor: srv.setor || '',
         dias: dias,
+        turno: turno,
         genero: genero,
         observacao: observacao,
         nomeArquivo: file.name,
@@ -272,6 +297,7 @@ async function enviarAtestadoRH() {
     _arEnviadosSessao.unshift({
       profissional: srv.nome,
       dias: dias,
+      turno: turno,
       pericia: pericia,
       arquivo: file.name,
       destinatario: dados.destinatario || 'RH',
@@ -280,13 +306,15 @@ async function enviarAtestadoRH() {
     });
     arRenderEnviados();
     try {
-      DB.saveLog('Documento', 'Enviou atestado de ' + srv.nome + ' (' + dias + ' dias' + (pericia ? ', com perícia' : '') + ') por e-mail ao RH (' + file.name + ')', 'servidores', srv.id);
+      DB.saveLog('Documento', 'Enviou atestado de ' + srv.nome + ' (' + arTextoDuracao(dias, turno) + (pericia ? ', com perícia' : '') + ') por e-mail ao RH (' + file.name + ')', 'servidores', srv.id);
     } catch (e) { /* log é opcional */ }
 
     document.getElementById('ar-pdf').value = '';
     document.getElementById('ar-pdf-info').textContent = '';
     document.getElementById('ar-obs').value = '';
     document.getElementById('ar-dias').value = '';
+    document.getElementById('ar-duracao').value = 'dias';
+    arMudarDuracao();
     document.getElementById('ar-servidor').value = '';
     arAtualizarPrevia();
     toastMsg('Atestado de ' + srv.nome + ' enviado ao RH!', 'success');
