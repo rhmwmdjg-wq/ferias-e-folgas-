@@ -3565,7 +3565,7 @@ Coordenação de RH
     <div id="ar-previa" style="display:none;margin-top:12px">
       <label style="display:block;font-size:.72rem;font-weight:700;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.07em">Texto do e-mail</label>
       <pre id="ar-previa-texto" style="white-space:pre-wrap;font:inherit;font-size:.85rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:12px;margin:0"></pre>
-      <div style="font-size:.74rem;opacity:.65;margin-top:4px">A assinatura (seu nome, cargo e a Coordenação) é acrescentada automaticamente.</div>
+      <div id="ar-remetente-aviso" style="display:none;font-size:.78rem;color:var(--warning, #f59e0b);margin-top:6px"></div>
     </div>
     <div style="margin-top:16px">
       <button class="btn btn-primary" id="ar-btn-enviar" onclick="enviarAtestadoRH()">📧 Enviar ao RH</button>
@@ -3573,8 +3573,15 @@ Coordenação de RH
   </div>
   <div id="ar-pergunta-whats" class="card" style="display:none;padding:16px;margin-top:16px;max-width:760px;border:1px solid var(--success, #22c55e)"></div>
   <div class="card" style="padding:16px;margin-top:16px;max-width:760px">
-    <h3 style="margin:0 0 10px">Enviados nesta sessão</h3>
-    <div id="ar-enviados"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <h3 style="margin:0">Histórico de atestados enviados <small id="ar-hist-total" style="font-weight:400;opacity:.6;font-size:.75rem"></small></h3>
+      <button type="button" class="btn btn-ghost btn-sm" onclick="arCarregarHistorico()">🔄 Atualizar</button>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <input type="text" id="ar-hist-busca" placeholder="Buscar servidor..." oninput="arRenderHistorico()" style="flex:1;min-width:180px">
+      <input type="month" id="ar-hist-mes" onchange="arRenderHistorico()" title="Filtrar por mês do envio">
+    </div>
+    <div id="ar-historico"></div>
   </div>
   <div class="card" style="padding:16px;margin-top:16px;max-width:760px">
     <h3 style="margin:0 0 6px">WhatsApp do RH da Secretaria de Saúde</h3>
@@ -4867,9 +4874,15 @@ Coordenação de RH
       <button class="btn btn-ghost" onclick="pmAbrirConfigPiso()">⚙️ Configurar Piso</button>
       <button class="btn btn-ghost" onclick="pmAbrirBeneficios()">🧷 Benefícios Fixos</button>
     </div>
-    <div class="field" style="margin-top:12px">
-      <label>🔍 Buscar servidor (nome ou matrícula)</label>
-      <input id="pm-busca" placeholder="Digite o nome ou a matrícula..." oninput="pmSetBusca(this.value)">
+    <div class="form-row cols-2" style="margin-top:12px">
+      <div class="field">
+        <label>🏥 Setor</label>
+        <select id="pm-filtro-setor" onchange="pmFiltrarSetor()"><option value="">Todos os setores</option></select>
+      </div>
+      <div class="field">
+        <label>🔍 Buscar servidor (nome ou matrícula)</label>
+        <input id="pm-busca" placeholder="Digite o nome ou a matrícula..." oninput="pmSetBusca(this.value)">
+      </div>
     </div>
     <div class="info-box" style="margin-top:12px;font-size:.78rem">
       Ao abrir um mês novo, o sistema <strong>puxa automaticamente todos os servidores cadastrados</strong>
@@ -6603,8 +6616,8 @@ function renderAniversariantes() {
 
   // Lista filtrada pelo mês selecionado, ordenada por dia
   // IMPORTANTE: Filtrar servidores que podem ter sido deletados do banco recentemente
-  const servidoresValidos = DB.servidores();
-  const lista = servidoresValidos
+  // Só os servidores dos setores que o usuário pode ver (a mesma base dos números acima)
+  const lista = servidores
     .filter(s => {
       const [,, m] = s.nascimento.match(/(\d{4})-(\d{2})-(\d{2})/) || [];
       return parseInt(m) - 1 === mesAtual;
@@ -7588,11 +7601,10 @@ function pmBaseDados() {
   };
 }
 
+// A folha do mês é uma só para a Secretaria: é sempre montada com o cadastro inteiro.
+// Cada usuário vê nela só os setores que está autorizado (pmLinhaVisivel).
 function pmServidoresDoCadastro() {
-  let lista = [];
-  try {
-    lista = (typeof getServidoresAcessiveis === 'function') ? getServidoresAcessiveis() : DB.servidores();
-  } catch (e) { lista = DB.servidores(); }
+  const lista = DB.servidores();
 
   const ehMedico = (cargo) => /m[ée]dic/i.test(String(cargo || ''));
   const mapRow = (s, item) => ({
@@ -7616,6 +7628,60 @@ function pmServidoresDoCadastro() {
     servidores: servidores.map((s, i) => mapRow(s, i + 1)),
     medicos: medicos.map((s, i) => mapRow(s, i + 1))
   };
+}
+
+// Setores que o usuário logado pode ver na folha (null = todos)
+function pmSetoresPermitidos() {
+  try {
+    const sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}');
+    if (sessao.role === 'gestor' && Array.isArray(sessao.setores) && sessao.setores.length) return sessao.setores;
+  } catch (e) { /* sem sessão */ }
+  return null;
+}
+
+function pmNormSetor(x) {
+  return pmNorm(x).replace(/\s+/g, ' ').trim();
+}
+
+// A linha aparece se o setor dela é permitido ao usuário e bate com o setor escolhido no filtro
+function pmLinhaVisivel(p) {
+  const st = pmNormSetor(p && p.setor);
+  const perm = pmSetoresPermitidos();
+  if (perm && !perm.some(x => pmNormSetor(x) === st)) return false;
+  const el = document.getElementById('pm-filtro-setor');
+  const filtro = el ? el.value : '';
+  if (filtro && pmNormSetor(filtro) !== st) return false;
+  return true;
+}
+
+function pmPopularSetores() {
+  const sel = document.getElementById('pm-filtro-setor');
+  if (!sel) return;
+  const atual = sel.value;
+  const perm = pmSetoresPermitidos();
+  let setores;
+  if (perm) {
+    setores = perm.slice();
+  } else {
+    const set = new Set(typeof getTodosSetores === 'function' ? getTodosSetores() : []);
+    ['servidores', 'medicos'].forEach(k => ((_pmFolha && _pmFolha.dados && _pmFolha.dados[k]) || []).forEach(p => { if (p.setor) set.add(p.setor); }));
+    setores = [...set];
+  }
+  setores.sort((a, b) => String(a).localeCompare(String(b), 'pt-BR'));
+  sel.innerHTML = `<option value="">${perm ? (perm.length > 1 ? 'Todos os meus setores' : esc(perm[0])) : 'Todos os setores'}</option>` +
+    (perm && perm.length === 1 ? '' : setores.map(x => `<option value="${esc(x)}">${esc(x)}</option>`).join(''));
+  if (atual && [...sel.options].some(o => o.value === atual)) sel.value = atual;
+}
+
+function pmFiltrarSetor() {
+  pmRenderTabela('servidor');
+  pmRenderTabela('medico');
+  pmRenderHistorico();
+}
+
+// Cópia das linhas visíveis, renumeradas, para impressão e exportação
+function pmListaVisivel(lista) {
+  return (lista || []).filter(pmLinhaVisivel).map((p, i) => ({ ...p, item: i + 1 }));
 }
 
 function pmList(tipo) {
@@ -7797,6 +7863,7 @@ async function pmCarregarMes() {
   document.getElementById('pm-responsavel').value = folha.responsavel || a.nome || '';
   document.getElementById('pm-funcao').value = folha.funcao || a.cargo || 'Coordenador';
 
+  pmPopularSetores();
   pmRenderStatus();
   pmRenderTabela('servidor');
   pmRenderTabela('medico');
@@ -7830,6 +7897,27 @@ function pmCriarFolha(mes) {
 
 function pmPuxarCadastro() {
   if (!_pmFolha) return;
+  const perm = pmSetoresPermitidos();
+  if (perm) {
+    // Gestor: atualiza só as linhas dos seus setores; as dos outros setores ficam como estão
+    if (!confirm('Atualizar, a partir do cadastro, os servidores dos seus setores neste mês?\n\nAs alterações já feitas nesses setores serão perdidas. Os outros setores não são alterados.')) return;
+    const novos = pmServidoresDoCadastro();
+    const ehMeu = p => perm.some(x => pmNormSetor(x) === pmNormSetor(p.setor));
+    novos.servidores = novos.servidores.filter(ehMeu);
+    novos.medicos = novos.medicos.filter(ehMeu);
+    pmAplicarBeneficiosFixos(novos);
+    ['servidores', 'medicos'].forEach(k => {
+      const mantidas = (_pmFolha.dados[k] || []).filter(p => !ehMeu(p));
+      const juntas = mantidas.concat(novos[k]).sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'));
+      juntas.forEach((x, i) => { x.item = i + 1; });
+      _pmFolha.dados[k] = juntas;
+    });
+    DB.savePontoFolha(_pmFolha);
+    pmPopularSetores();
+    pmRenderTabela('servidor');
+    pmRenderTabela('medico');
+    return toastMsg('Servidores dos seus setores atualizados!', 'success');
+  }
   if (!confirm('Substituir a grade deste mês por TODOS os servidores do cadastro?\n\nAs alterações já feitas neste mês serão perdidas.')) return;
   const dados = pmServidoresDoCadastro();
   if (!dados.servidores.length && !dados.medicos.length) return toastMsg('Nenhum servidor cadastrado encontrado.', 'warning');
@@ -7837,6 +7925,7 @@ function pmPuxarCadastro() {
   pmAplicarBeneficiosFixos(dados);
   _pmFolha.dados = dados;
   DB.savePontoFolha(_pmFolha);
+  pmPopularSetores();
   pmRenderTabela('servidor');
   pmRenderTabela('medico');
   toastMsg('Servidores do cadastro carregados!', 'success');
@@ -7873,12 +7962,13 @@ function pmRenderTabela(tipo) {
   if (!tbody) return;
   const lista = pmList(tipo);
   const entradas = lista.map((p, idx) => ({ p, idx })).filter(e => {
+    if (!pmLinhaVisivel(e.p)) return false;
     if (!_pmBusca) return true;
     return String(e.p.nome || '').toLowerCase().includes(_pmBusca) ||
            String(e.p.matricula || '').toLowerCase().includes(_pmBusca);
   });
   if (!entradas.length) {
-    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 2}" style="text-align:center;padding:18px;color:var(--muted)">${_pmBusca ? 'Nenhum servidor encontrado para a busca.' : 'Nenhum registro. Use "Adicionar linha".'}</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${PM_CAMPOS.length + 2}" style="text-align:center;padding:18px;color:var(--muted)">${_pmBusca ? 'Nenhum servidor encontrado para a busca.' : (lista.length ? 'Nenhum servidor deste(s) setor(es) nesta lista.' : 'Nenhum registro. Use "Adicionar linha".')}</td></tr>`;
     return;
   }
   tbody.innerHTML = entradas.map(({ p, idx }) => {
@@ -8017,7 +8107,10 @@ function pmSalvarAlteracao() {
 function pmAdicionarLinha(tipo) {
   if (!_pmFolha) return;
   const lista = pmList(tipo);
-  lista.push({ item: lista.length + 1, nome: '', matricula: '', setor: '', funcao: '', situacao: '', falta: '-', fracao: '-', ins: '', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '', alterados: {} });
+  const perm = pmSetoresPermitidos();
+  const filtro = (document.getElementById('pm-filtro-setor') || {}).value || '';
+  const setorNovo = filtro || (perm ? perm[0] : '');
+  lista.push({ item: lista.length + 1, nome: '', matricula: '', setor: setorNovo, funcao: '', situacao: '', falta: '-', fracao: '-', ins: '', not: '-', int: '-', disp: '-', grat: '-', comp: '-', obs: '', alterados: {} });
   DB.savePontoFolha(_pmFolha);
   pmRenderTabela(tipo);
 }
@@ -8060,6 +8153,7 @@ function pmReabrir() {
 
 function pmReporBase() {
   if (!_pmFolha) return;
+  if (pmSetoresPermitidos()) return toastMsg('Somente o administrador pode repor a lista base, porque ela vale para todos os setores.', 'warning');
   if (!confirm('Isso substitui a grade deste mês pela lista base. Continuar?')) return;
   _pmFolha.dados = pmBaseDados();
   DB.savePontoFolha(_pmFolha);
@@ -8071,8 +8165,13 @@ function pmReporBase() {
 function pmRenderHistorico() {
   const tbody = document.getElementById('pm-historico');
   if (!tbody) return;
+  // Mostra só as alterações de servidores visíveis para este usuário/filtro
+  const nomesVisiveis = new Set();
+  ['servidores', 'medicos'].forEach(k => ((_pmFolha && _pmFolha.dados && _pmFolha.dados[k]) || []).forEach(p => { if (pmLinhaVisivel(p)) nomesVisiveis.add(pmNorm(p.nome)); }));
+  const filtrando = !!pmSetoresPermitidos() || !!((document.getElementById('pm-filtro-setor') || {}).value);
   const regs = DB.pontoHistorico()
     .filter(h => h.mes === _pmMesAtual)
+    .filter(h => !filtrando || nomesVisiveis.has(pmNorm(h.funcionario)))
     .sort((a, b) => String(b.criadoEm || '').localeCompare(String(a.criadoEm || '')));
   if (!regs.length) {
     tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:18px;color:var(--muted)">Nenhuma alteração registrada.</td></tr>';
@@ -8092,7 +8191,7 @@ function pmExportarCSV() {
   if (!_pmFolha) return;
   const linhas = [PM_CAMPOS.map(c => c.label).join(';')];
   ['servidores', 'medicos'].forEach(k => {
-    (_pmFolha.dados[k] || []).forEach(p => {
+    pmListaVisivel(_pmFolha.dados[k]).forEach(p => {
       linhas.push(PM_CAMPOS.map(c => `"${String(p[c.key] ?? '').replace(/"/g, '""')}"`).join(';'));
     });
   });
@@ -8175,12 +8274,12 @@ function pmImprimir() {
     </div>
 
     ${cabecalho('PONTO DOS SERVIDORES LOTADOS NA APS', periodo)}
-    ${pmTabelaPrint(_pmFolha.dados.servidores)}
+    ${pmTabelaPrint(pmListaVisivel(_pmFolha.dados.servidores))}
     ${assinaturas}
 
     <div class="page-break"></div>
     ${cabecalho('PONTO DOS SERVIDORES LOTADOS NA APS - MÉDICOS DA ESF', periodo)}
-    ${pmTabelaPrint(_pmFolha.dados.medicos)}
+    ${pmTabelaPrint(pmListaVisivel(_pmFolha.dados.medicos))}
     ${assinaturas}
   </body>
   </html>`;

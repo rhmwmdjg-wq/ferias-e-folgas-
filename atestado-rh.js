@@ -5,7 +5,8 @@
 //
 // O envio do e-mail é feito por uma função no servidor (Supabase). O destinatário,
 // o remetente e a senha do e-mail ficam somente lá — nada disso existe neste arquivo.
-// O PDF não é armazenado: só fica o registro de que foi enviado.
+// O PDF não é armazenado: só fica o registro de que foi enviado (no log do sistema),
+// que alimenta o histórico de atestados enviados desta tela.
 
 const ATESTADO_RH_URL = 'https://bgvwaamwgcathojxtjqf.supabase.co/functions/v1/atlas-enviar-atestado';
 const ATESTADO_RH_MAX_BYTES = 8 * 1024 * 1024;
@@ -15,7 +16,8 @@ const AR_PERICIA_CONTRATADO_MIN_DIAS = 15; // contratado: 15 dias ou mais
 const AR_PERICIA_EFETIVO_ACIMA_DE = 5;     // efetivo: acima de 5 dias
 
 let _arEnviando = false;
-let _arEnviadosSessao = [];
+let _arHistorico = [];      // atestados enviados (do log do sistema), mais recentes primeiro
+let _arHistCarregado = false;
 
 function arEsc(t) {
   return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) {
@@ -45,32 +47,56 @@ function arTermos(genero) {
   return { trat: 'do(a) servidor(a)', lotado: 'lotado(a)', vinc: { efetivo: 'efetivo(a)', contratado: 'contratado(a)' } };
 }
 
+// Quem está enviando: nome e cargo do usuário logado (para gestores, o próprio cadastro;
+// sem cair no nome/cargo do coordenador)
+function arRemetenteAtual() {
+  let sessao = {};
+  try { sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}'); } catch (e) { /* sem sessão */ }
+  let gestor = null;
+  try {
+    gestor = DB.gestores().find(function (g) {
+      return (sessao.id && g.id === sessao.id) || (sessao.usuario && String(g.usuario || '').toLowerCase() === String(sessao.usuario).toLowerCase());
+    });
+  } catch (e) { /* sem gestores */ }
+  if (sessao.role !== 'admin' && gestor) {
+    return { nome: String(gestor.nome || sessao.nome || '').trim(), cargo: String(gestor.cargo || sessao.cargo || '').trim() };
+  }
+  const a = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : {};
+  return { nome: String(a.nome || sessao.nome || '').trim(), cargo: String(a.cargo || '').trim() };
+}
+
 // Trecho comum: "do servidor FULANO, matrícula 123, lotado no setor X, de 3 dias"
-function arDescricao(srv, dias, genero) {
+function arDescricao(srv, dias, genero, turno) {
   const t = arTermos(genero);
   let s = t.trat + ' ' + srv.nome;
   if (srv.matricula) s += ', matrícula ' + srv.matricula;
   if (srv.setor) s += ', ' + t.lotado + ' no setor ' + srv.setor;
-  s += ', de ' + arTextoDuracao(dias);
+  s += ', de ' + arTextoDuracao(dias, turno);
   return s;
 }
 
 // "3 dias", "1 dia" ou "meio período (turno da manhã)"
 function arTextoDuracao(dias, turno) {
-  turno = turno || arTurnoInformado();
+  if (turno === undefined) turno = arTurnoInformado();
   if (dias === 0.5) return 'meio período' + (turno ? ' (turno da ' + (turno === 'tarde' ? 'tarde' : 'manhã') + ')' : '');
   return dias + (dias === 1 ? ' dia' : ' dias');
 }
 
-function arTextoEmail(srv, dias, genero, obs) {
-  let txt = arSaudacao() + '\n\nSegue anexo o atestado ' + arDescricao(srv, dias, genero) + '.';
+// Mesmo texto que a função do servidor monta para o e-mail
+function arTextoEmail(srv, dias, genero, obs, turno, rem) {
+  rem = rem || arRemetenteAtual();
+  let txt = arSaudacao() + '\n\nSegue anexo o atestado ' + arDescricao(srv, dias, genero, turno) + '.';
+  if (rem.nome) txt += '\nEncaminhado por: ' + rem.nome + (rem.cargo ? ' (' + rem.cargo + ')' : '') + '.';
   if (obs) txt += '\n\n' + obs;
-  return txt + '\n\nPor favor, acusar o recebimento.';
+  txt += '\n\nPor favor, acusar o recebimento.\n\nAtenciosamente,';
+  if (rem.nome) txt += '\n' + rem.nome;
+  if (rem.cargo) txt += '\n' + rem.cargo;
+  return txt + '\nEnviado pelo e-mail da Coordenação de Atenção Primária à Saúde — Itacarambi/MG';
 }
 
-function arTextoWhatsApp(srv, dias, genero, quando) {
+function arTextoWhatsApp(srv, dias, genero, quando, turno) {
   const t = arTermos(genero);
-  let txt = arSaudacao() + '\n\nInformo que o atestado ' + arDescricao(srv, dias, genero).replace(srv.nome, '*' + srv.nome + '*') +
+  let txt = arSaudacao() + '\n\nInformo que o atestado ' + arDescricao(srv, dias, genero, turno).replace(srv.nome, '*' + srv.nome + '*') +
     ', foi enviado ao e-mail do RH da Prefeitura em ' + quando + '.';
   txt += '\nVínculo: ' + t.vinc[arVinculo(srv)] + '.';
   if (arPrecisaPericia(srv, dias)) txt += '\n\n*Favor agendar perícia.*';
@@ -117,7 +143,7 @@ function renderAtestadoRH() {
   const zap = document.getElementById('ar-whats-rh');
   if (zap && document.activeElement !== zap) zap.value = (DB.config().whatsRhSaude || '');
   arAtualizarPrevia();
-  arRenderEnviados();
+  arCarregarHistorico();
 }
 
 // Mostra os dados do servidor, o aviso de perícia e a prévia do e-mail
@@ -153,6 +179,12 @@ function arAtualizarPrevia() {
   previa.style.display = 'block';
   document.getElementById('ar-previa-texto').textContent =
     arTextoEmail(srv, dias, genero, document.getElementById('ar-obs').value.trim());
+  const rem = arRemetenteAtual();
+  const aviso = document.getElementById('ar-remetente-aviso');
+  if (aviso) {
+    aviso.style.display = rem.cargo ? 'none' : 'block';
+    aviso.textContent = rem.cargo ? '' : '⚠️ Seu cargo não está cadastrado: o e-mail sairá só com o seu nome. Peça ao administrador para preencher o cargo em Gerenciar Gestores.';
+  }
 }
 
 function arArquivoSelecionado() {
@@ -198,9 +230,9 @@ function arLinkWhatsApp(texto) {
 }
 
 function arAbrirWhatsApp(idx) {
-  const e = _arEnviadosSessao[idx];
+  const e = _arHistorico[idx];
   if (!e) return;
-  const w = window.open(arLinkWhatsApp(e.textoWhats), '_blank', 'noopener');
+  const w = window.open(arLinkWhatsApp(arTextoWhatsAppDe(e)), '_blank', 'noopener');
   if (w) w.opener = null;
   arFecharPergunta();
 }
@@ -210,16 +242,25 @@ function arFecharPergunta() {
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
 }
 
+// Texto do WhatsApp de um envio do histórico (o do envio atual já vem pronto, com o gênero escolhido)
+function arTextoWhatsAppDe(e) {
+  if (e.textoWhats) return e.textoWhats;
+  const srv = DB.servidores().find(function (s) { return s.id === e.srvId; }) || { nome: e.profissional, matricula: '', setor: '' };
+  const d = new Date(e.criadoEm);
+  const quando = d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return arTextoWhatsApp(srv, e.dias, '', quando, e.turno || '');
+}
+
 function arPerguntarWhatsApp() {
   const box = document.getElementById('ar-pergunta-whats');
-  const e = _arEnviadosSessao[0];
+  const e = _arHistorico[0];
   if (!box || !e) return;
   const semNumero = !String(DB.config().whatsRhSaude || '').replace(/\D/g, '');
   box.style.display = 'block';
   box.innerHTML =
     '<div style="font-weight:800;margin-bottom:6px">✅ E-mail enviado ao RH da Prefeitura.</div>' +
     '<div style="margin-bottom:10px">Deseja enviar o comprovante para o WhatsApp do RH da Secretaria de Saúde?</div>' +
-    '<pre style="white-space:pre-wrap;font:inherit;font-size:.82rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin:0 0 10px">' + arEsc(e.textoWhats) + '</pre>' +
+    '<pre style="white-space:pre-wrap;font:inherit;font-size:.82rem;background:var(--surface);border:1px solid var(--border);border-radius:var(--r-sm);padding:10px;margin:0 0 10px">' + arEsc(arTextoWhatsAppDe(e)) + '</pre>' +
     (semNumero ? '<div style="font-size:.78rem;opacity:.75;margin-bottom:10px">O número do RH da Secretaria ainda não foi cadastrado (campo no fim desta tela). O WhatsApp vai abrir com o texto pronto para você escolher a conversa.</div>' : '') +
     '<div style="display:flex;gap:8px;flex-wrap:wrap">' +
     '<button type="button" class="btn btn-success" onclick="arAbrirWhatsApp(0)">💬 Sim, abrir o WhatsApp</button>' +
@@ -227,20 +268,80 @@ function arPerguntarWhatsApp() {
   box.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-function arRenderEnviados() {
-  const box = document.getElementById('ar-enviados');
+// ---------- Histórico de atestados enviados ----------
+// Cada envio grava no log do sistema: "Enviou atestado de NOME (DURAÇÃO[, com perícia]) por e-mail ao RH (ARQUIVO)",
+// com o id do servidor. O histórico é montado a partir desses registros.
+
+function arLerRegistroLog(l) {
+  const m = /^Enviou atestado de (.+?) \((.+?)\) por e-mail ao RH \((.*)\)$/.exec(String(l.detalhes || ''));
+  if (!m) return null;
+  let dur = m[2], pericia = false;
+  if (/, com perícia$/.test(dur)) { pericia = true; dur = dur.replace(/, com perícia$/, ''); }
+  let dias = 0, turno = '';
+  if (/^meio período/.test(dur)) { dias = 0.5; turno = /tarde/.test(dur) ? 'tarde' : (/manh/.test(dur) ? 'manha' : ''); }
+  else { const n = parseInt(dur, 10); dias = isNaN(n) ? 0 : n; }
+  return {
+    id: l.id, srvId: l.registroId || '', profissional: m[1], dias: dias, turno: turno, pericia: pericia,
+    arquivo: m[3], criadoEm: l.criadoEm, enviadoPor: l.usuarioNome || ''
+  };
+}
+
+async function arCarregarHistorico() {
+  const box = document.getElementById('ar-historico');
+  if (box && !_arHistCarregado) box.innerHTML = '<div style="opacity:.6;font-size:.85rem">Carregando histórico...</div>';
+  let logs = [];
+  try {
+    const { data, error } = await supabaseClient.from('logs').select('*')
+      .ilike('detalhes', 'Enviou atestado de %').order('criadoEm', { ascending: false }).limit(1000);
+    if (!error && Array.isArray(data)) logs = data;
+  } catch (e) { /* sem conexão: usa os registros locais */ }
+  try {
+    const locais = JSON.parse(localStorage.getItem('srv_logs') || '[]').filter(function (l) { return /^Enviou atestado de /.test(String(l.detalhes || '')); });
+    const ids = new Set(logs.map(function (l) { return l.id; }));
+    locais.forEach(function (l) { if (!ids.has(l.id)) logs.push(l); });
+  } catch (e) { /* ignora */ }
+  const visiveis = new Set((typeof getServidoresAcessiveis === 'function' ? getServidoresAcessiveis() : DB.servidores()).map(function (s) { return s.id; }));
+  let sessao = {};
+  try { sessao = JSON.parse(sessionStorage.getItem('ferias_sessao') || '{}'); } catch (e) { /* sem sessão */ }
+  const restrito = sessao.role !== 'admin';
+  // Mantém os textos de WhatsApp já prontos dos envios feitos agora
+  const prontos = {};
+  _arHistorico.forEach(function (e) { if (e.textoWhats) prontos[e.id] = e.textoWhats; });
+  _arHistorico = logs.map(arLerRegistroLog).filter(function (e) {
+    return e && (!restrito || visiveis.has(e.srvId));
+  }).sort(function (a, b) { return String(b.criadoEm).localeCompare(String(a.criadoEm)); });
+  _arHistorico.forEach(function (e) { if (prontos[e.id]) e.textoWhats = prontos[e.id]; });
+  _arHistCarregado = true;
+  arRenderHistorico();
+}
+
+function arRenderHistorico() {
+  const box = document.getElementById('ar-historico');
   if (!box) return;
-  if (!_arEnviadosSessao.length) {
-    box.innerHTML = '<div style="opacity:.6;font-size:.85rem">Nenhum atestado enviado nesta sessão.</div>';
+  const busca = String((document.getElementById('ar-hist-busca') || {}).value || '').toLowerCase().trim();
+  const mes = (document.getElementById('ar-hist-mes') || {}).value || '';
+  const itens = _arHistorico.map(function (e, i) { return { e: e, i: i }; }).filter(function (x) {
+    if (busca && String(x.e.profissional).toLowerCase().indexOf(busca) < 0) return false;
+    if (mes && String(x.e.criadoEm).slice(0, 7) !== mes) return false;
+    return true;
+  });
+  const total = document.getElementById('ar-hist-total');
+  if (total) total.textContent = itens.length + (itens.length === 1 ? ' atestado' : ' atestados');
+  if (!itens.length) {
+    box.innerHTML = '<div style="opacity:.6;font-size:.85rem">' + (_arHistorico.length ? 'Nenhum atestado encontrado com esse filtro.' : 'Nenhum atestado enviado ainda.') + '</div>';
     return;
   }
-  box.innerHTML = _arEnviadosSessao.map(function (e, i) {
+  box.innerHTML = itens.slice(0, 200).map(function (x) {
+    const e = x.e, d = new Date(e.criadoEm);
+    const quando = isNaN(d) ? '' : d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+    const srv = DB.servidores().find(function (s) { return s.id === e.srvId; });
     return '<div style="display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border)">' +
-      '<span>✅</span><div style="flex:1"><strong>' + arEsc(e.profissional) + '</strong> — ' + arTextoDuracao(e.dias, e.turno) +
+      '<span>📧</span><div style="flex:1;min-width:0"><strong>' + arEsc(e.profissional) + '</strong> — ' + arEsc(arTextoDuracao(e.dias, e.turno)) +
       (e.pericia ? ' · <span style="color:var(--warning, #f59e0b);font-weight:700">perícia</span>' : '') +
-      '<div style="font-size:.75rem;opacity:.7">' + arEsc(e.arquivo) + ' · enviado às ' + arEsc(e.hora) + ' para ' + arEsc(e.destinatario) + '</div></div>' +
-      '<button type="button" class="btn btn-success btn-sm" onclick="arAbrirWhatsApp(' + i + ')" title="Enviar comprovante pelo WhatsApp">💬 WhatsApp</button></div>';
-  }).join('');
+      '<div style="font-size:.75rem;opacity:.7">' + arEsc(quando) + (srv && srv.setor ? ' · ' + arEsc(srv.setor) : '') +
+      (e.enviadoPor ? ' · enviado por ' + arEsc(e.enviadoPor) : '') + (e.arquivo ? ' · ' + arEsc(e.arquivo) : '') + '</div></div>' +
+      '<button type="button" class="btn btn-success btn-sm" onclick="arAbrirWhatsApp(' + x.i + ')" title="Enviar comprovante pelo WhatsApp">💬 WhatsApp</button></div>';
+  }).join('') + (itens.length > 200 ? '<div style="font-size:.75rem;opacity:.6;margin-top:8px">Mostrando os 200 mais recentes. Use a busca ou o mês para encontrar os demais.</div>' : '');
 }
 
 async function enviarAtestadoRH() {
@@ -269,7 +370,7 @@ async function enviarAtestadoRH() {
   arFecharPergunta();
 
   try {
-    const assinante = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : {};
+    const assinante = arRemetenteAtual();
     const resp = await fetch(ATESTADO_RH_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -294,19 +395,15 @@ async function enviarAtestadoRH() {
     const agora = new Date();
     const hora = agora.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
     const pericia = arPrecisaPericia(srv, dias);
-    _arEnviadosSessao.unshift({
-      profissional: srv.nome,
-      dias: dias,
-      turno: turno,
-      pericia: pericia,
-      arquivo: file.name,
-      destinatario: dados.destinatario || 'RH',
-      hora: hora,
-      textoWhats: arTextoWhatsApp(srv, dias, genero, agora.toLocaleDateString('pt-BR') + ' às ' + hora)
+    const detalhesLog = 'Enviou atestado de ' + srv.nome + ' (' + arTextoDuracao(dias, turno) + (pericia ? ', com perícia' : '') + ') por e-mail ao RH (' + file.name + ')';
+    _arHistorico.unshift({
+      id: 'novo-' + Date.now(), srvId: srv.id, profissional: srv.nome, dias: dias, turno: turno, pericia: pericia,
+      arquivo: file.name, criadoEm: agora.toISOString(), enviadoPor: assinante.nome || '',
+      textoWhats: arTextoWhatsApp(srv, dias, genero, agora.toLocaleDateString('pt-BR') + ' às ' + hora, turno)
     });
-    arRenderEnviados();
+    arRenderHistorico();
     try {
-      DB.saveLog('Documento', 'Enviou atestado de ' + srv.nome + ' (' + arTextoDuracao(dias, turno) + (pericia ? ', com perícia' : '') + ') por e-mail ao RH (' + file.name + ')', 'servidores', srv.id);
+      DB.saveLog('Documento', detalhesLog, 'servidores', srv.id);
     } catch (e) { /* log é opcional */ }
 
     document.getElementById('ar-pdf').value = '';
