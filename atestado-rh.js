@@ -187,26 +187,138 @@ function arAtualizarPrevia() {
   }
 }
 
-function arArquivoSelecionado() {
+// ---------- Arquivo do atestado: PDF ou fotos (convertidas em PDF aqui mesmo) ----------
+// Aceita um ou mais arquivos: PDFs e/ou imagens (JPG, PNG, WEBP…). Tudo vira um único PDF A4,
+// na ordem em que foram escolhidos — útil para frente e verso. Nada sai do navegador antes do envio.
+let _arArquivo = null;       // { bytes: Uint8Array, nome, paginas, convertido }
+let _arArquivoUrl = '';
+let _arPreparo = null;       // promessa em andamento
+
+function arEhPdf(f) { return /\.pdf$/i.test(f.name) || f.type === 'application/pdf'; }
+function arEhImagem(f) { return /^image\//i.test(f.type) || /\.(jpe?g|png|webp|gif|bmp|heic|heif)$/i.test(f.name); }
+function arEhHeic(f) { return /heic|heif/i.test(f.type) || /\.(heic|heif)$/i.test(f.name); }
+
+function arNomeBase(texto) {
+  return String(texto || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Za-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 60);
+}
+
+// Lê a imagem já na orientação certa (fotos de celular) e reduz para até 2000 px, em JPEG
+function arImagemParaJpeg(file) {
+  return new Promise(function (resolve, reject) {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = function () {
+      try {
+        const lado = Math.max(img.naturalWidth, img.naturalHeight) || 1;
+        const k = Math.min(1, 2000 / lado);
+        const cv = document.createElement('canvas');
+        cv.width = Math.max(1, Math.round(img.naturalWidth * k));
+        cv.height = Math.max(1, Math.round(img.naturalHeight * k));
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, cv.width, cv.height);   // fundo branco para PNG transparente
+        ctx.drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        cv.toBlob(function (b) {
+          if (!b) return reject(new Error('Não foi possível converter ' + file.name + '.'));
+          b.arrayBuffer().then(function (ab) { resolve({ bytes: new Uint8Array(ab), w: cv.width, h: cv.height }); }, reject);
+        }, 'image/jpeg', 0.85);
+      } catch (e) { URL.revokeObjectURL(url); reject(e); }
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      reject(new Error(arEhHeic(file)
+        ? 'O navegador não abre fotos HEIC do iPhone (' + file.name + '). No iPhone, vá em Ajustes → Câmera → Formatos e escolha "Mais Compatível", ou envie um print/foto em JPG.'
+        : 'Não foi possível abrir a imagem ' + file.name + '.'));
+    };
+    img.src = url;
+  });
+}
+
+async function arMontarPdf(files, srv) {
+  if (typeof PDFLib === 'undefined') throw new Error('Biblioteca de PDF não carregou. Verifique a internet e recarregue a página.');
+  // Um único PDF: vai como está, sem regravar
+  if (files.length === 1 && arEhPdf(files[0])) {
+    return { bytes: new Uint8Array(await files[0].arrayBuffer()), nome: files[0].name, paginas: null, convertido: false };
+  }
+  const L = PDFLib;
+  const doc = await L.PDFDocument.create();
+  const A4 = [595.28, 841.89], M = 24;
+  for (const f of files) {
+    if (arEhPdf(f)) {
+      let origem;
+      try { origem = await L.PDFDocument.load(await f.arrayBuffer(), { ignoreEncryption: true }); }
+      catch (e) { throw new Error('Não foi possível abrir o PDF ' + f.name + '.'); }
+      const pags = await doc.copyPages(origem, origem.getPageIndices());
+      pags.forEach(function (p) { doc.addPage(p); });
+    } else {
+      const im = await arImagemParaJpeg(f);
+      const jpg = await doc.embedJpg(im.bytes);
+      // Página em pé ou deitada conforme a foto, com a imagem centralizada e inteira
+      const deitada = im.w > im.h;
+      const pw = deitada ? A4[1] : A4[0], ph = deitada ? A4[0] : A4[1];
+      const k = Math.min((pw - 2 * M) / im.w, (ph - 2 * M) / im.h);
+      const w = im.w * k, h = im.h * k;
+      const pg = doc.addPage([pw, ph]);
+      pg.drawImage(jpg, { x: (pw - w) / 2, y: (ph - h) / 2, width: w, height: h });
+    }
+  }
+  doc.setTitle('Atestado' + (srv ? ' - ' + srv.nome : ''));
+  doc.setCreator('Atlas Saúde');
+  doc.setProducer('Atlas Saúde');
+  const bytes = await doc.save();
+  const base = arNomeBase(srv ? srv.nome : '') || arNomeBase(files[0].name.replace(/\.[^.]+$/, '')) || 'documento';
+  return { bytes: bytes, nome: 'Atestado_' + base + '.pdf', paginas: doc.getPageCount(), convertido: true };
+}
+
+function arLimparArquivo() {
+  _arArquivo = null; _arPreparo = null;
+  if (_arArquivoUrl) { URL.revokeObjectURL(_arArquivoUrl); _arArquivoUrl = ''; }
+}
+
+async function arArquivoSelecionado() {
   const input = document.getElementById('ar-pdf');
   const info = document.getElementById('ar-pdf-info');
-  const f = input.files[0];
-  if (!f) { info.textContent = ''; return; }
-  const mb = (f.size / 1024 / 1024).toFixed(2).replace('.', ',');
-  if (f.size > ATESTADO_RH_MAX_BYTES) {
-    info.innerHTML = '<span style="color:var(--danger)">⚠️ ' + arEsc(f.name) + ' tem ' + mb + ' MB. O limite é 8 MB.</span>';
-  } else {
-    info.textContent = '📎 ' + f.name + ' (' + mb + ' MB)';
+  arLimparArquivo();
+  const files = Array.from(input.files || []);
+  if (!files.length) { info.textContent = ''; return; }
+  const invalido = files.find(function (f) { return !arEhPdf(f) && !arEhImagem(f); });
+  if (invalido) {
+    info.innerHTML = '<span style="color:var(--danger)">⚠️ ' + arEsc(invalido.name) + ' não é PDF nem imagem.</span>';
+    input.value = '';
+    return;
+  }
+  const temImagem = files.some(arEhImagem);
+  info.textContent = temImagem || files.length > 1 ? '⏳ Montando o PDF...' : '';
+  const prep = arMontarPdf(files, arSrvSelecionado());
+  _arPreparo = prep;
+  try {
+    const r = await prep;
+    if (_arPreparo !== prep) return;   // o usuário trocou o arquivo enquanto montava
+    _arArquivo = r;
+    const mb = (r.bytes.length / 1024 / 1024).toFixed(2).replace('.', ',');
+    _arArquivoUrl = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' }));
+    const ver = ' <a href="' + _arArquivoUrl + '" target="_blank" rel="noopener" style="color:var(--primary);font-weight:600">👁️ Ver PDF</a>';
+    if (r.bytes.length > ATESTADO_RH_MAX_BYTES) {
+      info.innerHTML = '<span style="color:var(--danger)">⚠️ ' + arEsc(r.nome) + ' ficou com ' + mb + ' MB. O limite é 8 MB.</span>' + ver;
+    } else if (r.convertido) {
+      info.innerHTML = '✅ ' + files.length + ' arquivo(s) convertido(s) em PDF: <strong>' + arEsc(r.nome) + '</strong> (' + r.paginas + ' página' + (r.paginas > 1 ? 's' : '') + ', ' + mb + ' MB).' + ver;
+    } else {
+      info.innerHTML = '📎 ' + arEsc(r.nome) + ' (' + mb + ' MB)' + ver;
+    }
+  } catch (e) {
+    if (_arPreparo !== prep) return;
+    console.error(e);
+    _arPreparo = null;
+    info.innerHTML = '<span style="color:var(--danger)">⚠️ ' + arEsc(e.message || 'Não foi possível montar o PDF.') + '</span>';
   }
 }
 
-function arLerBase64(file) {
-  return new Promise(function (resolve, reject) {
-    const r = new FileReader();
-    r.onload = function () { resolve(String(r.result).split(',')[1] || ''); };
-    r.onerror = function () { reject(new Error('Não foi possível ler o arquivo.')); };
-    r.readAsDataURL(file);
-  });
+function arBytesBase64(bytes) {
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+  return btoa(bin);
 }
 
 // ---------- WhatsApp do RH da Secretaria de Saúde ----------
@@ -349,16 +461,16 @@ async function enviarAtestadoRH() {
   const srv = arSrvSelecionado();
   const dias = arDiasInformados();
   const turno = arTurnoInformado();
-  const file = document.getElementById('ar-pdf').files[0];
   const genero = document.getElementById('ar-genero').value;
   const observacao = document.getElementById('ar-obs').value.trim();
 
   if (!srv) return toastMsg('Selecione o servidor.', 'warning');
   if (!dias) return toastMsg('Informe de quantos dias é o atestado.', 'warning');
-  if (!file) return toastMsg('Anexe o PDF do atestado.', 'warning');
-  const ehPdf = /\.pdf$/i.test(file.name) || file.type === 'application/pdf';
-  if (!ehPdf) return toastMsg('O arquivo precisa ser um PDF.', 'warning');
-  if (file.size > ATESTADO_RH_MAX_BYTES) return toastMsg('O PDF passa de 8 MB. Reduza o arquivo.', 'warning');
+  if (!(document.getElementById('ar-pdf').files || []).length) return toastMsg('Anexe o atestado (PDF ou foto).', 'warning');
+  if (_arPreparo && !_arArquivo) { try { await _arPreparo; } catch (e) { /* mensagem já exibida */ } }
+  if (!_arArquivo) return toastMsg('Não foi possível preparar o arquivo. Escolha-o novamente.', 'warning');
+  if (_arArquivo.bytes.length > ATESTADO_RH_MAX_BYTES) return toastMsg('O PDF passa de 8 MB. Use menos fotos ou fotos menores.', 'warning');
+  const file = { name: _arArquivo.convertido ? 'Atestado_' + (arNomeBase(srv.nome) || 'servidor') + '.pdf' : _arArquivo.nome };
 
   if (!confirm('Enviar o atestado de ' + srv.nome + ' (' + arTextoDuracao(dias, turno) + ') por e-mail ao RH da Prefeitura?\n\nArquivo: ' + file.name)) return;
 
@@ -383,7 +495,7 @@ async function enviarAtestadoRH() {
         genero: genero,
         observacao: observacao,
         nomeArquivo: file.name,
-        pdfBase64: await arLerBase64(file),
+        pdfBase64: arBytesBase64(_arArquivo.bytes),
         enviadoPor: assinante.nome || '',
         cargoEnviadoPor: assinante.cargo || ''
       })
@@ -408,6 +520,7 @@ async function enviarAtestadoRH() {
 
     document.getElementById('ar-pdf').value = '';
     document.getElementById('ar-pdf-info').textContent = '';
+    arLimparArquivo();
     document.getElementById('ar-obs').value = '';
     document.getElementById('ar-dias').value = '';
     document.getElementById('ar-duracao').value = 'dias';

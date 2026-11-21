@@ -3554,8 +3554,9 @@ Coordenação de RH
           <option value="m">do servidor</option>
         </select>
       </div>
-      <div class="field"><label>PDF do Atestado * <small style="opacity:.7">(até 8 MB)</small></label>
-        <input type="file" id="ar-pdf" accept="application/pdf,.pdf" onchange="arArquivoSelecionado()">
+      <div class="field"><label>Atestado (PDF ou foto) * <small style="opacity:.7">(até 8 MB)</small></label>
+        <input type="file" id="ar-pdf" accept="application/pdf,.pdf,image/*" multiple onchange="arArquivoSelecionado()">
+        <div style="font-size:.7rem;color:var(--muted);margin-top:4px">Pode escolher várias fotos (ex.: frente e verso): o sistema junta tudo em um só PDF antes de enviar.</div>
         <div id="ar-pdf-info" style="font-size:.8rem;margin-top:6px"></div>
       </div>
     </div>
