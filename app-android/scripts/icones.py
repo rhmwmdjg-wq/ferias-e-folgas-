@@ -18,3 +18,14 @@ for dens, t in tamanhos.items():
     fundo.paste(img.resize((miolo, miolo), Image.LANCZOS), ((f - miolo) // 2, (f - miolo) // 2))
     fundo.save(os.path.join(pasta, 'ic_launcher_foreground.png'))
 print('ícones gerados')
+
+# Tela de abertura: fundo escuro com o logo do Atlas no centro (no lugar da imagem padrão)
+import glob
+for caminho in glob.glob(os.path.join(res, 'drawable*', 'splash.png')):
+    w, h = Image.open(caminho).size
+    tela = Image.new('RGB', (w, h), (11, 16, 32))
+    lado = round(min(w, h) * 0.32)
+    logo = img.resize((lado, lado), Image.LANCZOS)
+    tela.paste(logo, ((w - lado) // 2, (h - lado) // 2), logo)
+    tela.save(caminho)
+print('tela de abertura gerada')
