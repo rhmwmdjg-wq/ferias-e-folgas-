@@ -1,0 +1,12 @@
+{
+  "name": "Atlas Atestados",
+  "short_name": "Atestados",
+  "description": "Envio de atestados ao RH — Coordenação de Atenção Primária à Saúde de Itacarambi",
+  "start_url": "app-atestado.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1020",
+  "theme_color": "#0b1020",
+  "icons": [{ "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }]
+}

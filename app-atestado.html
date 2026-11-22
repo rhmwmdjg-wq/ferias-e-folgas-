@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#0b1020">
+<title>Atlas Atestados</title>
+<link rel="manifest" href="app-atestado.webmanifest">
+<link rel="icon" href="icon-512.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="app-atestado.css">
+</head>
+<body>
+
+<!-- ===================== LOGIN ===================== -->
+<section id="tela-login" class="tela" hidden>
+  <div class="login-box">
+    <img src="icon-512.png" alt="" class="login-logo">
+    <h1>Atlas Atestados</h1>
+    <p class="sub">Envio de atestados ao RH · Coordenação de Atenção Primária à Saúde de Itacarambi</p>
+    <form id="form-login" onsubmit="appEntrar(event)">
+      <label>Usuário</label>
+      <input id="login-usuario" autocomplete="username" autocapitalize="none" required>
+      <label>Senha</label>
+      <input id="login-senha" type="password" autocomplete="current-password" required>
+      <button class="btn btn-primario btn-grande" id="btn-entrar">Entrar</button>
+      <div id="login-erro" class="erro"></div>
+    </form>
+    <p class="rodape-login">Use o mesmo usuário e senha do Atlas Saúde.</p>
+  </div>
+</section>
+
+<!-- ===================== APP ===================== -->
+<section id="tela-app" class="tela" hidden>
+  <header class="topo">
+    <div>
+      <div class="topo-titulo">📄 Atlas Atestados</div>
+      <div class="topo-sub" id="topo-usuario"></div>
+    </div>
+    <button class="btn btn-mini" onclick="appSair()">Sair</button>
+  </header>
+
+  <nav class="abas">
+    <button class="aba ativa" id="aba-enviar" onclick="appAba('enviar')">✉️ Enviar</button>
+    <button class="aba" id="aba-historico" onclick="appAba('historico')">🕘 Enviados</button>
+  </nav>
+
+  <!-- ----- ENVIAR ----- -->
+  <main id="painel-enviar" class="painel">
+    <div class="cartao">
+      <label>Servidor *</label>
+      <button type="button" class="seletor" id="btn-servidor" onclick="appAbrirBusca()">Toque para escolher o servidor…</button>
+      <div id="srv-info" class="dica"></div>
+
+      <div class="linha2">
+        <div>
+          <label>Duração *</label>
+          <select id="f-duracao" onchange="appMudouDuracao()">
+            <option value="dias">Dias inteiros</option>
+            <option value="manha">Meio período – manhã</option>
+            <option value="tarde">Meio período – tarde</option>
+          </select>
+        </div>
+        <div id="campo-dias">
+          <label>Quantos dias? *</label>
+          <input id="f-dias" type="number" inputmode="numeric" min="1" max="365" placeholder="Ex.: 3" oninput="appAtualizarPrevia()">
+        </div>
+      </div>
+
+      <label>Tratamento no e-mail</label>
+      <select id="f-genero" onchange="appAtualizarPrevia()">
+        <option value="">do(a) servidor(a)</option>
+        <option value="f">da servidora</option>
+        <option value="m">do servidor</option>
+      </select>
+
+      <label>Observação <small>(opcional — vai no corpo do e-mail)</small></label>
+      <textarea id="f-obs" maxlength="1000" rows="2" placeholder="Ex.: afastamento a partir de 12/11." oninput="appAtualizarPrevia()"></textarea>
+      <div id="aviso-pericia" class="aviso" hidden></div>
+    </div>
+
+    <div class="cartao">
+      <div class="cartao-topo">
+        <strong>Páginas do atestado</strong>
+        <span class="dica" id="paginas-resumo">nenhuma página</span>
+      </div>
+      <div id="paginas" class="paginas"></div>
+      <div class="botoes-captura">
+        <button type="button" class="btn btn-primario" onclick="scanAbrirCamera()">📷 Escanear</button>
+        <button type="button" class="btn" onclick="document.getElementById('in-galeria').click()">🖼️ Galeria / PDF</button>
+      </div>
+      <input type="file" id="in-galeria" accept="image/*,application/pdf,.pdf" multiple hidden onchange="appImportarArquivos(this)">
+      <input type="file" id="in-camera" accept="image/*" capture="environment" hidden onchange="appImportarArquivos(this)">
+    </div>
+
+    <details class="cartao" id="previa-box">
+      <summary>Ver o texto do e-mail</summary>
+      <pre id="previa-email"></pre>
+    </details>
+
+    <button class="btn btn-sucesso btn-grande" id="btn-enviar" onclick="appEnviar()">📨 Enviar ao RH</button>
+    <p class="dica centro">O e-mail sai pela conta da Coordenação e fica registrado no Atlas Saúde.</p>
+  </main>
+
+  <!-- ----- HISTÓRICO ----- -->
+  <main id="painel-historico" class="painel" hidden>
+    <div class="cartao-topo" style="padding:0 2px 10px">
+      <strong>Atestados enviados</strong>
+      <button class="btn btn-mini" onclick="appCarregarHistorico()">↻ Atualizar</button>
+    </div>
+    <input id="hist-busca" placeholder="🔍 Buscar servidor…" oninput="appRenderHistorico()">
+    <div id="historico"></div>
+  </main>
+</section>
+
+<!-- ===================== BUSCA DE SERVIDOR ===================== -->
+<div id="busca" class="sobreposto" hidden>
+  <div class="busca-topo">
+    <button class="btn-icone" onclick="appFecharBusca()">←</button>
+    <input id="busca-texto" placeholder="Nome, matrícula ou setor…" oninput="appRenderBusca()" autocomplete="off">
+  </div>
+  <div id="busca-lista" class="busca-lista"></div>
+</div>
+
+<!-- ===================== SCANNER: CÂMERA ===================== -->
+<div id="scan-camera" class="sobreposto escuro" hidden>
+  <video id="scan-video" playsinline muted autoplay></video>
+  <div class="moldura"></div>
+  <div class="scan-topo">
+    <button class="btn-icone claro" onclick="scanFecharCamera()">✕</button>
+    <span id="scan-contador"></span>
+    <button class="btn-icone claro" id="btn-flash" onclick="scanFlash()" hidden>⚡</button>
+  </div>
+  <div class="scan-base">
+    <button class="btn-icone claro grande" onclick="scanGaleriaDaCamera()" title="Galeria">🖼️</button>
+    <button class="obturador" id="btn-obturador" onclick="scanCapturar()" aria-label="Fotografar"></button>
+    <button class="btn-icone claro grande" onclick="scanFecharCamera()" title="Concluir">✔</button>
+  </div>
+  <div class="scan-dica">Enquadre o atestado sobre uma superfície escura e toque no botão.</div>
+</div>
+
+<!-- ===================== SCANNER: RECORTE ===================== -->
+<div id="scan-recorte" class="sobreposto escuro" hidden>
+  <div class="scan-topo">
+    <button class="btn-icone claro" onclick="scanCancelarRecorte()">✕</button>
+    <span>Ajuste os cantos</span>
+    <span></span>
+  </div>
+  <div class="area-recorte" id="area-recorte">
+    <canvas id="cv-recorte"></canvas>
+    <svg id="svg-recorte"></svg>
+  </div>
+  <div class="barra-acoes">
+    <button class="btn btn-escuro" onclick="scanRecorteTudo()">⛶ Inteira</button>
+    <button class="btn btn-escuro" onclick="scanRecorteAuto()">✨ Detectar</button>
+    <button class="btn btn-primario" onclick="scanConfirmarRecorte()">Avançar →</button>
+  </div>
+</div>
+
+<!-- ===================== SCANNER: FILTRO ===================== -->
+<div id="scan-filtro" class="sobreposto escuro" hidden>
+  <div class="scan-topo">
+    <button class="btn-icone claro" onclick="scanVoltarRecorte()">←</button>
+    <span>Ajuste a imagem</span>
+    <button class="btn-icone claro" onclick="scanGirar()" title="Girar">⟳</button>
+  </div>
+  <div class="area-filtro"><canvas id="cv-filtro"></canvas></div>
+  <div class="filtros">
+    <button class="chip" data-f="documento" onclick="scanFiltro('documento')">Documento</button>
+    <button class="chip" data-f="realcado" onclick="scanFiltro('realcado')">Realçado</button>
+    <button class="chip" data-f="cinza" onclick="scanFiltro('cinza')">Cinza</button>
+    <button class="chip" data-f="original" onclick="scanFiltro('original')">Original</button>
+  </div>
+  <div class="barra-acoes">
+    <button class="btn btn-escuro" onclick="scanUsarPagina(true)">＋ Usar e fotografar outra</button>
+    <button class="btn btn-primario" onclick="scanUsarPagina(false)">✔ Usar página</button>
+  </div>
+</div>
+
+<!-- ===================== VISUALIZAR PÁGINA ===================== -->
+<div id="ver-pagina" class="sobreposto escuro" hidden onclick="this.hidden = true">
+  <img id="ver-pagina-img" alt="">
+</div>
+
+<div id="carregando" class="carregando" hidden><div class="spinner"></div><div id="carregando-txt">Processando…</div></div>
+<div id="toast" class="toast" hidden></div>
+
+<script src="https://unpkg.com/pdf-lib@1.17.1/dist/pdf-lib.min.js"></script>
+<script src="app-atestado.js"></script>
+</body>
+</html>

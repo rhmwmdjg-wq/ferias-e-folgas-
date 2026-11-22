@@ -1,0 +1,13 @@
+{
+  "appId": "br.mg.itacarambi.saude.atestados",
+  "appName": "Atlas Atestados",
+  "webDir": "www",
+  "server": {
+    "url": "https://ferias-e-folgas.vercel.app/app-atestado.html",
+    "androidScheme": "https",
+    "allowNavigation": ["ferias-e-folgas.vercel.app"]
+  },
+  "android": {
+    "backgroundColor": "#0b1020"
+  }
+}

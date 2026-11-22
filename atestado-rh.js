@@ -394,7 +394,7 @@ function arLerRegistroLog(l) {
   else { const n = parseInt(dur, 10); dias = isNaN(n) ? 0 : n; }
   return {
     id: l.id, srvId: l.registroId || '', profissional: m[1], dias: dias, turno: turno, pericia: pericia,
-    arquivo: m[3], criadoEm: l.criadoEm, enviadoPor: l.usuarioNome || ''
+    arquivo: m[3], criadoEm: l.criadoEm, enviadoPor: l.usuarioNome || '', app: l.acao === 'Documento (app)'
   };
 }
 
@@ -451,7 +451,7 @@ function arRenderHistorico() {
       '<span>📧</span><div style="flex:1;min-width:0"><strong>' + arEsc(e.profissional) + '</strong> — ' + arEsc(arTextoDuracao(e.dias, e.turno)) +
       (e.pericia ? ' · <span style="color:var(--warning, #f59e0b);font-weight:700">perícia</span>' : '') +
       '<div style="font-size:.75rem;opacity:.7">' + arEsc(quando) + (srv && srv.setor ? ' · ' + arEsc(srv.setor) : '') +
-      (e.enviadoPor ? ' · enviado por ' + arEsc(e.enviadoPor) : '') + (e.arquivo ? ' · ' + arEsc(e.arquivo) : '') + '</div></div>' +
+      (e.enviadoPor ? ' · enviado por ' + arEsc(e.enviadoPor) : '') + (e.app ? ' · 📱 pelo app' : '') + (e.arquivo ? ' · ' + arEsc(e.arquivo) : '') + '</div></div>' +
       '<button type="button" class="btn btn-success btn-sm" onclick="arAbrirWhatsApp(' + x.i + ')" title="Enviar comprovante pelo WhatsApp">💬 WhatsApp</button></div>';
   }).join('') + (itens.length > 200 ? '<div style="font-size:.75rem;opacity:.6;margin-top:8px">Mostrando os 200 mais recentes. Use a busca ou o mês para encontrar os demais.</div>' : '');
 }

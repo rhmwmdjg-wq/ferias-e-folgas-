@@ -1,0 +1,12 @@
+{
+  "name": "atlas-atestados",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Aplicativo Android do Atlas Saúde para envio de atestados ao RH",
+  "dependencies": {
+    "@capacitor/android": "^7.0.0",
+    "@capacitor/app": "^7.0.0",
+    "@capacitor/cli": "^7.0.0",
+    "@capacitor/core": "^7.0.0"
+  }
+}

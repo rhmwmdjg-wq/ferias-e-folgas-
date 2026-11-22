@@ -1,0 +1,86 @@
+# Compila o aplicativo Android "Atlas Atestados" e publica o APK na página de versões
+# (Releases) do repositório, sempre com o mesmo endereço de download:
+# https://github.com/rhmwmdjg-wq/ferias-e-folgas-/releases/latest/download/AtlasAtestados.apk
+#
+# O app abre a tela app-atestado.html do Atlas Saúde. Mudanças nessa tela chegam ao
+# celular na hora, sem novo APK; este build só precisa rodar quando mudar a parte Android.
+name: App Android (Atlas Atestados)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app-android/**'
+      - '.github/workflows/app-android.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Instalar o Capacitor
+        working-directory: app-android
+        run: npm install --no-audit --no-fund
+
+      - name: Criar o projeto Android
+        working-directory: app-android
+        run: |
+          npx cap add android
+          npx cap sync android
+
+      - name: Permissões, ícones e cor
+        working-directory: app-android
+        run: |
+          MANIFEST=android/app/src/main/AndroidManifest.xml
+          sed -i 's#<uses-permission android:name="android.permission.INTERNET" />#<uses-permission android:name="android.permission.INTERNET" />\n    <uses-permission android:name="android.permission.CAMERA" />\n    <uses-feature android:name="android.hardware.camera" android:required="false" />#' $MANIFEST
+          grep -q 'android.permission.CAMERA' $MANIFEST
+          pip install --quiet pillow
+          python3 scripts/icones.py ../icon-512.png android/app/src/main/res
+          COR=android/app/src/main/res/values/ic_launcher_background.xml
+          if [ -f "$COR" ]; then sed -i 's#>[^<]*</color>#>\#0B1020</color>#' "$COR"; fi
+          cat $MANIFEST
+
+      - name: Chave de assinatura fixa (permite atualizar o app sem desinstalar)
+        run: |
+          mkdir -p ~/.android
+          cp app-android/assinatura/atlas-debug.keystore ~/.android/debug.keystore
+
+      - name: Compilar o APK
+        working-directory: app-android/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk ../../AtlasAtestados.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AtlasAtestados
+          path: AtlasAtestados.apk
+
+      - name: Publicar na página de versões
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-atestados
+          name: Atlas Atestados (Android)
+          make_latest: true
+          files: AtlasAtestados.apk
+          body: |
+            Aplicativo Android para enviar atestados ao RH pelo Atlas Saúde.
+
+            **Instalar:** abra este link no celular e baixe o arquivo **AtlasAtestados.apk**. O Android vai pedir para permitir a instalação de "fontes desconhecidas" para o navegador; permita e instale.
+
+            Entre com o mesmo usuário e senha do Atlas Saúde.
