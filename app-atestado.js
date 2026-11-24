@@ -352,6 +352,7 @@ async function scanAbrirCamera() {
   v.srcObject = _stream;
   $('scan-camera').hidden = false;
   scanAtualizarContador();
+  scanIniciarContornoAoVivo();
   try {
     const track = _stream.getVideoTracks()[0];
     const cap = track.getCapabilities ? track.getCapabilities() : {};
@@ -363,7 +364,54 @@ function scanAtualizarContador() {
   const n = _paginas.length;
   $('scan-contador').textContent = n ? n + ' página' + (n > 1 ? 's' : '') : '';
 }
+// Contorno da folha ao vivo sobre a imagem da câmera (como nos apps de scanner)
+let _aoVivo = 0, _quadVivo = null;
+function scanIniciarContornoAoVivo() {
+  const id = ++_aoVivo;
+  const v = $('scan-video'), tela = $('scan-contorno');
+  const peq = document.createElement('canvas');
+  const passo = () => {
+    if (id !== _aoVivo || !_stream) return;
+    if (v.videoWidth) {
+      try {
+        const k = Math.min(1, DET_MAX / Math.max(v.videoWidth, v.videoHeight));
+        peq.width = Math.round(v.videoWidth * k); peq.height = Math.round(v.videoHeight * k);
+        peq.getContext('2d').drawImage(v, 0, 0, peq.width, peq.height);
+        const r = detReduzir(peq), d = detNaReduzida(r);
+        const novo = d ? d.q.map((p) => [p[0] / r.k / k, p[1] / r.k / k]) : null;   // em pixels do vídeo
+        // suaviza o movimento do contorno
+        if (novo && _quadVivo) _quadVivo = novo.map((p, i) => [_quadVivo[i][0] * 0.4 + p[0] * 0.6, _quadVivo[i][1] * 0.4 + p[1] * 0.6]);
+        else _quadVivo = novo;
+        scanDesenharContornoAoVivo(v, tela);
+      } catch (e) { /* quadro indisponível */ }
+    }
+    setTimeout(passo, 280);
+  };
+  setTimeout(passo, 400);
+}
+function scanDesenharContornoAoVivo(v, tela) {
+  const W = tela.clientWidth, H = tela.clientHeight;
+  if (tela.width !== W) tela.width = W;
+  if (tela.height !== H) tela.height = H;
+  const ctx = tela.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  $('scan-moldura').hidden = !!_quadVivo;
+  $('scan-dica').textContent = _quadVivo ? 'Folha encontrada. Segure firme e toque no botão.' : 'Enquadre o atestado inteiro. Quando o contorno azul aparecer em volta da folha, toque no botão.';
+  if (!_quadVivo) return;
+  // o vídeo ocupa a tela com "cover": mesma escala e deslocamento
+  const esc = Math.max(W / v.videoWidth, H / v.videoHeight);
+  const ox = (W - v.videoWidth * esc) / 2, oy = (H - v.videoHeight * esc) / 2;
+  const p = _quadVivo.map((c) => [ox + c[0] * esc, oy + c[1] * esc]);
+  ctx.beginPath();
+  p.forEach((c, i) => (i ? ctx.lineTo(c[0], c[1]) : ctx.moveTo(c[0], c[1])));
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(77,124,255,.18)'; ctx.fill();
+  ctx.lineWidth = 3; ctx.strokeStyle = '#4d7cff'; ctx.stroke();
+}
+
 function scanPararCamera() {
+  _aoVivo++; _quadVivo = null;
+  const tela = $('scan-contorno'); tela.getContext('2d').clearRect(0, 0, tela.width, tela.height);
   if (_stream) _stream.getTracks().forEach((t) => t.stop());
   _stream = null; _flashLigado = false;
   $('scan-video').srcObject = null;
@@ -440,23 +488,324 @@ function scanLimitar(cv, max) {
 }
 
 // ===================== SCANNER: DETECÇÃO DO DOCUMENTO =====================
-// Procura a folha (região clara maior) numa versão reduzida da foto e devolve os 4 cantos.
-function scanDetectar(cv) {
-  const W = 360, k = Math.min(1, W / Math.max(cv.width, cv.height));
-  const w = Math.max(8, Math.round(cv.width * k)), h = Math.max(8, Math.round(cv.height * k));
+// Duas estratégias, e fica a que tiver as bordas mais nítidas sob os 4 lados:
+//  1) Bordas: gradiente (Sobel) + transformada de Hough → as 4 retas da borda da folha.
+//     Funciona em mesa clara, com sombra, luz irregular e mão segurando o papel.
+//  2) Região: a área clara maior (bom em fundo escuro e quando as bordas somem).
+
+const DET_MAX = 420;
+
+// Reduz a foto, desfoca levemente e devolve tons de cinza + o fator de escala
+function detReduzir(cv) {
+  const k = Math.min(1, DET_MAX / Math.max(cv.width, cv.height));
+  const w = Math.max(16, Math.round(cv.width * k)), h = Math.max(16, Math.round(cv.height * k));
   const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const ctx = c.getContext('2d');
-  ctx.filter = 'blur(2px)';
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.filter = 'blur(1.2px)';
   ctx.drawImage(cv, 0, 0, w, h);
   const d = ctx.getImageData(0, 0, w, h).data;
-  const n = w * h, cinza = new Uint8Array(n), hist = new Array(256).fill(0);
+  return { w, h, k, rgba: d };
+}
+
+// Mapa de bordas finas: Sobel em cada canal (bordas de cor também contam) + supressão de não máximos
+function detBordas(r) {
+  const { w, h, rgba } = r, n = w * h;
+  const mag = new Float32Array(n), gx = new Float32Array(n), gy = new Float32Array(n);
+  for (let y = 1; y < h - 1; y++) {
+    for (let x = 1; x < w - 1; x++) {
+      let melhor = -1, bx = 0, by = 0;
+      for (let c = 0; c < 3; c++) {
+        const p = (i) => rgba[i * 4 + c];
+        const i = y * w + x;
+        const sx = -p(i - w - 1) - 2 * p(i - 1) - p(i + w - 1) + p(i - w + 1) + 2 * p(i + 1) + p(i + w + 1);
+        const sy = -p(i - w - 1) - 2 * p(i - w) - p(i - w + 1) + p(i + w - 1) + 2 * p(i + w) + p(i + w + 1);
+        const m = sx * sx + sy * sy;
+        if (m > melhor) { melhor = m; bx = sx; by = sy; }
+      }
+      const i = y * w + x;
+      mag[i] = Math.sqrt(melhor); gx[i] = bx; gy[i] = by;
+    }
+  }
+  // limiar adaptativo: percentil 88 das magnitudes, com piso
+  const amostra = [];
+  for (let i = 0; i < n; i += 7) if (mag[i] > 0) amostra.push(mag[i]);
+  amostra.sort((a, b) => a - b);
+  const limiar = Math.max(28, amostra.length ? amostra[Math.floor(amostra.length * 0.88)] : 60);
+  const borda = new Uint8Array(n);
+  for (let y = 2; y < h - 2; y++) {
+    for (let x = 2; x < w - 2; x++) {
+      const i = y * w + x, m = mag[i];
+      if (m < limiar) continue;
+      const ax = Math.abs(gx[i]), ay = Math.abs(gy[i]);
+      let a, b;
+      if (ax > 2.4 * ay) { a = mag[i - 1]; b = mag[i + 1]; }
+      else if (ay > 2.4 * ax) { a = mag[i - w]; b = mag[i + w]; }
+      else if ((gx[i] > 0) === (gy[i] > 0)) { a = mag[i - w - 1]; b = mag[i + w + 1]; }
+      else { a = mag[i - w + 1]; b = mag[i + w - 1]; }
+      if (m >= a && m >= b) borda[i] = 1;
+    }
+  }
+  return { borda, gx, gy, mag, limiar };
+}
+
+// Retas dominantes pela transformada de Hough (cada pixel vota só perto da sua própria direção)
+function detRetas(r, b) {
+  const { w, h } = r, NT = 180, diag = Math.ceil(Math.hypot(w, h)), NR = 2 * diag + 1;
+  const acc = new Float32Array(NT * NR), cs = new Float32Array(NT), sn = new Float32Array(NT);
+  for (let t = 0; t < NT; t++) { cs[t] = Math.cos(t * Math.PI / NT); sn[t] = Math.sin(t * Math.PI / NT); }
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = y * w + x;
+      if (!b.borda[i]) continue;
+      let ang = Math.atan2(b.gy[i], b.gx[i]) * 180 / Math.PI;
+      if (ang < 0) ang += 180;
+      const t0 = Math.round(ang);
+      for (let dt = -5; dt <= 5; dt++) {
+        const t = ((t0 + dt) % NT + NT) % NT;
+        const rho = Math.round(x * cs[t] + y * sn[t]) + diag;
+        acc[t * NR + rho] += 1;
+      }
+    }
+  }
+  // picos com supressão de vizinhança
+  const minVotos = Math.min(w, h) * 0.1, picos = [];
+  for (let t = 0; t < NT; t++) {
+    for (let rr = 0; rr < NR; rr++) {
+      const v = acc[t * NR + rr];
+      if (v < minVotos) continue;
+      let max = true;
+      for (let dt = -3; dt <= 3 && max; dt++) {
+        const tt = t + dt;
+        for (let dr = -6; dr <= 6; dr++) {
+          if (!dt && !dr) continue;
+          let t2 = tt, r2 = rr + dr;
+          if (t2 < 0) { t2 += NT; r2 = 2 * diag - r2; } else if (t2 >= NT) { t2 -= NT; r2 = 2 * diag - r2; }
+          if (r2 < 0 || r2 >= NR) continue;
+          const o = acc[t2 * NR + r2];
+          if (o > v || (o === v && (t2 * NR + r2) < (t * NR + rr))) { max = false; break; }
+        }
+      }
+      if (max) picos.push({ t, rho: rr - diag, v });
+    }
+  }
+  picos.sort((a, b2) => b2.v - a.v);
+  return picos.slice(0, 26).map((p) => ({ c: cs[p.t], s: sn[p.t], rho: p.rho, theta: p.t, v: p.v }));
+}
+
+function detIntersecao(a, b) {
+  const det = a.c * b.s - a.s * b.c;
+  if (Math.abs(det) < 1e-6) return null;
+  return [(a.rho * b.s - b.rho * a.s) / det, (a.c * b.rho - b.c * a.rho) / det];
+}
+
+// Ordena 4 pontos como superior-esquerdo, superior-direito, inferior-direito, inferior-esquerdo
+function detOrdenar(pts) {
+  const cx = pts.reduce((s, p) => s + p[0], 0) / 4, cy = pts.reduce((s, p) => s + p[1], 0) / 4;
+  const o = pts.slice().sort((a, b) => Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx));
+  // começa pelo de menor x+y (superior esquerdo)
+  let ini = 0;
+  o.forEach((p, i) => { if (p[0] + p[1] < o[ini][0] + o[ini][1]) ini = i; });
+  return [0, 1, 2, 3].map((i) => o[(ini + i) % 4]);
+}
+
+// Apoio de um trecho [t0, t1] do segmento a→c: fração com borda perpendicular e contraste no mesmo
+// sentido (a borda do papel é contínua; linhas de texto alternam claro/escuro e não passam).
+function detApoioTrecho(a, c, t0, t1, r, b) {
+  const { w, h } = r;
+  const comp = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1, N = Math.max(8, Math.round(comp * (t1 - t0) / 3));
+  const nx = -(c[1] - a[1]) / comp, ny = (c[0] - a[0]) / comp;
+  let dentro = 0, fora = 0, pos = 0, neg = 0;
+  for (let k = 1; k < N; k++) {
+    const t = t0 + (t1 - t0) * k / N;
+    const x = Math.round(a[0] + (c[0] - a[0]) * t), y = Math.round(a[1] + (c[1] - a[1]) * t);
+    if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) { fora++; continue; }
+    dentro++;
+    let mx = 0, gx = 0, gy = 0;
+    for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+      const p = (y + dy) * w + x + dx;
+      if (b.borda[p] && b.mag[p] > mx) { mx = b.mag[p]; gx = b.gx[p]; gy = b.gy[p]; }
+    }
+    if (!mx) continue;
+    const dot = (gx * nx + gy * ny) / mx;
+    if (dot > 0.75) pos++; else if (dot < -0.75) neg++;
+  }
+  const real = dentro >= 4 ? Math.max(0, (Math.max(pos, neg) - 0.5 * Math.min(pos, neg)) / dentro) : 0;
+  const tot = dentro + fora || 1;
+  return { real, dentro: dentro / tot, fora: fora / tot };
+}
+
+// Apoio de cada lado (0 a 1). O trecho que sai da foto (folha cortada pelo enquadramento) vale 0,65.
+function detApoio(q, r, b) {
+  const lados = [];
+  lados.reais = [];
+  for (let i = 0; i < 4; i++) {
+    const t = detApoioTrecho(q[i], q[(i + 1) % 4], 0, 1, r, b);
+    lados.push(t.dentro < 0.05 ? 0.65 : t.real * t.dentro + 0.65 * t.fora);
+    lados.reais.push(t);
+  }
+  return lados;
+}
+
+function detAngulosOk(q) {
+  for (let i = 0; i < 4; i++) {
+    const a = q[(i + 3) % 4], b = q[i], c = q[(i + 1) % 4];
+    const v1 = [a[0] - b[0], a[1] - b[1]], v2 = [c[0] - b[0], c[1] - b[1]];
+    const cos = (v1[0] * v2[0] + v1[1] * v2[1]) / (Math.hypot(v1[0], v1[1]) * Math.hypot(v2[0], v2[1]) || 1);
+    const ang = Math.acos(Math.max(-1, Math.min(1, cos))) * 180 / Math.PI;
+    if (ang < 40 || ang > 140) return false;
+  }
+  return true;
+}
+
+// Quanto há de "textura" (letras, riscos) logo para dentro de cada lado. A borda real do papel
+// tem a margem em branco do lado de dentro; o contorno do bloco de texto tem letras.
+function detTexturaInterna(q, r, b) {
+  const { w, h } = r;
+  const cx = (q[0][0] + q[1][0] + q[2][0] + q[3][0]) / 4, cy = (q[0][1] + q[1][1] + q[2][1] + q[3][1]) / 4;
+  let total = 0, com = 0;
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], c = q[(i + 1) % 4];
+    const comp = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+    let nx = -(c[1] - a[1]) / comp, ny = (c[0] - a[0]) / comp;
+    const mx = (a[0] + c[0]) / 2, my = (a[1] + c[1]) / 2;
+    if ((cx - mx) * nx + (cy - my) * ny < 0) { nx = -nx; ny = -ny; }   // aponta para dentro
+    for (let k = 1; k < 24; k++) {
+      const t = 0.1 + 0.8 * k / 24, x0 = a[0] + (c[0] - a[0]) * t, y0 = a[1] + (c[1] - a[1]) * t;
+      for (let d = 4; d <= 9; d++) {
+        const x = Math.round(x0 + nx * d), y = Math.round(y0 + ny * d);
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        total++;
+        if (b.borda[y * w + x]) com++;
+      }
+    }
+  }
+  return total ? com / total : 0;
+}
+
+function detPontuar(q, r, b) {
+  const { w, h } = r;
+  if (!scanQuadValido(q, w, h) || !detAngulosOk(q)) return null;
+  const area = scanAreaQuad(q) / (w * h);
+  if (area < 0.12 || area > 1.15) return null;
+  if (q.some((p) => p[0] < -0.15 * w || p[0] > 1.15 * w || p[1] < -0.15 * h || p[1] > 1.15 * h)) return null;
+  const ap = detApoio(q, r, b);
+  const min = Math.min.apply(null, ap), media = ap.reduce((s, v) => s + v, 0) / 4;
+  if (min < 0.25) return null;
+  // pelo menos 2 lados precisam ter borda de verdade visível na foto
+  if (ap.reais.filter((l) => l.dentro > 0.6 && l.real > 0.55).length < 2) return null;
+  // lado fora da foto só vale se as bordas vizinhas da folha chegam até a beira da foto
+  for (let i = 0; i < 4; i++) {
+    if (ap.reais[i].dentro > 0.4) continue;
+    const ant = (i + 3) % 4, prox = (i + 1) % 4;
+    const fimAnt = detApoioTrecho(q[ant], q[i], 0.88, 0.98, r, b);        // fim do lado anterior (junto deste)
+    const iniProx = detApoioTrecho(q[prox], q[(prox + 1) % 4], 0.02, 0.12, r, b); // começo do próximo
+    const ok = (l) => l.dentro < 0.3 || l.real > 0.5;
+    if (!ok(fimAnt) || !ok(iniProx)) return null;
+  }
+  const textura = detTexturaInterna(q, r, b);
+  const nota = (0.6 * media + 0.4 * min) * (0.55 + 0.45 * Math.sqrt(Math.min(area, 1))) * (1 - Math.min(0.7, textura * 4));
+  return { q, nota, min, media, textura };
+}
+
+// Ajuste fino: ao longo de cada lado, acha o ponto exato da borda (até 6 px para cada lado)
+// e recalcula a reta por mínimos quadrados. Corrige ângulo e posição das retas de Hough.
+function detRefinar(q, r, b) {
+  const { w, h } = r;
+  const retas = [];
+  for (let i = 0; i < 4; i++) {
+    const a = q[i], c = q[(i + 1) % 4];
+    const comp = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+    const nx = -(c[1] - a[1]) / comp, ny = (c[0] - a[0]) / comp;
+    const pts = [];
+    let pos = 0, neg = 0;
+    const amostras = [];
+    for (let k = 1; k < 40; k++) {
+      const t = 0.04 + 0.92 * k / 40, x0 = a[0] + (c[0] - a[0]) * t, y0 = a[1] + (c[1] - a[1]) * t;
+      let melhor = null;
+      for (let d = -6; d <= 6; d++) {
+        const x = Math.round(x0 + nx * d), y = Math.round(y0 + ny * d);
+        if (x < 2 || y < 2 || x >= w - 2 || y >= h - 2) continue;
+        const j = y * w + x;
+        if (!b.borda[j]) continue;
+        const dot = (b.gx[j] * nx + b.gy[j] * ny) / (b.mag[j] || 1);
+        if (Math.abs(dot) < 0.7) continue;
+        const nota = b.mag[j] - Math.abs(d) * 2;
+        if (!melhor || nota > melhor.nota) melhor = { x, y, nota, sinal: dot > 0 ? 1 : -1 };
+      }
+      if (melhor) { amostras.push(melhor); if (melhor.sinal > 0) pos++; else neg++; }
+    }
+    const sinal = pos >= neg ? 1 : -1;
+    amostras.forEach((m) => { if (m.sinal === sinal) pts.push([m.x, m.y]); });
+    if (pts.length < 8) { retas.push(null); continue; }
+    // reta por componentes principais (mínimos quadrados total)
+    let mx = 0, my = 0;
+    pts.forEach((p) => { mx += p[0]; my += p[1]; }); mx /= pts.length; my /= pts.length;
+    let sxx = 0, syy = 0, sxy = 0;
+    pts.forEach((p) => { const dx = p[0] - mx, dy = p[1] - my; sxx += dx * dx; syy += dy * dy; sxy += dx * dy; });
+    const ang = 0.5 * Math.atan2(2 * sxy, sxx - syy);           // direção da reta
+    const c2 = -Math.sin(ang), s2 = Math.cos(ang);                // normal
+    retas.push({ c: c2, s: s2, rho: mx * c2 + my * s2 });
+  }
+  // lado sem pontos suficientes: mantém a reta original
+  for (let i = 0; i < 4; i++) {
+    if (retas[i]) continue;
+    const a = q[i], c = q[(i + 1) % 4], comp = Math.hypot(c[0] - a[0], c[1] - a[1]) || 1;
+    const c2 = -(c[1] - a[1]) / comp, s2 = (c[0] - a[0]) / comp;
+    retas[i] = { c: c2, s: s2, rho: a[0] * c2 + a[1] * s2 };
+  }
+  const novo = [];
+  for (let i = 0; i < 4; i++) {
+    const p = detIntersecao(retas[(i + 3) % 4], retas[i]);
+    if (!p) return q;
+    novo.push(p);
+  }
+  return novo;
+}
+
+function detPorBordas(r, b) {
+  const { w, h } = r;
+  const retas = detRetas(r, b);
+  // horizontais: normal perto de 90°; verticais: normal perto de 0°/180°
+  const hor = retas.filter((l) => l.theta >= 45 && l.theta < 135).slice(0, 10);
+  const ver = retas.filter((l) => l.theta < 45 || l.theta >= 135).slice(0, 10);
+  // bordas da própria foto, para folhas cortadas pelo enquadramento
+  const R = (theta, rho) => ({ c: Math.cos(theta * Math.PI / 180), s: Math.sin(theta * Math.PI / 180), rho, theta, borda: true });
+  hor.push(R(90, 1), R(90, h - 2)); ver.push(R(0, 1), R(0, w - 2));
+  const candidatos = [];
+  for (let i = 0; i < hor.length; i++) for (let j = i + 1; j < hor.length; j++) {
+    for (let a = 0; a < ver.length; a++) for (let c = a + 1; c < ver.length; c++) {
+      const L = [hor[i], hor[j], ver[a], ver[c]];
+      if (L.filter((l) => l.borda).length > 2) continue;
+      const pts = [detIntersecao(L[0], L[2]), detIntersecao(L[0], L[3]), detIntersecao(L[1], L[3]), detIntersecao(L[1], L[2])];
+      if (pts.some((p) => !p)) continue;
+      const q = detOrdenar(pts);
+      const p = detPontuar(q, r, b);
+      if (p) candidatos.push(p);
+    }
+  }
+  // refina os melhores candidatos e fica com o de nota mais alta
+  candidatos.sort((x, y) => y.nota - x.nota);
+  let melhor = null;
+  candidatos.slice(0, 6).forEach((cand) => {
+    let q = cand.q, atual = cand;
+    for (let it = 0; it < 2; it++) {
+      const q2 = detRefinar(q, r, b), p2 = detPontuar(q2, r, b);
+      if (p2 && p2.nota >= atual.nota - 0.02) { atual = p2; q = q2; } else break;
+    }
+    if (!melhor || atual.nota > melhor.nota) melhor = atual;
+  });
+  return melhor;
+}
+
+// Estratégia antiga (região clara maior), devolvida já na escala reduzida
+function detPorRegiao(r) {
+  const { w, h, rgba } = r, n = w * h;
+  const cinza = new Uint8Array(n), hist = new Array(256).fill(0);
   for (let i = 0; i < n; i++) {
-    const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
-    // papel: claro e pouco saturado
-    const v = Math.max(0, Math.min(255, (0.299 * r + 0.587 * g + 0.114 * b) - 0.5 * (Math.max(r, g, b) - Math.min(r, g, b))));
+    const R = rgba[i * 4], G = rgba[i * 4 + 1], B = rgba[i * 4 + 2];
+    const v = Math.max(0, Math.min(255, (0.299 * R + 0.587 * G + 0.114 * B) - 0.5 * (Math.max(R, G, B) - Math.min(R, G, B))));
     cinza[i] = v; hist[v | 0]++;
   }
-  // Limiar de Otsu
   let soma = 0; for (let t = 0; t < 256; t++) soma += t * hist[t];
   let sB = 0, wB = 0, melhor = 0, limiar = 128;
   for (let t = 0; t < 256; t++) {
@@ -466,33 +815,25 @@ function scanDetectar(cv) {
     const mB = sB / wB, mF = (soma - sB) / wF, entre = wB * wF * (mB - mF) * (mB - mF);
     if (entre > melhor) { melhor = entre; limiar = t; }
   }
-  const bin = new Uint8Array(n);
-  for (let i = 0; i < n; i++) bin[i] = cinza[i] > limiar ? 1 : 0;
-  // Maior região clara (preferindo a que contém o centro)
-  const rot = new Int32Array(n), fila = new Int32Array(n);
-  let melhorRot = 0, melhorArea = 0, rotulo = 0;
-  const centro = (h >> 1) * w + (w >> 1);
-  for (let s = 0; s < n; s++) {
-    if (!bin[s] || rot[s]) continue;
+  const rot = new Int32Array(n), fila = new Int32Array(n), centro = (h >> 1) * w + (w >> 1);
+  let melhorRot = 0, melhorPeso = 0, rotulo = 0;
+  for (let s0 = 0; s0 < n; s0++) {
+    if (cinza[s0] <= limiar || rot[s0]) continue;
     rotulo++;
     let ini = 0, fim = 0, area = 0, temCentro = false;
-    fila[fim++] = s; rot[s] = rotulo;
+    fila[fim++] = s0; rot[s0] = rotulo;
     while (ini < fim) {
       const p = fila[ini++]; area++;
       if (p === centro) temCentro = true;
       const x = p % w, y = (p / w) | 0;
-      if (x > 0 && bin[p - 1] && !rot[p - 1]) { rot[p - 1] = rotulo; fila[fim++] = p - 1; }
-      if (x < w - 1 && bin[p + 1] && !rot[p + 1]) { rot[p + 1] = rotulo; fila[fim++] = p + 1; }
-      if (y > 0 && bin[p - w] && !rot[p - w]) { rot[p - w] = rotulo; fila[fim++] = p - w; }
-      if (y < h - 1 && bin[p + w] && !rot[p + w]) { rot[p + w] = rotulo; fila[fim++] = p + w; }
+      const viz = [x > 0 ? p - 1 : -1, x < w - 1 ? p + 1 : -1, y > 0 ? p - w : -1, y < h - 1 ? p + w : -1];
+      for (const q of viz) if (q >= 0 && !rot[q] && cinza[q] > limiar) { rot[q] = rotulo; fila[fim++] = q; }
     }
     const peso = area * (temCentro ? 1.6 : 1);
-    if (peso > melhorArea) { melhorArea = peso; melhorRot = rotulo; }
+    if (peso > melhorPeso) { melhorPeso = peso; melhorRot = rotulo; }
   }
   if (!melhorRot) return null;
-  // Cantos pelos extremos de x+y e x−y
-  let tl = null, tr = null, br = null, bl = null, area = 0;
-  let mTL = Infinity, mTR = -Infinity, mBR = -Infinity, mBL = Infinity;
+  let tl, tr, br, bl, area = 0, mTL = Infinity, mTR = -Infinity, mBR = -Infinity, mBL = Infinity;
   for (let p = 0; p < n; p++) {
     if (rot[p] !== melhorRot) continue;
     area++;
@@ -502,8 +843,30 @@ function scanDetectar(cv) {
     if (s2 > mTR) { mTR = s2; tr = [x, y]; }
     if (s2 < mBL) { mBL = s2; bl = [x, y]; }
   }
-  if (area < n * 0.08) return null;
-  const q = [tl, tr, br, bl].map((p) => [p[0] / k, p[1] / k]);
+  if (area < n * 0.08 || area > n * 0.97) return null;
+  return [tl, tr, br, bl];
+}
+
+// Detecção na escala reduzida; devolve { q (escala reduzida), nota } ou null (= usar a foto inteira)
+function detNaReduzida(r) {
+  const b = detBordas(r);
+  const melhor = detPorBordas(r, b);
+  const reg = detPorRegiao(r);
+  const pReg = reg ? detPontuar(reg, r, b) : null;
+  // a região clara só vence quando as bordas dela estão claramente mais bem apoiadas
+  let fim = melhor;
+  if (pReg && (!fim || pReg.nota > fim.nota + 0.08)) fim = pReg;
+  return fim && fim.media >= 0.42 && fim.nota >= 0.42 ? fim : null;
+}
+
+function scanDetectar(cv) {
+  const r = detReduzir(cv);
+  const d = detNaReduzida(r);
+  if (!d) return null;
+  const q = d.q.map((p) => [
+    Math.min(cv.width, Math.max(0, p[0] / r.k)),
+    Math.min(cv.height, Math.max(0, p[1] / r.k))
+  ]);
   return scanQuadValido(q, cv.width, cv.height) ? q : null;
 }
 
@@ -580,8 +943,30 @@ function scanMoverArrasto(ev) {
   ev.preventDefault();
   _quad[_arrastando] = scanPontoDoToque(ev);
   scanDesenharQuad();
+  scanDesenharLupa(_quad[_arrastando]);
 }
-function scanSoltarArrasto() { _arrastando = -1; }
+function scanSoltarArrasto() { _arrastando = -1; $('lupa').hidden = true; }
+
+// Lupa: mostra ampliado o ponto sob o dedo, do lado oposto da tela
+function scanDesenharLupa(p) {
+  const lupa = $('lupa'), area = $('area-recorte'), cv = $('cv-recorte');
+  const ra = area.getBoundingClientRect(), rc = cv.getBoundingClientRect();
+  const dedoX = rc.left - ra.left + p[0] * _escalaRec;
+  lupa.style.left = dedoX < ra.width / 2 ? (ra.width - 130) + 'px' : '10px';
+  lupa.hidden = false;
+  const L = lupa.width, zoom = 3;
+  const lado = L / (_escalaRec * zoom);                 // pixels da foto mostrados na lupa
+  const ctx = lupa.getContext('2d');
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, L, L);
+  ctx.drawImage(_fonte, p[0] - lado / 2, p[1] - lado / 2, lado, lado, 0, 0, L, L);
+  // linhas do contorno perto do canto
+  const i = _arrastando, viz = [_quad[(i + 3) % 4], _quad[(i + 1) % 4]];
+  const conv = (c) => [(c[0] - p[0]) / lado * L + L / 2, (c[1] - p[1]) / lado * L + L / 2];
+  ctx.strokeStyle = '#4d7cff'; ctx.lineWidth = 3;
+  viz.forEach((c) => { const q = conv(c); ctx.beginPath(); ctx.moveTo(L / 2, L / 2); ctx.lineTo(q[0], q[1]); ctx.stroke(); });
+  ctx.strokeStyle = '#fff'; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(L / 2 - 18, L / 2); ctx.lineTo(L / 2 + 18, L / 2); ctx.moveTo(L / 2, L / 2 - 18); ctx.lineTo(L / 2, L / 2 + 18); ctx.stroke();
+}
 
 function scanRecorteTudo() { _quad = scanQuadInteiro(_fonte); scanDesenharQuad(); }
 function scanRecorteAuto() {

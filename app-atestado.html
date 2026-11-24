@@ -125,7 +125,8 @@
 <!-- ===================== SCANNER: CÂMERA ===================== -->
 <div id="scan-camera" class="sobreposto escuro" hidden>
   <video id="scan-video" playsinline muted autoplay></video>
-  <div class="moldura"></div>
+  <canvas id="scan-contorno"></canvas>
+  <div class="moldura" id="scan-moldura"></div>
   <div class="scan-topo">
     <button class="btn-icone claro" onclick="scanFecharCamera()">✕</button>
     <span id="scan-contador"></span>
@@ -136,7 +137,7 @@
     <button class="obturador" id="btn-obturador" onclick="scanCapturar()" aria-label="Fotografar"></button>
     <button class="btn-icone claro grande" onclick="scanFecharCamera()" title="Concluir">✔</button>
   </div>
-  <div class="scan-dica">Enquadre o atestado sobre uma superfície escura e toque no botão.</div>
+  <div class="scan-dica" id="scan-dica">Enquadre o atestado inteiro. Quando o contorno azul aparecer em volta da folha, toque no botão.</div>
 </div>
 
 <!-- ===================== SCANNER: RECORTE ===================== -->
@@ -149,6 +150,7 @@
   <div class="area-recorte" id="area-recorte">
     <canvas id="cv-recorte"></canvas>
     <svg id="svg-recorte"></svg>
+    <canvas id="lupa" width="240" height="240" hidden></canvas>
   </div>
   <div class="barra-acoes">
     <button class="btn btn-escuro" onclick="scanRecorteTudo()">⛶ Inteira</button>

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ferias-gestao-v7';
+const CACHE_NAME = 'ferias-gestao-v8';
 const ASSETS_TO_CACHE = [
   'index.html.html',
   'manifest.json',
