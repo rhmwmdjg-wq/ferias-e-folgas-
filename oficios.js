@@ -722,6 +722,9 @@ function docRenderHistorico(tipo) {
         acoes.push(b(tipo === 'ofi' ? '🖋️ Assinar / ✉️ Enviar' : '🖋️ Assinar', `docAbrirEnvio('${tipo}','${esc(o.id)}',${tipo === 'ofi'})`,
           tipo === 'ofi' ? 'Assinar digitalmente e enviar por e-mail' : 'Assinar digitalmente e baixar', 'btn-primary'));
       }
+      if (x.envios && x.envios.length) {
+        acoes.push(b('💬', `docZapDoHistorico('${tipo}','${esc(o.id)}')`, 'Encaminhar pelo WhatsApp (texto com o link do documento)'));
+      }
       acoes.push(b('📑', `docUsarComoModelo('${tipo}','${esc(o.id)}')`, 'Usar como base para um novo documento'));
       acoes.push(b('✏️', `docEditar('${tipo}','${esc(o.id)}')`, 'Editar'));
       acoes.push(x.cancelado

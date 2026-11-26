@@ -445,7 +445,7 @@ async function docAbrirEnvio(tipo, id, enviar) {
     '</div>' +
     '<div style="' + bloco + '">' +
       '<div class="field"><label>Mensagem do e-mail</label><textarea id="doc-envio-msg" style="min-height:120px; line-height:1.5">' + esc(docEnvioMensagemPadrao(o, tipo)) + '</textarea></div>' +
-      '<div style="font-size:.7rem; color:var(--muted); margin-top:4px">Assunto do e-mail: <strong>' + esc(((o.codigo || '') + ' – ' + (o.assunto || '')).slice(0, 160)) + '</strong>. O e-mail sai pela conta da Coordenação, com cópia para ela mesma.</div>' +
+      '<div style="font-size:.7rem; color:var(--muted); margin-top:4px">Assunto do e-mail: <strong>' + esc(((o.codigo || '') + ' – ' + (o.assunto || '')).slice(0, 160)) + '</strong>. O e-mail sai pela conta da Coordenação e fica guardado na pasta “Enviados” dela.</div>' +
     '</div>' +
     '<div style="' + bloco + '" id="doc-envio-chave-box">' +
       (temChave
@@ -603,9 +603,9 @@ async function docEnvioExecutar(soBaixar) {
     const patch = {};
     if (assinar) { patch.assinadoEm = new Date().toISOString(); patch.assinadoPor = docCertNome(); patch.sha256 = await docSha256Hex(bytes); }
 
+    const assinante = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : {};
     if (enviar) {
       docEnvioStatus('⏳ Enviando o e-mail...');
-      const assinante = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : {};
       const resp = await fetch(OFICIO_ENVIO_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -630,6 +630,7 @@ async function docEnvioExecutar(soBaixar) {
     if (!enviar || (copia && copia.checked)) docBaixarBytes(bytes, nomeArq);
 
     docRenderHistorico(tipo);
+    if (enviar) docEnvioMostrarZap(o, tipo, { para: para, em: new Date().toISOString(), assinado: assinar, por: assinante.nome || '', bytes: bytes, nomeArq: nomeArq });
     docEnvioStatus('✅ ' + (enviar ? 'E-mail enviado para ' + para.map(esc).join(', ') + '.' : 'PDF ' + (assinar ? 'assinado e ' : '') + 'baixado: ' + esc(nomeArq)) +
       (assinar ? '<br>Assinado por <strong>' + esc(docCertNome()) + '</strong>. Abra no Adobe Reader para ver o painel de assinatura.' : ''), 'var(--success)');
     toastMsg(enviar ? 'Ofício enviado por e-mail!' : 'PDF pronto!', 'success');
@@ -643,4 +644,219 @@ async function docEnvioExecutar(soBaixar) {
     _docEnvioOcupado = false;
     botoes.forEach(function (b) { b.disabled = false; });
   }
+}
+
+// ===================== ENCAMINHAR PELO WHATSAPP =====================
+// O WhatsApp não aceita anexo por link (wa.me só leva texto). Então há dois caminhos:
+//  - "Enviar o PDF": usa o compartilhamento do próprio aparelho (navigator.share) e manda o
+//    arquivo assinado de verdade para a conversa escolhida — funciona no celular e no app Android.
+//  - "Abrir conversa": abre o WhatsApp (ou o WhatsApp Web, no computador) com o texto pronto,
+//    incluindo o link público de conferência, de onde o destinatário baixa o PDF assinado.
+
+let _docZap = null; // { texto, bytes, nomeArq, codigo }
+
+function docZapContatos() {
+  const l = DB.config().whatsOficios;
+  return Array.isArray(l) ? l.filter(function (c) { return c && c.numero; }) : [];
+}
+
+function docZapNumeroLimpo(valor) {
+  let num = String(valor || '').replace(/\D/g, '');
+  if (num && num.length <= 11) num = '55' + num;
+  return num;
+}
+
+async function docZapCadastrarContato() {
+  const n = document.getElementById('doc-zap-novo-nome'), t = document.getElementById('doc-zap-novo-num');
+  if (!n || !t) return;
+  const nome = (n.value || '').trim();
+  const bruto = (t.value || '').replace(/\D/g, '');
+  if (!nome) return toastMsg('Informe o nome do contato.', 'warning');
+  if (bruto.length < 10 || bruto.length > 13) return toastMsg('Número inválido. Use DDD + número, ex.: 38 99999-9999.', 'warning');
+  const cfg = DB.config();
+  const lista = Array.isArray(cfg.whatsOficios) ? cfg.whatsOficios.slice() : [];
+  const num = docZapNumeroLimpo(bruto);
+  if (lista.some(function (c) { return docZapNumeroLimpo(c.numero) === num; })) return toastMsg('Esse número já está cadastrado.', 'warning');
+  lista.push({ nome: nome, numero: num });
+  cfg.whatsOficios = lista;
+  await DB.saveConfig(cfg);
+  n.value = ''; t.value = '';
+  docZapRenderContatos(num);
+  toastMsg('Contato de WhatsApp cadastrado!', 'success');
+}
+
+async function docZapRemoverContato() {
+  const sel = document.getElementById('doc-zap-contato');
+  const num = sel ? sel.value : '';
+  if (!num) return toastMsg('Escolha um contato cadastrado para remover.', 'warning');
+  const cfg = DB.config();
+  const lista = (Array.isArray(cfg.whatsOficios) ? cfg.whatsOficios : []).filter(function (c) { return docZapNumeroLimpo(c.numero) !== num; });
+  if (!confirm('Remover esse contato de WhatsApp do cadastro?')) return;
+  cfg.whatsOficios = lista;
+  await DB.saveConfig(cfg);
+  docZapRenderContatos('');
+  toastMsg('Contato removido.', 'success');
+}
+
+function docZapRenderContatos(selecionar) {
+  const sel = document.getElementById('doc-zap-contato');
+  if (!sel) return;
+  const atual = selecionar !== undefined ? selecionar : sel.value;
+  sel.innerHTML = '<option value="">— Escolher a conversa no próprio WhatsApp —</option>' +
+    docZapContatos().map(function (c) {
+      const n = docZapNumeroLimpo(c.numero);
+      return '<option value="' + esc(n) + '">' + esc(c.nome) + ' — ' + esc(docZapNumeroBonito(n)) + '</option>';
+    }).join('');
+  sel.value = atual || '';
+}
+
+function docZapNumeroBonito(num) {
+  const n = String(num || '').replace(/\D/g, '').replace(/^55/, '');
+  if (n.length === 11) return '(' + n.slice(0, 2) + ') ' + n.slice(2, 7) + '-' + n.slice(7);
+  if (n.length === 10) return '(' + n.slice(0, 2) + ') ' + n.slice(2, 6) + '-' + n.slice(6);
+  return num || '';
+}
+
+// Texto do encaminhamento: o que foi enviado, para quem, quando e onde conferir
+function docZapTexto(o, tipo, dados) {
+  const d = dados || {};
+  const h = new Date().getHours();
+  const saud = h < 12 ? 'Bom dia!' : (h < 18 ? 'Boa tarde!' : 'Boa noite!');
+  const quando = d.em ? new Date(d.em) : new Date();
+  const linhas = [saud, ''];
+  linhas.push('Encaminho o *' + (o.codigo || DOC_CFG[tipo].nome) + '*' + (d.assinado ? ' (assinado digitalmente — ICP-Brasil)' : '') + '.');
+  if (o.assunto) linhas.push('Assunto: ' + o.assunto + '.');
+  if ((d.para || []).length) linhas.push('Enviado por e-mail em ' + quando.toLocaleDateString('pt-BR') + ' às ' +
+    quando.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) + ' para: ' + (d.para || []).join(', ') + '.');
+  if (o.token) {
+    linhas.push('');
+    linhas.push('Conferência e download do documento:');
+    linhas.push(docLinkPublico(tipo, o.token));
+  }
+  const assinante = (typeof getAssinanteAtual === 'function') ? getAssinanteAtual() : {};
+  const nome = (d.por || assinante.nome || o.emissorNome || '').trim();
+  if (nome) { linhas.push(''); linhas.push(nome); if (assinante.cargo || o.emissorCargo) linhas.push(assinante.cargo || o.emissorCargo); }
+  linhas.push('Coordenação de Atenção Primária à Saúde — Itacarambi/MG');
+  return linhas.join('\n');
+}
+
+function docZapTextoAtual() {
+  const ta = document.getElementById('doc-zap-msg');
+  return ((ta && ta.value) || (_docZap && _docZap.texto) || '').trim();
+}
+
+function docZapLink(texto, num) {
+  const celular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const q = (num ? (celular ? '' : 'phone=' + num + '&') : '') + 'text=' + encodeURIComponent(texto);
+  if (celular) return 'https://wa.me/' + (num || '') + '?text=' + encodeURIComponent(texto);
+  return 'https://web.whatsapp.com/send?' + q;
+}
+
+function docZapAbrirConversa() {
+  const texto = docZapTextoAtual();
+  if (!texto) return toastMsg('Escreva a mensagem do WhatsApp.', 'warning');
+  const sel = document.getElementById('doc-zap-contato');
+  const w = window.open(docZapLink(texto, sel ? sel.value : ''), '_blank', 'noopener');
+  if (w) w.opener = null;
+  else toastMsg('O navegador bloqueou a janela. Libere os pop-ups deste site.', 'warning');
+}
+
+// Manda o PDF em si para o WhatsApp, pelo compartilhamento do aparelho
+async function docZapEnviarPdf() {
+  if (!_docZap || !_docZap.bytes) return toastMsg('O PDF deste envio não está mais em memória. Use "Abrir conversa" — o link leva ao documento.', 'warning');
+  const texto = docZapTextoAtual();
+  try {
+    const arquivo = new File([_docZap.bytes], _docZap.nomeArq || 'oficio.pdf', { type: 'application/pdf' });
+    if (!navigator.canShare || !navigator.canShare({ files: [arquivo] })) {
+      throw new Error('Este navegador não compartilha arquivos. No computador, use "Abrir conversa" e anexe o PDF baixado.');
+    }
+    await navigator.share({ files: [arquivo], text: texto, title: _docZap.codigo || 'Documento oficial' });
+    toastMsg('PDF entregue ao WhatsApp.', 'success');
+  } catch (e) {
+    if (e && e.name === 'AbortError') return; // o usuário fechou a escolha do aplicativo
+    toastMsg(e.message || 'Não foi possível compartilhar o arquivo.', 'warning');
+  }
+}
+
+// Bloco que aparece no diálogo depois do e-mail enviado
+function docZapBloco(o, tipo, dados) {
+  _docZap = {
+    texto: docZapTexto(o, tipo, dados),
+    bytes: dados && dados.bytes ? dados.bytes : null,
+    nomeArq: dados && dados.nomeArq ? dados.nomeArq : '',
+    codigo: o.codigo || '',
+  };
+  let podeArquivo = false;
+  try {
+    podeArquivo = !!(_docZap.bytes && navigator.canShare &&
+      navigator.canShare({ files: [new File([new Uint8Array([1])], 'teste.pdf', { type: 'application/pdf' })] }));
+  } catch (e) { podeArquivo = false; }
+  return '' +
+    '<div id="doc-zap-box" style="border:1px solid var(--border); border-radius:var(--r-sm); padding:12px; margin-bottom:12px; background:var(--surface)">' +
+      '<div style="font-weight:700; font-size:.84rem; margin-bottom:8px">💬 Encaminhar pelo WhatsApp</div>' +
+      '<div class="field"><label>Contato</label>' +
+        '<select id="doc-zap-contato" class="doc-ctl"></select>' +
+      '</div>' +
+      '<div style="display:flex; gap:6px; flex-wrap:wrap; margin:8px 0">' +
+        '<input id="doc-zap-novo-nome" class="doc-ctl" placeholder="Nome / setor" style="flex:1; min-width:110px">' +
+        '<input id="doc-zap-novo-num" class="doc-ctl" placeholder="38 99999-9999" style="flex:1; min-width:130px">' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="docZapCadastrarContato()">➕ Cadastrar</button>' +
+        '<button type="button" class="btn btn-ghost btn-sm" onclick="docZapRemoverContato()" title="Remover o contato escolhido">🗑️</button>' +
+      '</div>' +
+      '<div class="field"><label>Mensagem</label><textarea id="doc-zap-msg" style="min-height:120px; line-height:1.5">' + esc(_docZap.texto) + '</textarea></div>' +
+      '<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:10px">' +
+        (podeArquivo ? '<button type="button" class="btn btn-success btn-sm" onclick="docZapEnviarPdf()">📎 Enviar o PDF pelo WhatsApp</button>' : '') +
+        '<button type="button" class="btn btn-primary btn-sm" onclick="docZapAbrirConversa()">💬 Abrir conversa com o texto</button>' +
+      '</div>' +
+      '<div style="font-size:.7rem; color:var(--muted); margin-top:8px">' +
+        (podeArquivo
+          ? 'O botão do PDF usa o compartilhamento do aparelho — escolha o WhatsApp e a conversa. No computador, o WhatsApp não aceita anexo por link: use “Abrir conversa” (o texto já leva o link de onde o documento é baixado).'
+          : 'No computador o WhatsApp não aceita anexo por link. A mensagem já leva o link público, de onde o destinatário baixa o PDF assinado.') +
+      '</div>' +
+    '</div>';
+}
+
+// 💬 do histórico: reaproveita o bloco, só sem o arquivo (o PDF assinado fica no link)
+function docZapDoHistorico(tipo, id) {
+  const o = docLista(tipo).find(function (d) { return d.id === id; });
+  if (!o) return toastMsg('Documento não encontrado.', 'warning');
+  const x = docExtras(o);
+  const u = (x.envios && x.envios.length) ? x.envios[x.envios.length - 1] : null;
+  const anterior = document.getElementById('modal-doc-zap');
+  if (anterior) anterior.remove();
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.id = 'modal-doc-zap';
+  bg.innerHTML =
+    '<div class="modal" style="max-width:560px; width:100%; max-height:92vh; overflow:auto">' +
+      '<h3 style="margin-bottom:4px">💬 Encaminhar pelo WhatsApp</h3>' +
+      '<div style="font-size:.8rem; color:var(--muted); margin-bottom:14px">' + esc(o.codigo || '') + ' — ' + esc(o.assunto || '') + '</div>' +
+      docZapBloco(o, tipo, {
+        para: u ? (u.para || []) : [], em: u ? u.em : null,
+        assinado: !!(u ? u.assinado : x.assinadoEm), por: u ? u.por : '',
+      }) +
+      '<div class="modal-footer" style="display:flex; justify-content:flex-end">' +
+        '<button type="button" class="btn btn-ghost" onclick="docZapFechar()">Fechar</button>' +
+      '</div>' +
+    '</div>';
+  bg.addEventListener('mousedown', function (ev) { if (ev.target === bg) docZapFechar(); });
+  document.body.appendChild(bg);
+  docZapRenderContatos('');
+}
+
+function docZapFechar() {
+  const m = document.getElementById('modal-doc-zap');
+  if (m) m.remove();
+}
+
+// Insere o bloco do WhatsApp no diálogo, logo depois do envio do e-mail
+function docEnvioMostrarZap(o, tipo, dados) {
+  const st = document.getElementById('doc-envio-status');
+  if (!st || !st.parentNode) return;
+  const antigo = document.getElementById('doc-zap-box');
+  if (antigo) antigo.remove();
+  const div = document.createElement('div');
+  div.innerHTML = docZapBloco(o, tipo, dados);
+  st.parentNode.insertBefore(div.firstChild, st);
+  docZapRenderContatos('');
 }

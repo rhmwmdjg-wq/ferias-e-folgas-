@@ -2,7 +2,7 @@
 // O e-mail sai pela conta Yahoo da Coordenação de Atenção Primária (senha de app em segredo).
 // Diferente do envio de atestados, aqui o navegador escolhe os destinatários. Por isso o
 // envio só acontece com a CHAVE DE ENVIO (segredo OFICIO_ENVIO_CHAVE), além do limite diário,
-// do bloqueio por tentativas erradas e da cópia de cada mensagem para a própria Coordenação.
+// do bloqueio por tentativas erradas e do registro de cada envio na tabela atlas_oficio_envios.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import nodemailer from "npm:nodemailer@6.9.16";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -91,7 +91,9 @@ Deno.serve(async (req: Request) => {
     return resposta(origin, 401, { ok: false, erro: "Chave de envio incorreta." });
   }
 
-  const para = [...new Set((Array.isArray(dados.para) ? dados.para : []).map((e) => String(e ?? "").trim().toLowerCase()))].filter(Boolean);
+  // Lista sem repetições e sem o próprio remetente (mandar para si mesmo gerava cópia a mais)
+  const para = [...new Set((Array.isArray(dados.para) ? dados.para : []).map((e) => String(e ?? "").trim().toLowerCase()))]
+    .filter(Boolean).filter((e) => e !== REMETENTE);
   const assunto = limpar(dados.assunto, 200);
   const mensagem = String(dados.mensagem ?? "").replace(/[<>]/g, "").replace(/\r/g, "").trim().slice(0, 3000);
   const assinado = dados.assinado === true;
@@ -100,7 +102,12 @@ Deno.serve(async (req: Request) => {
   if (!/\.pdf$/i.test(nomeArquivo)) nomeArquivo += ".pdf";
   const base64 = String(dados.pdfBase64 ?? "").replace(/^data:[^,]*,/, "");
 
-  if (!para.length) return resposta(origin, 400, { ok: false, erro: "Marque pelo menos um e-mail." });
+  if (!para.length) {
+    return resposta(origin, 400, {
+      ok: false,
+      erro: `Marque pelo menos um e-mail diferente de ${REMETENTE} (o envio já fica guardado na pasta Enviados dessa conta).`,
+    });
+  }
   if (para.length > MAX_DESTINATARIOS) return resposta(origin, 400, { ok: false, erro: `No máximo ${MAX_DESTINATARIOS} e-mails por envio.` });
   const invalido = para.find((e) => !emailValido(e));
   if (invalido) return resposta(origin, 400, { ok: false, erro: `E-mail inválido: ${invalido.slice(0, 80)}` });
@@ -146,7 +153,10 @@ Deno.serve(async (req: Request) => {
     }).sendMail({
       from: { name: NOME_REMETENTE, address: REMETENTE },
       to: para,
-      bcc: REMETENTE, // cópia na caixa da Coordenação: todo envio fica registrado lá
+      // Sem cópia oculta para a própria Coordenação: o Yahoo já guarda sozinho uma cópia
+      // na pasta "Enviados" de quem envia pelo SMTP dele. A cópia oculta chegava também na
+      // Caixa de entrada e o envio parecia ter saído duas vezes. O registro de cada envio
+      // continua na tabela atlas_oficio_envios e no histórico do próprio ofício.
       replyTo: REMETENTE,
       subject: `${codigo} – ${assunto}`.slice(0, 240),
       text: linhas.join("\n"),
