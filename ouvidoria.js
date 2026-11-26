@@ -8,7 +8,7 @@
 // a chave de acesso (a mesma chave de envio dos ofícios, enquanto não houver uma própria).
 
 const OUVIDORIA_URL = 'https://bgvwaamwgcathojxtjqf.supabase.co/functions/v1/atlas-ouvidoria';
-const OUVIDORIA_FORM_URL = 'https://ferias-e-folgas.vercel.app/ouvidoria.html';
+const OUVIDORIA_FORM_URL = 'https://ouvidoria-itacarambi.vercel.app/';
 const OUV_CHAVE_LS = 'atlas_ouvidoria_chave';
 
 const OUV_TIPOS = {
@@ -337,7 +337,7 @@ async function ouvCartazPdf() {
       y -= 20;
     }
 
-    centro('ferias-e-folgas.vercel.app/ouvidoria.html', y, 11, F, SUAVE); y -= 34;
+    centro('ouvidoria-itacarambi.vercel.app', y, 11, F, SUAVE); y -= 34;
 
     const opcoes = [
       ['SUGESTAO', 'uma ideia para melhorar o servico'],

@@ -16,7 +16,12 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
 
-const ORIGENS_PERMITIDAS = ["https://ferias-e-folgas.vercel.app"];
+// O formulário público mora em endereço próprio, separado do sistema interno.
+const ORIGEM_FORMULARIO = "https://ouvidoria-itacarambi.vercel.app";
+const ORIGEM_SISTEMA = "https://ferias-e-folgas.vercel.app";
+const ORIGENS_PERMITIDAS = [ORIGEM_FORMULARIO, ORIGEM_SISTEMA];
+// Ler as manifestações e mexer nelas só a partir do sistema (além da chave).
+const ORIGENS_COORDENACAO = [ORIGEM_SISTEMA];
 const MSG_MIN = 15;
 const MSG_MAX = 4000;
 const LIMITE_HORA = 80;   // manifestações por hora no município todo (guarda contra enxurrada)
@@ -95,8 +100,11 @@ Deno.serve(async (req: Request) => {
   const acao = limpar(dados.acao, 30);
   const publicas = ["unidades", "enviar", "consultar"];
 
-  // Ações da Coordenação exigem a chave
+  // Ações da Coordenação exigem a chave e só valem a partir do sistema
   if (!publicas.includes(acao)) {
+    if (!ORIGENS_COORDENACAO.includes(origin)) {
+      return resposta(origin, 403, { ok: false, erro: "Esta ação só é permitida pelo sistema." });
+    }
     const correta = chaveEsperada();
     if (correta.length < 8) {
       return resposta(origin, 503, { ok: false, erro: "Ouvidoria ainda não liberada: cadastre o segredo OUVIDORIA_CHAVE no painel do Supabase, em Edge Functions → Secrets." });
