@@ -2,7 +2,7 @@
 // O e-mail sai pela conta Yahoo da Coordenação de Atenção Primária (senha de app em segredo).
 // Diferente do envio de atestados, aqui o navegador escolhe os destinatários. Por isso o
 // envio só acontece com a CHAVE DE ENVIO (segredo OFICIO_ENVIO_CHAVE), além do limite diário,
-// do bloqueio por tentativas erradas e da cópia de cada mensagem para a própria Coordenação.
+// do bloqueio por tentativas erradas e do registro de cada envio na tabela atlas_oficio_envios.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import nodemailer from "npm:nodemailer@6.9.16";
 import { createClient } from "npm:@supabase/supabase-js@2";
