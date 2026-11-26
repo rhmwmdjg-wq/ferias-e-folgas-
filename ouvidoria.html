@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<meta name="referrer" content="no-referrer">
+<title>Ouvidoria Anônima — Atenção Primária à Saúde de Itacarambi</title>
+<style>
+  :root {
+    --bg:#f3f6fb; --card:#fff; --texto:#15213a; --suave:#5a6882; --borda:#dde4f0;
+    --azul:#1d4ed8; --azul-escuro:#163fae; --verde:#047857; --verde-claro:#ecfdf5;
+    --amarelo:#b45309; --amarelo-claro:#fffbeb; --vermelho:#b91c1c;
+    --r:14px;
+  }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  body {
+    margin:0; background:var(--bg); color:var(--texto);
+    font:16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding:16px 14px 40px;
+  }
+  .envelope { max-width:620px; margin:0 auto; }
+  header { text-align:center; margin-bottom:18px; }
+  header h1 { font-size:1.35rem; margin:10px 0 4px; letter-spacing:-.02em; }
+  header p { margin:0; color:var(--suave); font-size:.9rem; }
+  .escudo {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:58px; height:58px; border-radius:50%; background:#e4ecfb; font-size:1.7rem;
+  }
+  .card {
+    background:var(--card); border:1px solid var(--borda); border-radius:var(--r);
+    padding:18px; margin-bottom:14px;
+  }
+  .selo {
+    background:var(--verde-claro); border:1px solid #a7e3c8; border-radius:var(--r);
+    padding:14px 16px; margin-bottom:14px;
+  }
+  .selo strong { color:var(--verde); display:block; margin-bottom:6px; font-size:1rem; }
+  .selo ul { margin:0; padding-left:18px; font-size:.86rem; color:#17543c; }
+  .selo li { margin-bottom:3px; }
+  label.rotulo { display:block; font-weight:700; font-size:.95rem; margin-bottom:8px; }
+  .dica { font-size:.8rem; color:var(--suave); margin:-4px 0 10px; }
+  .opcoes { display:grid; gap:8px; }
+  .opcao {
+    display:flex; gap:12px; align-items:flex-start; border:2px solid var(--borda);
+    border-radius:12px; padding:13px 14px; cursor:pointer; background:#fff;
+  }
+  .opcao:has(input:checked) { border-color:var(--azul); background:#f5f8ff; }
+  .opcao input { margin:3px 0 0; width:20px; height:20px; accent-color:var(--azul); flex:none; }
+  .opcao b { display:block; font-size:.98rem; }
+  .opcao span { font-size:.82rem; color:var(--suave); }
+  select, textarea, input[type=text] {
+    width:100%; font:inherit; color:inherit; background:#fff;
+    border:1px solid #c6d1e4; border-radius:11px; padding:13px 14px;
+  }
+  select:focus, textarea:focus, input:focus { outline:2px solid var(--azul); outline-offset:1px; border-color:var(--azul); }
+  textarea { min-height:190px; resize:vertical; line-height:1.5; }
+  .contador { text-align:right; font-size:.78rem; color:var(--suave); margin-top:6px; }
+  .aviso {
+    background:var(--amarelo-claro); border:1px solid #f4d9a0; border-radius:11px;
+    padding:12px 14px; font-size:.84rem; color:#7c4a08; margin-top:12px;
+  }
+  button.enviar {
+    width:100%; font:inherit; font-weight:800; font-size:1.05rem; color:#fff;
+    background:var(--azul); border:0; border-radius:12px; padding:17px; cursor:pointer;
+    margin-top:4px;
+  }
+  button.enviar:active { background:var(--azul-escuro); }
+  button.enviar:disabled { background:#9fb3d9; cursor:default; }
+  .erro { color:var(--vermelho); font-size:.88rem; margin-top:10px; font-weight:600; }
+  .armadilha { position:absolute; left:-9999px; width:1px; height:1px; overflow:hidden; }
+  .pronto { text-align:center; }
+  .pronto .marca { font-size:3rem; line-height:1; }
+  .pronto h2 { margin:10px 0 6px; font-size:1.2rem; color:var(--verde); }
+  .protocolo {
+    font:700 1.3rem/1.3 ui-monospace, SFMono-Regular, Menlo, monospace;
+    background:#f1f5fc; border:1px dashed #b8c6e0; border-radius:11px;
+    padding:14px; margin:14px 0; letter-spacing:.06em; word-break:break-all;
+  }
+  .secundario {
+    display:inline-block; font:inherit; font-size:.9rem; font-weight:700; color:var(--azul);
+    background:#eef3fe; border:1px solid #c9d8f8; border-radius:10px;
+    padding:11px 16px; cursor:pointer; text-decoration:none; margin:4px;
+  }
+  footer { text-align:center; font-size:.76rem; color:var(--suave); margin-top:18px; line-height:1.6; }
+  .linha-consulta { display:flex; gap:8px; flex-wrap:wrap; }
+  .linha-consulta input { flex:1; min-width:170px; }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0d1424; --card:#151d31; --texto:#e8eefb; --suave:#93a3c2; --borda:#26324c;
+      --verde-claro:#0e2a20; --amarelo-claro:#2a2109;
+    }
+    select, textarea, input[type=text] { background:#0f1727; border-color:#2c3a58; }
+    .opcao { background:#121a2c; }
+    .opcao:has(input:checked) { background:#16233d; }
+    .escudo { background:#1b2740; }
+    .protocolo { background:#101a2e; border-color:#2f3f61; }
+    .secundario { background:#16233d; border-color:#2c3a58; color:#9dbcff; }
+  }
+</style>
+</head>
+<body>
+<div class="envelope">
+
+  <header>
+    <div class="escudo">🗳️</div>
+    <h1>Ouvidoria Anônima</h1>
+    <p>Atenção Primária à Saúde — Itacarambi/MG</p>
+  </header>
+
+  <div id="tela-form">
+    <div class="selo">
+      <strong>🔒 Você não precisa se identificar</strong>
+      <ul>
+        <li>Não pedimos nome, telefone, e-mail nem login.</li>
+        <li>Não guardamos seu IP, seu aparelho nem sua localização.</li>
+        <li>Ninguém consegue descobrir quem enviou — nem a Coordenação.</li>
+        <li>A única informação necessária é <strong>de qual unidade de saúde</strong> você está falando.</li>
+      </ul>
+    </div>
+
+    <div class="card">
+      <label class="rotulo">1. O que você quer fazer?</label>
+      <div class="opcoes">
+        <label class="opcao"><input type="radio" name="tipo" value="sugestao">
+          <span><b>💡 Sugestão</b><span>Uma ideia para melhorar o atendimento ou o serviço.</span></span></label>
+        <label class="opcao"><input type="radio" name="tipo" value="reclamacao">
+          <span><b>⚠️ Reclamação</b><span>Algo que não funcionou bem e precisa ser corrigido.</span></span></label>
+        <label class="opcao"><input type="radio" name="tipo" value="denuncia">
+          <span><b>🚨 Denúncia</b><span>Irregularidade, falta de servidor, mau uso de bem público, desrespeito.</span></span></label>
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="rotulo" for="unidade">2. De qual unidade de saúde se trata?</label>
+      <p class="dica">Se não souber o nome exato, escolha a última opção.</p>
+      <select id="unidade">
+        <option value="">Carregando as unidades...</option>
+      </select>
+      <div id="campo-outra" style="display:none; margin-top:10px">
+        <input type="text" id="outra" maxlength="120" placeholder="Escreva a unidade, o bairro ou o local">
+      </div>
+    </div>
+
+    <div class="card">
+      <label class="rotulo" for="mensagem">3. Descreva exatamente o que aconteceu</label>
+      <p class="dica">Quanto mais claro — o que foi, quando, em que setor —, mais fácil resolver. Escreva com suas palavras.</p>
+      <textarea id="mensagem" maxlength="4000" placeholder="Conte aqui, com detalhes, o que você quer sugerir, reclamar ou denunciar."></textarea>
+      <div class="contador"><span id="contador">0</span> / 4000</div>
+      <div class="aviso">
+        ⚠️ Para o anonimato continuar valendo, <strong>não escreva seu nome, telefone ou e-mail</strong> no texto.
+        Falar o nome do servidor ou do setor envolvido pode ser necessário e não identifica você.
+      </div>
+      <div class="armadilha"><label>Não preencha<input type="text" id="armadilha" tabindex="-1" autocomplete="off"></label></div>
+      <div id="erro" class="erro" style="display:none"></div>
+      <button class="enviar" id="btn-enviar" type="button">Enviar</button>
+    </div>
+
+    <div class="card">
+      <label class="rotulo">Já enviou e quer acompanhar?</label>
+      <p class="dica">Digite o protocolo que apareceu na tela quando você enviou.</p>
+      <div class="linha-consulta">
+        <input type="text" id="protocolo-consulta" maxlength="40" placeholder="OUV-0000-AAAA-BBBB">
+        <button class="secundario" type="button" id="btn-consultar">Consultar</button>
+      </div>
+      <div id="resultado-consulta" style="margin-top:12px; font-size:.88rem"></div>
+    </div>
+  </div>
+
+  <div id="tela-pronto" class="card pronto" style="display:none">
+    <div class="marca">✅</div>
+    <h2>Recebido!</h2>
+    <p style="margin:0; font-size:.92rem">Sua manifestação chegou à Coordenação de Atenção Primária <strong>sem nenhuma identificação sua</strong>.</p>
+    <div class="protocolo" id="protocolo-novo"></div>
+    <p style="font-size:.84rem; color:var(--suave); margin:0 0 14px">
+      Guarde este protocolo. Com ele você acompanha o andamento depois, sem precisar dizer quem é.
+      Ele não está ligado ao seu nome nem ao seu aparelho.
+    </p>
+    <button class="secundario" type="button" id="btn-copiar">📋 Copiar o protocolo</button>
+    <button class="secundario" type="button" id="btn-nova">Enviar outra</button>
+  </div>
+
+  <footer>
+    Coordenação de Atenção Primária à Saúde<br>
+    Secretaria Municipal de Saúde de Itacarambi/MG
+  </footer>
+</div>
+
+<script>
+const OUVIDORIA_URL = 'https://bgvwaamwgcathojxtjqf.supabase.co/functions/v1/atlas-ouvidoria';
+const OUTRA = '__outra__';
+
+function el(id) { return document.getElementById(id); }
+
+async function chamar(corpo) {
+  const r = await fetch(OUVIDORIA_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    referrerPolicy: 'no-referrer',
+    body: JSON.stringify(corpo)
+  });
+  let d = {};
+  try { d = await r.json(); } catch (e) { /* sem corpo */ }
+  if (!r.ok || !d.ok) throw new Error(d.erro || ('Falha de comunicação (código ' + r.status + ').'));
+  return d;
+}
+
+async function carregarUnidades() {
+  const sel = el('unidade');
+  let lista = [];
+  try { lista = (await chamar({ acao: 'unidades' })).unidades || []; } catch (e) { lista = []; }
+  sel.innerHTML = '<option value="">Escolha a unidade...</option>' +
+    lista.map(function (u) { return '<option value="' + u.replace(/"/g, '&quot;') + '">' + u + '</option>'; }).join('') +
+    '<option value="' + OUTRA + '">Outra / não sei o nome exato</option>';
+}
+
+el('unidade').addEventListener('change', function () {
+  const outra = this.value === OUTRA;
+  el('campo-outra').style.display = outra ? 'block' : 'none';
+  if (outra) el('outra').focus();
+});
+
+el('mensagem').addEventListener('input', function () { el('contador').textContent = this.value.length; });
+
+function mostrarErro(msg) {
+  const e = el('erro');
+  e.style.display = msg ? 'block' : 'none';
+  e.textContent = msg || '';
+  if (msg) e.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+el('btn-enviar').addEventListener('click', async function () {
+  const tipoEl = document.querySelector('input[name=tipo]:checked');
+  const sel = el('unidade').value;
+  const unidade = sel === OUTRA ? el('outra').value.trim() : sel;
+  const mensagem = el('mensagem').value.trim();
+
+  if (!tipoEl) return mostrarErro('Escolha se é sugestão, reclamação ou denúncia.');
+  if (!unidade) return mostrarErro('Informe de qual unidade de saúde se trata.');
+  if (mensagem.length < 15) return mostrarErro('Descreva com um pouco mais de detalhe, para dar para resolver.');
+
+  mostrarErro('');
+  this.disabled = true;
+  const rotulo = this.textContent;
+  this.textContent = 'Enviando...';
+  try {
+    const d = await chamar({
+      acao: 'enviar', tipo: tipoEl.value, unidade: unidade,
+      mensagem: mensagem, armadilha: el('armadilha').value
+    });
+    el('protocolo-novo').textContent = d.protocolo;
+    el('tela-form').style.display = 'none';
+    el('tela-pronto').style.display = 'block';
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    mostrarErro(e.message);
+    this.disabled = false;
+    this.textContent = rotulo;
+  }
+});
+
+el('btn-copiar').addEventListener('click', async function () {
+  try {
+    await navigator.clipboard.writeText(el('protocolo-novo').textContent);
+    this.textContent = '✅ Copiado!';
+  } catch (e) { this.textContent = 'Anote o protocolo acima'; }
+});
+
+el('btn-nova').addEventListener('click', function () {
+  document.querySelectorAll('input[name=tipo]').forEach(function (i) { i.checked = false; });
+  el('unidade').value = ''; el('outra').value = ''; el('campo-outra').style.display = 'none';
+  el('mensagem').value = ''; el('contador').textContent = '0';
+  const b = el('btn-enviar'); b.disabled = false; b.textContent = 'Enviar';
+  el('tela-pronto').style.display = 'none';
+  el('tela-form').style.display = 'block';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+});
+
+const SITUACOES_TEXTO = {
+  nova: '📥 Recebida, aguardando análise',
+  em_analise: '🔎 Em análise pela Coordenação',
+  providencia: '🛠️ Providência em andamento',
+  concluida: '✅ Concluída',
+  arquivada: '📁 Arquivada'
+};
+const TIPOS_TEXTO = { sugestao: 'Sugestão', reclamacao: 'Reclamação', denuncia: 'Denúncia' };
+
+el('btn-consultar').addEventListener('click', async function () {
+  const alvo = el('resultado-consulta');
+  const protocolo = el('protocolo-consulta').value.trim();
+  if (!protocolo) { alvo.textContent = 'Digite o protocolo.'; return; }
+  alvo.textContent = 'Consultando...';
+  try {
+    const d = await chamar({ acao: 'consultar', protocolo: protocolo });
+    const r = d.registro;
+    alvo.innerHTML = '<div style="background:var(--verde-claro); border:1px solid #a7e3c8; border-radius:11px; padding:12px 14px">' +
+      '<strong>' + (SITUACOES_TEXTO[r.situacao] || r.situacao) + '</strong><br>' +
+      (TIPOS_TEXTO[r.tipo] || r.tipo) + ' — ' + r.unidade + '<br>' +
+      '<span style="color:var(--suave); font-size:.85rem">Enviada em ' + new Date(r.criado_em).toLocaleDateString('pt-BR') + '</span></div>';
+  } catch (e) {
+    alvo.innerHTML = '<span style="color:var(--vermelho); font-weight:600">' + e.message + '</span>';
+  }
+});
+
+carregarUnidades();
+</script>
+</body>
+</html>

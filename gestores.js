@@ -29,6 +29,7 @@ const MODULOS_SISTEMA = [
   { id: 'mapaausencias', tab: 'tab-mapaausencias', label: 'Mapa de Ausências' },
   { id: 'sistemas', tab: 'tab-sistemas', label: 'Sistemas Parceiros' },
   { id: 'atestadorh', tab: 'tab-atestadorh', label: 'Enviar Atestado ao RH' },
+  { id: 'ouvidoria', tab: 'tab-ouvidoria', label: 'Ouvidoria Anônima' },
   { id: 'iagestao', tab: 'tab-iagestao', label: 'Central de IA' }
 ];
 
