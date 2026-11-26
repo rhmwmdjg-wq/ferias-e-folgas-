@@ -178,7 +178,8 @@ function ouvRenderLista() {
             '<span>🔒 sem identificação do autor</span>' +
           '</div>' +
           '<div style="margin-top:8px; display:flex; gap:6px; align-items:center; flex-wrap:wrap">' + sitSel +
-            '<button class="btn btn-ghost btn-sm" onclick="ouvEditarNota(\'' + r.id + '\')">📝 Nota interna</button></div>' +
+            '<button class="btn btn-ghost btn-sm" onclick="ouvEditarNota(\'' + r.id + '\')">📝 Nota interna</button>' +
+            '<button class="btn btn-ghost btn-sm" onclick="ouvCompartilharZap(\'' + r.id + '\')" title="Compartilhar com a equipe pelo WhatsApp">💬 Compartilhar</button></div>' +
           (r.nota_interna ? '<div style="margin-top:8px; font-size:.8rem; background:var(--surface); border-left:3px solid var(--primary); border-radius:var(--r-sm); padding:8px 10px; white-space:pre-wrap">' + esc(r.nota_interna) + '</div>' : '') +
         '</div>' +
       '</div></div>';
@@ -401,4 +402,79 @@ function renderOuvidoria() {
     sel.value = atual || '';
   }
   ouvCarregar();
+}
+
+// ---------- compartilhar com a equipe pelo WhatsApp ----------
+// Serve para discutir a solução em conjunto. Não há o que proteger do autor:
+// a manifestação já chega sem qualquer identificação de quem escreveu.
+function ouvZapTexto(r) {
+  const t = OUV_TIPOS[r.tipo] || { rotulo: r.tipo, icone: '•' };
+  const d = new Date(r.criado_em);
+  const linhas = [
+    '*' + t.icone + ' Ouvidoria Anônima — ' + t.rotulo.toUpperCase() + '*',
+    '*Unidade:* ' + r.unidade,
+    '*Recebida em:* ' + d.toLocaleDateString('pt-BR') + ' às ' + d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+    '*Protocolo:* ' + r.protocolo,
+    '*Situação:* ' + (OUV_SITUACOES[r.situacao] || r.situacao),
+    '',
+    '"' + r.mensagem + '"',
+    '',
+    'Manifestação anônima — não há identificação de quem enviou.',
+    'Vamos analisar juntos para definir a providência.',
+  ];
+  return linhas.join('\n');
+}
+
+function ouvCompartilharZap(id) {
+  const r = _ouvRegistros.find(function (x) { return x.id === id; });
+  if (!r) return toastMsg('Manifestação não encontrada.', 'warning');
+  const anterior = document.getElementById('modal-ouv-zap');
+  if (anterior) anterior.remove();
+  const bg = document.createElement('div');
+  bg.className = 'modal-bg open';
+  bg.id = 'modal-ouv-zap';
+  bg.innerHTML =
+    '<div class="modal" style="max-width:560px; width:100%; max-height:92vh; overflow:auto">' +
+      '<h3 style="margin-bottom:4px">💬 Compartilhar com a equipe</h3>' +
+      '<div style="font-size:.78rem; color:var(--muted); margin-bottom:14px">' +
+        'Abre o WhatsApp Web no computador, ou o aplicativo no celular, com o texto pronto. ' +
+        'Escolha o grupo da equipe na própria tela do WhatsApp.' +
+      '</div>' +
+      '<div class="field"><label>Mensagem</label>' +
+        '<textarea id="ouv-zap-msg" style="min-height:230px; line-height:1.5">' + esc(ouvZapTexto(r)) + '</textarea>' +
+      '</div>' +
+      '<div style="font-size:.7rem; color:var(--muted); margin-top:8px">' +
+        'Pode editar antes de enviar — por exemplo, tirar nomes de servidores citados, se achar melhor para a conversa.' +
+      '</div>' +
+      '<div class="modal-footer" style="display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; margin-top:14px">' +
+        '<button type="button" class="btn btn-ghost" onclick="ouvZapFechar()">Fechar</button>' +
+        '<button type="button" class="btn btn-ghost" onclick="ouvZapCopiar()">📋 Copiar</button>' +
+        '<button type="button" class="btn btn-primary" onclick="ouvZapAbrir()">💬 Abrir o WhatsApp</button>' +
+      '</div>' +
+    '</div>';
+  bg.addEventListener('mousedown', function (ev) { if (ev.target === bg) ouvZapFechar(); });
+  document.body.appendChild(bg);
+}
+
+function ouvZapFechar() {
+  const m = document.getElementById('modal-ouv-zap');
+  if (m) m.remove();
+}
+
+async function ouvZapCopiar() {
+  const t = (document.getElementById('ouv-zap-msg') || {}).value || '';
+  try { await navigator.clipboard.writeText(t); toastMsg('Mensagem copiada!', 'success', 2000); }
+  catch (e) { toastMsg('Selecione o texto e copie manualmente.', 'info', 4000); }
+}
+
+function ouvZapAbrir() {
+  const texto = ((document.getElementById('ouv-zap-msg') || {}).value || '').trim();
+  if (!texto) return toastMsg('A mensagem está vazia.', 'warning');
+  const celular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = celular
+    ? 'https://wa.me/?text=' + encodeURIComponent(texto)
+    : 'https://web.whatsapp.com/send?text=' + encodeURIComponent(texto);
+  const w = window.open(url, '_blank', 'noopener');
+  if (w) { w.opener = null; ouvZapFechar(); }
+  else toastMsg('O navegador bloqueou a janela. Libere os pop-ups deste site.', 'warning');
 }
