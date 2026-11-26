@@ -38,6 +38,7 @@ function showTab(tab) {
   if (tab === 'oficios') { carregarNovoOficio(); renderHistoricoOficios(); }
   if (tab === 'sistemas' && typeof renderSistemasParceiros === 'function') renderSistemasParceiros();
   if (tab === 'atestadorh' && typeof renderAtestadoRH === 'function') renderAtestadoRH();
+  if (tab === 'ouvidoria' && typeof renderOuvidoria === 'function') renderOuvidoria();
   if (tab === 'iagestao' && typeof renderIaGestao === 'function') renderIaGestao();
   if (tab === 'notificacoes') { carregarNovaNotificacao(); renderHistoricoNotificacoes(); }
   currentPage = 1;

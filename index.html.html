@@ -1794,9 +1794,13 @@ tr:hover td { background:rgba(77,139,255,0.04); color:var(--text); }
         <i class="fa-solid fa-envelope-circle-check"></i>
         <span class="tab-label">Enviar Atestado ao RH</span>
       </button>
-      <button class="tab-btn" onclick="showTab('presenca')" id="tab-presenca" style="margin-bottom:4px">
+      <button class="tab-btn" onclick="showTab('presenca')" id="tab-presenca">
         <i class="fa-solid fa-clipboard-user"></i>
         <span class="tab-label">Lista de Presença</span>
+      </button>
+      <button class="tab-btn" onclick="showTab('ouvidoria')" id="tab-ouvidoria" style="margin-bottom:4px">
+        <i class="fa-solid fa-comments"></i>
+        <span class="tab-label">Ouvidoria Anônima</span>
       </button>
 
       <!-- ===== Relatórios ===== -->
@@ -3527,6 +3531,73 @@ Coordenação de RH
 </div>
 
 <!-- ======================= ABA ENVIAR ATESTADO AO RH ======================= -->
+<div class="tab-panel" id="panel-ouvidoria">
+  <div class="section-title">🗳️ Ouvidoria Anônima</div>
+
+  <div class="card" style="padding:16px 18px;margin-bottom:12px">
+    <p style="margin:0 0 12px;font-size:.85rem;opacity:.85">
+      Sugestões, reclamações e denúncias enviadas pelo QR Code afixado nas unidades.
+      <strong>Nada identifica quem escreveu</strong>: o formulário não pede nome, telefone, e-mail nem login,
+      e o sistema não guarda IP, aparelho ou localização. A unidade de saúde é a única informação de contexto exigida.
+    </p>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <select id="ouv-cartaz-unidade" class="doc-ctl" style="flex:1;min-width:220px;max-width:340px"></select>
+      <button class="btn btn-primary btn-sm" onclick="ouvCartazPdf()">🖨️ Gerar cartaz com QR Code</button>
+      <button class="btn btn-ghost btn-sm" onclick="ouvAbrirFormulario()">👁️ Ver o formulário</button>
+      <button class="btn btn-ghost btn-sm" onclick="ouvCopiarLinkFormulario()">🔗 Copiar o link</button>
+      <button class="btn btn-ghost btn-sm" onclick="ouvSincronizarUnidades()" title="Envia os setores/unidades cadastrados para a lista do formulário público">🔄 Atualizar unidades do formulário</button>
+    </div>
+  </div>
+
+  <div class="card" id="ouv-chave-box" style="padding:16px 18px;margin-bottom:12px;display:none">
+    <div class="field"><label>🔑 Chave de acesso da ouvidoria</label>
+      <input type="password" id="ouv-chave" autocomplete="off" placeholder="A mesma chave de envio dos ofícios">
+    </div>
+    <div style="font-size:.72rem;color:var(--muted);margin:6px 0 10px">
+      Protege as manifestações: só quem tem a chave consegue ler. Fica salva neste aparelho.
+    </div>
+    <button class="btn btn-primary btn-sm" onclick="ouvSalvarChave()">Entrar</button>
+  </div>
+
+  <div id="ouv-resumo" style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px"></div>
+
+  <div class="card" style="padding:14px 18px;margin-bottom:12px">
+    <div class="form-row cols-3">
+      <div class="field"><label>Unidade</label><select id="ouv-f-unidade" onchange="ouvCarregar()"></select></div>
+      <div class="field"><label>Tipo</label>
+        <select id="ouv-f-tipo" onchange="ouvCarregar()">
+          <option value="">Todos os tipos</option>
+          <option value="sugestao">💡 Sugestão</option>
+          <option value="reclamacao">⚠️ Reclamação</option>
+          <option value="denuncia">🚨 Denúncia</option>
+        </select>
+      </div>
+      <div class="field"><label>Situação</label>
+        <select id="ouv-f-situacao" onchange="ouvCarregar()">
+          <option value="">Todas as situações</option>
+          <option value="nova">Recebida, aguardando análise</option>
+          <option value="em_analise">Em análise</option>
+          <option value="providencia">Providência em andamento</option>
+          <option value="concluida">Concluída</option>
+          <option value="arquivada">Arquivada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row cols-3" style="margin-top:4px">
+      <div class="field"><label>De</label><input type="date" id="ouv-f-de" onchange="ouvCarregar()"></div>
+      <div class="field"><label>Até</label><input type="date" id="ouv-f-ate" onchange="ouvCarregar()"></div>
+      <div class="field"><label>Buscar no texto</label><input type="text" id="ouv-f-busca" oninput="ouvRenderLista()" placeholder="palavra, protocolo..."></div>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+      <button class="btn btn-primary btn-sm" onclick="ouvCarregar()">🔄 Atualizar</button>
+      <button class="btn btn-ghost btn-sm" onclick="ouvLimparFiltros()">Limpar filtros</button>
+      <button class="btn btn-ghost btn-sm" onclick="ouvRelatorio()">📄 Relatório por unidade</button>
+    </div>
+  </div>
+
+  <div id="ouv-lista"></div>
+</div>
+
 <div class="tab-panel" id="panel-atestadorh">
   <div class="section-title">📧 Enviar Atestado ao RH</div>
   <div class="card" style="padding:12px 18px;max-width:760px;margin-bottom:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
@@ -7536,6 +7607,7 @@ const badgeObserver = new MutationObserver(syncBnavBadges);
 <script src="oficios-pdf.js"></script>
 <script src="sistemas.js"></script>
 <script src="atestado-rh.js"></script>
+<script src="ouvidoria.js"></script>
 <script src="ia-gestao.js"></script>
 <script src="assinatura.js"></script>
 <script>
